@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main-layout(
+          ~{::title},
+          'Quản lý Danh mục',
+          'categories',
+          ~{::#categories-content}
+      )}">
+<head>
+    <title>Danh mục — BizPOS</title>
+</head>
+<body>
+
+    <div id="categories-content">
+
+        <!-- THÔNG BÁO TOAST NỔI GÓC PHẢI -->
+        <div id="bizToast" class="biz-toast alert alert-dismissible fade show shadow-lg" role="alert" style="display: none; position: fixed; top: 24px; right: 24px; z-index: 1060; min-width: 320px;">
+            <div class="d-flex align-items-center">
+                <i id="bizToastIcon" class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                <div class="flex-grow-1">
+                    <strong id="bizToastTitle" class="d-block small fw-bold">Thông báo</strong>
+                    <span id="bizToastMessage" class="small text-secondary">Nội dung thông báo</span>
+                </div>
+                <button type="button" class="btn-close ms-2" onclick="hideToast()" aria-label="Close"></button>
+            </div>
+        </div>
+
+        <!-- 1. TOOLBAR: TIÊU ĐỀ + NÚT THÊM MỚI -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+            <div>
+                <h4 class="mb-1 fw-bold text-dark">Danh sách Danh mục</h4>
+                <p class="text-muted small mb-0">Quản lý và phân loại các nhóm sản phẩm trong cửa hàng</p>
+            </div>
+            <button type="button" class="btn btn-biz-primary d-inline-flex align-items-center gap-2" onclick="openAddModal()">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span>Thêm danh mục</span>
+            </button>
+        </div>
+
+        <!-- 2. KHỐI TÌM KIẾM (SEARCH TOOLBAR) -->
+        <div class="biz-card p-3 p-md-4 mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-9 col-sm-8">
+                    <div class="position-relative">
+                        <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                        <input type="text" id="searchInput" class="biz-input ps-5" placeholder="Tìm theo tên hoặc mô tả danh mục..." onkeydown="if(event.key === 'Enter') handleSearch()">
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-4 d-flex gap-2">
+                    <button type="button" class="btn btn-biz-primary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1" onclick="handleSearch()">
+                        <i class="bi bi-search"></i>
+                        <span>Tìm</span>
+                    </button>
+                    <button type="button" class="btn btn-biz-outline" title="Đặt lại tìm kiếm" onclick="resetSearch()">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. BẢNG DANH SÁCH DANH MỤC -->
+        <div class="biz-card mb-4 overflow-hidden position-relative">
+            <!-- Loading Overlay -->
+            <div id="tableLoading" class="position-absolute top-0 start-0 w-100 h-100 flex-column align-items-center justify-content-center bg-white bg-opacity-75 d-none" style="z-index: 10;">
+                <div class="spinner-border text-danger" role="status" style="width: 2.2rem; height: 2.2rem;">
+                    <span class="visually-hidden">Đang tải...</span>
+                </div>
+                <span class="small text-muted mt-2 fw-medium">Đang tải danh sách danh mục...</span>
+            </div>
+
+            <div class="biz-table-wrapper border-0 rounded-0">
+                <table class="biz-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;" class="text-center">STT</th>
+                            <th style="width: 220px;">Tên danh mục</th>
+                            <th>Mô tả</th>
+                            <th style="width: 180px;">Ngày tạo</th>
+                            <th class="text-center" style="width: 130px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoryTableBody">
+                        <!-- Render qua JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-5 d-none">
+                <i class="bi bi-tags display-4 text-muted d-block mb-3"></i>
+                <h6 class="fw-bold text-dark">Chưa có danh mục nào</h6>
+                <p class="text-muted small mb-3">Hãy tạo danh mục đầu tiên để bắt đầu phân loại sản phẩm.</p>
+                <button type="button" class="btn btn-biz-primary btn-sm" onclick="openAddModal()">
+                    <i class="bi bi-plus-lg me-1"></i> Thêm danh mục mới
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. THANH PHÂN TRANG (PAGINATION) -->
+        <div id="paginationContainer" class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+            <span id="paginationInfo" class="small text-muted">Hiển thị 0 - 0 trong tổng số 0 danh mục</span>
+            <ul id="paginationUl" class="pagination mb-0 gap-1">
+                <!-- Render qua JavaScript -->
+            </ul>
+        </div>
+
+        <!-- ================= MODAL: THÊM / SỬA DANH MỤC ================= -->
+        <div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header border-bottom py-3 px-4">
+                        <h5 class="modal-title fw-bold text-dark" id="categoryModalLabel">
+                            <i class="bi bi-tags-fill text-danger me-2"></i>Thêm danh mục mới
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <form id="categoryForm" onsubmit="handleSaveCategory(event)">
+                        <div class="modal-body p-4">
+                            <!-- ID ẩn cho Edit -->
+                            <input type="hidden" id="modalCategoryId">
+
+                            <!-- Tên danh mục -->
+                            <div class="mb-3">
+                                <label class="biz-label" for="modalCategoryName">Tên danh mục <span class="text-danger">*</span></label>
+                                <input type="text" id="modalCategoryName" class="biz-input" placeholder="Ví dụ: Đồ uống, Đồ ăn vặt, Bánh ngọt..." required maxlength="100">
+                                <div id="nameError" class="small text-danger mt-1" style="display: none;"></div>
+                            </div>
+
+                            <!-- Mô tả -->
+                            <div class="mb-2">
+                                <label class="biz-label" for="modalCategoryDescription">Mô tả danh mục</label>
+                                <textarea id="modalCategoryDescription" class="biz-input" rows="3" placeholder="Nhập mô tả chi tiết phân loại nhóm hàng..." maxlength="255"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50">
+                            <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Hủy</button>
+                            <button type="submit" id="btnSaveCategory" class="btn btn-biz-primary d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-check-lg"></i>
+                                <span>Lưu danh mục</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: XÁC NHẬN XÓA DANH MỤC ================= -->
+        <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-body p-4 text-center">
+                        <div class="d-inline-flex p-3 rounded-circle bg-danger bg-opacity-10 text-danger mb-3">
+                            <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-2">Xác nhận xóa?</h5>
+                        <p class="small text-muted mb-3">
+                            Bạn có chắc chắn muốn xóa danh mục <strong id="deleteCategoryName" class="text-dark">DM</strong>? Thao tác này không thể hoàn tác.
+                        </p>
+                        <input type="hidden" id="deleteCategoryId">
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" class="btn btn-biz-outline flex-grow-1" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" id="btnConfirmDelete" class="btn btn-biz-danger flex-grow-1" onclick="executeDeleteCategory()">
+                                Xóa bỏ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JAVASCRIPT XỬ LÝ QUẢN LÝ DANH MỤC (NẰM TRONG FRAGMENT ĐỂ ĐƯỢC LOAD VÀO LAYOUT) -->
+        <script>
+            // State
+            let allCategories = [];
+            let filteredCategories = [];
+            let currentPage = 0;
+            const pageSize = 10;
+            let totalPages = 0;
+
+            // Modals
+            let categoryModalInstance = null;
+            let deleteModalInstance = null;
+
+            function getCategoryModal() {
+                if (!categoryModalInstance) {
+                    const el = document.getElementById('categoryModal');
+                    if (el && window.bootstrap) categoryModalInstance = new bootstrap.Modal(el);
+                }
+                return categoryModalInstance;
+            }
+
+            function getDeleteModal() {
+                if (!deleteModalInstance) {
+                    const el = document.getElementById('deleteConfirmModal');
+                    if (el && window.bootstrap) deleteModalInstance = new bootstrap.Modal(el);
+                }
+                return deleteModalInstance;
+            }
+
+            // ================= AUTH HEADERS & CHECK =================
+            function getAuthHeaders() {
+                const token = localStorage.getItem('bizpos_token');
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                return headers;
+            }
+
+            function checkAuthError(status) {
+                if (status === 401) {
+                    showToast('Lỗi xác thực', 'Phiên làm việc đã hết hạn. Đang chuyển về trang Đăng nhập...', false);
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    return true;
+                }
+                if (status === 403) {
+                    showToast('Từ chối quyền', 'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho ADMIN)!', false);
+                    return true;
+                }
+                return false;
+            }
+
+            // ================= TOAST =================
+            function showToast(title, message, isSuccess = true) {
+                const toast = document.getElementById('bizToast');
+                const icon = document.getElementById('bizToastIcon');
+                const titleEl = document.getElementById('bizToastTitle');
+                const msgEl = document.getElementById('bizToastMessage');
+
+                if (!toast) return;
+
+                toast.className = `biz-toast alert alert-dismissible fade show shadow-lg ${isSuccess ? 'alert-success border-success' : 'alert-danger border-danger'}`;
+                icon.className = `bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-octagon-fill text-danger'} me-2 fs-5`;
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+                toast.style.display = 'block';
+
+                setTimeout(() => { hideToast(); }, 3500);
+            }
+
+            function hideToast() {
+                const toast = document.getElementById('bizToast');
+                if (toast) toast.style.display = 'none';
+            }
+
+            function formatDate(dateStr) {
+                if (!dateStr) return '—';
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+
+            // ================= 1. NẠP DANH SÁCH DANH MỤC =================
+            async function loadCategories() {
+                const loadingEl = document.getElementById('tableLoading');
+                if (loadingEl) {
+                    loadingEl.classList.remove('d-none');
+                    loadingEl.classList.add('d-flex');
+                }
+
+                try {
+                    const response = await fetch('/api/categories', {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) return;
+
+                    if (response.ok) {
+                        allCategories = await response.json();
+                        applyFilterAndRender();
+                    } else {
+                        const err = await response.json();
+                        showToast('Lỗi', err.message || 'Không thể tải danh sách danh mục!', false);
+                    }
+                } catch (err) {
+                    console.error('Fetch categories error:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (loadingEl) {
+                        loadingEl.classList.remove('d-flex');
+                        loadingEl.classList.add('d-none');
+                    }
+                }
+            }
+
+            // ================= 2. LỌC & PHÂN TRANG =================
+            function applyFilterAndRender() {
+                const searchInput = document.getElementById('searchInput');
+                const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+                if (keyword) {
+                    filteredCategories = allCategories.filter(c => 
+                        (c.name && c.name.toLowerCase().includes(keyword)) ||
+                        (c.description && c.description.toLowerCase().includes(keyword))
+                    );
+                } else {
+                    filteredCategories = [...allCategories];
+                }
+
+                totalPages = Math.ceil(filteredCategories.length / pageSize) || 1;
+                if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+
+                renderTable();
+                renderPagination();
+            }
+
+            function renderTable() {
+                const tbody = document.getElementById('categoryTableBody');
+                const emptyState = document.getElementById('emptyState');
+                const paginationContainer = document.getElementById('paginationContainer');
+
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                if (filteredCategories.length === 0) {
+                    if (emptyState) emptyState.classList.remove('d-none');
+                    if (paginationContainer) paginationContainer.classList.add('d-none');
+                    return;
+                }
+
+                if (emptyState) emptyState.classList.add('d-none');
+                if (paginationContainer) paginationContainer.classList.remove('d-none');
+
+                const startIndex = currentPage * pageSize;
+                const pageItems = filteredCategories.slice(startIndex, startIndex + pageSize);
+
+                pageItems.forEach((c, idx) => {
+                    const tr = document.createElement('tr');
+                    const safeName = (c.name || '').replace(/'/g, "\\'");
+                    tr.innerHTML = `
+                        <td class="text-center text-muted small">${startIndex + idx + 1}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="biz-badge biz-badge-primary">
+                                    <i class="bi bi-tag-fill" style="font-size: 0.7rem;"></i>
+                                </span>
+                                <span class="fw-semibold text-dark">${c.name || ''}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="text-muted small">${c.description ? c.description : '<span class="fst-italic text-secondary">Chưa có mô tả</span>'}</span>
+                        </td>
+                        <td>
+                            <span class="text-muted small">${formatDate(c.createdAt)}</span>
+                        </td>
+                        <td class="text-center">
+                            <div class="d-inline-flex gap-1">
+                                <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Chỉnh sửa" onclick="openEditModal(${c.id})">
+                                    <i class="bi bi-pencil-square text-primary"></i>
+                                </button>
+                                <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Xóa danh mục" onclick="openDeleteModal(${c.id}, '${safeName}')">
+                                    <i class="bi bi-trash3 text-danger"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            function renderPagination() {
+                const paginationUl = document.getElementById('paginationUl');
+                const infoEl = document.getElementById('paginationInfo');
+
+                if (!paginationUl || !infoEl) return;
+
+                const total = filteredCategories.length;
+                const start = total === 0 ? 0 : (currentPage * pageSize) + 1;
+                const end = Math.min((currentPage + 1) * pageSize, total);
+                infoEl.textContent = `Hiển thị ${start} - ${end} trong tổng số ${total} danh mục`;
+
+                paginationUl.innerHTML = '';
+                if (totalPages <= 1) return;
+
+                // Nút Trước
+                const prevLi = document.createElement('li');
+                prevLi.className = `page-item ${currentPage === 0 ? 'disabled' : ''}`;
+                prevLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage - 1})"><i class="bi bi-chevron-left"></i></button>`;
+                paginationUl.appendChild(prevLi);
+
+                // Các trang
+                for (let i = 0; i < totalPages; i++) {
+                    const li = document.createElement('li');
+                    li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                    li.innerHTML = `<button class="page-link" onclick="goToPage(${i})">${i + 1}</button>`;
+                    paginationUl.appendChild(li);
+                }
+
+                // Nút Sau
+                const nextLi = document.createElement('li');
+                nextLi.className = `page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}`;
+                nextLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage + 1})"><i class="bi bi-chevron-right"></i></button>`;
+                paginationUl.appendChild(nextLi);
+            }
+
+            function goToPage(page) {
+                if (page < 0 || page >= totalPages || page === currentPage) return;
+                currentPage = page;
+                renderTable();
+                renderPagination();
+            }
+
+            function handleSearch() {
+                currentPage = 0;
+                applyFilterAndRender();
+            }
+
+            function resetSearch() {
+                const input = document.getElementById('searchInput');
+                if (input) input.value = '';
+                currentPage = 0;
+                applyFilterAndRender();
+            }
+
+            // ================= 3. MODAL THÊM / SỬA =================
+            function clearModalErrors() {
+                const el = document.getElementById('nameError');
+                if (el) el.style.display = 'none';
+            }
+
+            function openAddModal() {
+                clearModalErrors();
+                const form = document.getElementById('categoryForm');
+                if (form) form.reset();
+                document.getElementById('modalCategoryId').value = '';
+                document.getElementById('categoryModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-danger me-2"></i>Thêm danh mục mới';
+                document.getElementById('btnSaveCategory').innerHTML = '<i class="bi bi-check-lg"></i><span>Thêm danh mục</span>';
+
+                const modal = getCategoryModal();
+                if (modal) modal.show();
+            }
+
+            async function openEditModal(id) {
+                clearModalErrors();
+                try {
+                    const response = await fetch(`/api/categories/${id}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) return;
+
+                    if (response.ok) {
+                        const c = await response.json();
+                        document.getElementById('modalCategoryId').value = c.id;
+                        document.getElementById('modalCategoryName').value = c.name;
+                        document.getElementById('modalCategoryDescription').value = c.description || '';
+
+                        document.getElementById('categoryModalLabel').innerHTML = '<i class="bi bi-pencil-square text-danger me-2"></i>Chỉnh sửa danh mục';
+                        document.getElementById('btnSaveCategory').innerHTML = '<i class="bi bi-check-lg"></i><span>Lưu thay đổi</span>';
+
+                        const modal = getCategoryModal();
+                        if (modal) modal.show();
+                    } else {
+                        const err = await response.json();
+                        showToast('Lỗi', err.message || 'Không thể lấy thông tin danh mục!', false);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối máy chủ!', false);
+                }
+            }
+
+            // ================= 4. LƯU DANH MỤC (POST / PUT) =================
+            async function handleSaveCategory(event) {
+                event.preventDefault();
+                clearModalErrors();
+
+                const id = document.getElementById('modalCategoryId').value;
+                const name = document.getElementById('modalCategoryName').value.trim();
+                const description = document.getElementById('modalCategoryDescription').value.trim();
+
+                if (!name) {
+                    const el = document.getElementById('nameError');
+                    if (el) { el.textContent = 'Vui lòng nhập tên danh mục!'; el.style.display = 'block'; }
+                    return;
+                }
+
+                const payload = {
+                    name: name,
+                    description: description
+                };
+
+                const isEdit = !!id;
+                const url = isEdit ? `/api/categories/${id}` : '/api/categories';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                const btnSave = document.getElementById('btnSaveCategory');
+                if (btnSave) {
+                    btnSave.disabled = true;
+                    btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
+                }
+
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (btnSave) btnSave.disabled = false;
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        const modal = getCategoryModal();
+                        if (modal) modal.hide();
+                        showToast('Thành công', isEdit ? `Đã cập nhật danh mục '${data.name}'!` : `Đã thêm danh mục '${data.name}'!`, true);
+                        loadCategories();
+                    } else {
+                        showToast('Thất bại', data.message || 'Không thể lưu danh mục!', false);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnSave) {
+                        btnSave.disabled = false;
+                        btnSave.innerHTML = `<i class="bi bi-check-lg"></i><span>${isEdit ? 'Lưu thay đổi' : 'Thêm danh mục'}</span>`;
+                    }
+                }
+            }
+
+            // ================= 5. XÓA DANH MỤC (XỬ LÝ 409 & 403 & 401) =================
+            function openDeleteModal(id, name) {
+                document.getElementById('deleteCategoryId').value = id;
+                document.getElementById('deleteCategoryName').textContent = `'${name}'`;
+                const modal = getDeleteModal();
+                if (modal) modal.show();
+            }
+
+            async function executeDeleteCategory() {
+                const id = document.getElementById('deleteCategoryId').value;
+                if (!id) return;
+
+                const btnConfirm = document.getElementById('btnConfirmDelete');
+                if (btnConfirm) {
+                    btnConfirm.disabled = true;
+                    btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                }
+
+                try {
+                    const response = await fetch(`/api/categories/${id}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        if (btnConfirm) { btnConfirm.disabled = false; btnConfirm.innerHTML = 'Xóa bỏ'; }
+                        return;
+                    }
+
+                    // Xử lý mã lỗi 409 Conflict: Danh mục đang có sản phẩm liên kết
+                    if (response.status === 409) {
+                        const err = await response.json();
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Không thể xóa (409 Conflict)', err.message || 'Danh mục này đang có sản phẩm liên kết nên không thể xóa!', false);
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Thành công', 'Đã xóa danh mục thành công!', true);
+                        loadCategories();
+                    } else {
+                        const err = await response.json();
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Lỗi xóa danh mục', err.message || 'Không thể xóa danh mục!', false);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    const modal = getDeleteModal();
+                    if (modal) modal.hide();
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnConfirm) {
+                        btnConfirm.disabled = false;
+                        btnConfirm.innerHTML = 'Xóa bỏ';
+                    }
+                }
+            }
+
+            // Gán window global
+            window.openAddModal = openAddModal;
+            window.openEditModal = openEditModal;
+            window.handleSearch = handleSearch;
+            window.resetSearch = resetSearch;
+            window.handleSaveCategory = handleSaveCategory;
+            window.openDeleteModal = openDeleteModal;
+            window.executeDeleteCategory = executeDeleteCategory;
+            window.goToPage = goToPage;
+            window.hideToast = hideToast;
+
+            // Khởi chạy khi DOM sẵn sàng
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => { loadCategories(); });
+            } else {
+                loadCategories();
+            }
+        </script>
+
+    </div>
+
+</body>
+</html>
