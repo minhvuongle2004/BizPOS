@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${appName} + ' - Chào mừng'">BizPOS</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 text-center">
+                <div class="card shadow-sm border-0 rounded-4 p-4">
+                    <div class="card-body">
+                        <div class="mb-3 text-primary">
+                            <i class="bi bi-shop-window" style="font-size: 3.5rem;"></i>
+                        </div>
+                        <h1 class="card-title fw-bold text-dark" th:text="${appName}">BizPOS</h1>
+                        <p class="text-muted fs-5 mb-4">Hệ thống quản lý bán hàng cơ bản</p>
+
+                        <div class="alert alert-success border-0 rounded-3 py-3" role="alert">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <span th:text="${message}">Khởi chạy thành công!</span>
+                        </div>
+
+                        <div class="row text-start mt-4 g-3">
+                            <div class="col-sm-6">
+                                <div class="p-3 bg-white border rounded-3 h-100">
+                                    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-stack me-2 text-primary"></i>Công nghệ sử dụng</h6>
+                                    <ul class="list-unstyled mb-0 small text-muted">
+                                        <li>• Java 17 &amp; Spring Boot 3</li>
+                                        <li>• Spring Web &amp; Thymeleaf</li>
+                                        <li>• Spring Data JPA &amp; MySQL</li>
+                                        <li>• Bootstrap 5</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-3 bg-white border rounded-3 h-100">
+                                    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-database-check me-2 text-info"></i>Kết nối Database</h6>
+                                    <div th:if="${dbConnected}" class="text-success small fw-semibold">
+                                        <i class="bi bi-check-circle-fill me-1"></i> <span th:text="${dbInfo}">Kết nối thành công!</span>
+                                    </div>
+                                    <div th:unless="${dbConnected}" class="text-danger small fw-semibold">
+                                        <i class="bi bi-x-circle-fill me-1"></i> <span th:text="${dbInfo}">Không thể kết nối!</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bảng kiểm tra 5 Repositories -->
+                        <div class="mt-4 text-start">
+                            <div class="p-3 bg-white border rounded-3">
+                                <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-table me-2 text-warning"></i>Kiểm tra Đọc/Ghi 5 Spring Data JPA Repositories</h6>
+                                <div th:if="${repoError}" class="alert alert-danger py-2 small mb-3" th:text="${repoError}"></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Thực thể (Entity / Table)</th>
+                                                <th class="text-end">Số bản ghi hiện tại</th>
+                                                <th class="text-center">Trạng thái đọc</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr th:each="entry : ${tableCounts}">
+                                                <td class="fw-medium" th:text="${entry.key}">Bảng</td>
+                                                <td class="text-end fw-bold text-primary" th:text="${entry.value}">0</td>
+                                                <td class="text-center"><span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-circle me-1"></i>Sẵn sàng</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
