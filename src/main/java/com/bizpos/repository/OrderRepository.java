@@ -14,6 +14,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     boolean existsByOrderCode(String orderCode);
 
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.customer LEFT JOIN FETCH o.items WHERE o.id = :id")
+    Optional<Order> findByIdWithDetails(@org.springframework.data.repository.query.Param("id") Long id);
+
     List<Order> findByCustomerIdOrderByOrderDateDesc(Long customerId);
 
     List<Order> findAllByOrderByOrderDateDesc();
