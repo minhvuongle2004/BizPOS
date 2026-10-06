@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main-layout(
+          ~{::title},
+          'Điểm bán hàng (POS)',
+          'pos',
+          ~{::#pos-content}
+      )}">
+<head>
+    <title>Điểm bán hàng (POS) — BizPOS</title>
+</head>
+<body>
+
+    <div id="pos-content">
+
+        <!-- THÔNG BÁO TOAST NỔI GÓC PHẢI -->
+        <div id="bizToast" class="biz-toast alert alert-dismissible fade show shadow-lg" role="alert" style="display: none; position: fixed; top: 24px; right: 24px; z-index: 1060; min-width: 320px;">
+            <div class="d-flex align-items-center">
+                <i id="bizToastIcon" class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                <div class="flex-grow-1">
+                    <strong id="bizToastTitle" class="d-block small fw-bold">Thông báo</strong>
+                    <span id="bizToastMessage" class="small text-secondary">Nội dung thông báo</span>
+                </div>
+                <button type="button" class="btn-close ms-2" onclick="hideToast()" aria-label="Close"></button>
+            </div>
+        </div>
+
+        <!-- ================= BỐ CỤC CHÍNH CỦA POS (2 CỘT) ================= -->
+        <div class="row g-4">
+
+            <!-- CỘT TRÁI: DANH MỤC, TÌM KIẾM & CATALOGUE SẢN PHẨM (8 / 12) -->
+            <div class="col-lg-7 col-xl-8">
+
+                <!-- 1. THANH TÌM KIẾM & LỌC DANH MỤC -->
+                <div class="biz-card p-3 mb-3">
+                    <div class="row g-2 align-items-center mb-3">
+                        <div class="col-12">
+                            <div class="position-relative">
+                                <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                                <input type="text" id="posSearchInput" class="biz-input ps-5" 
+                                       placeholder="Tìm theo tên hoặc mã sản phẩm... (Gõ để tìm ngay)" 
+                                       oninput="handleSearchInput()">
+                                <button type="button" id="btnClearSearch" class="btn position-absolute top-50 end-0 translate-middle-y me-2 text-muted p-1 d-none" 
+                                        onclick="clearSearch()" title="Xóa tìm kiếm">
+                                    <i class="bi bi-x-circle-fill"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Danh mục Pills (cuộn ngang) -->
+                    <div class="d-flex align-items-center gap-2 overflow-x-auto pb-1" id="categoryPillsList" style="scrollbar-width: thin;">
+                        <button type="button" class="pos-cat-pill active" data-id="" onclick="selectCategory(null, this)">
+                            <i class="bi bi-grid-fill me-1"></i>Tất cả
+                        </button>
+                        <!-- Danh mục nạp động từ /api/categories -->
+                    </div>
+                </div>
+
+                <!-- 2. GRID SẢN PHẨM CHỌN MUA -->
+                <div class="position-relative" style="min-height: 420px;">
+
+                    <!-- Loading Overlay cho Catalog -->
+                    <div id="catalogLoading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex align-items-center justify-content-center rounded-3" style="z-index: 10;">
+                        <div class="spinner-border text-danger" role="status" style="width: 2.5rem; height: 2.5rem;">
+                            <span class="visually-hidden">Đang tải sản phẩm...</span>
+                        </div>
+                    </div>
+
+                    <!-- Grid Card sản phẩm -->
+                    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-2 row-cols-xl-3 g-3" id="productGrid">
+                        <!-- Nạp động qua JS -->
+                    </div>
+
+                    <!-- Trạng thái trống khi không có sản phẩm -->
+                    <div id="catalogEmptyState" class="biz-card p-5 text-center d-none">
+                        <div class="d-inline-flex p-3 rounded-circle bg-light text-muted mb-3">
+                            <i class="bi bi-box-seam fs-1"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-1">Không tìm thấy sản phẩm nào</h6>
+                        <p class="small text-muted mb-0">Thử tìm kiếm với từ khóa khác hoặc chọn danh mục khác</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CỘT PHẢI: GIỎ HÀNG, KHÁCH HÀNG & THANH TOÁN (4 / 12) -->
+            <div class="col-lg-5 col-xl-4">
+                <div class="pos-cart-panel sticky-top" style="top: 86px;">
+
+                    <!-- Header Giỏ hàng -->
+                    <div class="p-3 border-bottom d-flex align-items-center justify-content-between bg-light bg-opacity-50">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-cart3 text-danger fs-5"></i>
+                            <h5 class="fw-bold text-dark mb-0">Giỏ hàng</h5>
+                            <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger-subtle px-2 py-1" id="cartItemBadge">
+                                0 món
+                            </span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-biz-outline py-1 px-2 text-danger border-0" id="btnClearCart" onclick="confirmClearCart()" title="Xóa tất cả sản phẩm">
+                            <i class="bi bi-trash3 me-1"></i>Xóa giỏ
+                        </button>
+                    </div>
+
+                    <!-- Danh sách các món trong giỏ (cuộn dọc) -->
+                    <div class="pos-cart-list" id="cartItemsList">
+                        <!-- Danh sách món hoặc Empty State bên dưới -->
+                        <div id="cartEmptyState" class="text-center py-5">
+                            <div class="d-inline-flex p-3 rounded-circle bg-light text-muted mb-3">
+                                <i class="bi bi-bag-x fs-2"></i>
+                            </div>
+                            <h6 class="fw-semibold text-dark mb-1">Giỏ hàng trống</h6>
+                            <p class="small text-muted mb-0">Nhấn vào sản phẩm bên trái để thêm vào đơn hàng</p>
+                        </div>
+                    </div>
+
+                    <!-- Phần Khách hàng & Ghi chú -->
+                    <div class="p-3 border-top bg-light bg-opacity-25">
+                        <!-- Chọn Khách hàng -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-dark d-flex align-items-center justify-content-between mb-1">
+                                <span><i class="bi bi-person-fill text-muted me-1"></i>Khách hàng</span>
+                                <a href="/customers" target="_blank" class="text-decoration-none small text-danger" title="Mở danh sách khách hàng">+ Thêm KH</a>
+                            </label>
+                            <select id="posCustomerSelect" class="biz-input py-2">
+                                <option value="">Khách vãng lai (Mặc định)</option>
+                                <!-- Danh sách khách hàng nạp động từ /api/customers -->
+                            </select>
+                        </div>
+
+                        <!-- Ghi chú đơn hàng -->
+                        <div>
+                            <label class="form-label small fw-semibold text-dark mb-1">
+                                <i class="bi bi-chat-left-text text-muted me-1"></i>Ghi chú đơn hàng
+                            </label>
+                            <textarea id="posOrderNote" class="biz-input py-2" rows="2" maxlength="500" placeholder="Ghi chú thêm cho đơn hàng (tùy chọn)..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Phần Tổng tiền & Nút Tạo đơn hàng -->
+                    <div class="p-3 border-top bg-white">
+                        <div class="d-flex justify-content-between align-items-center mb-1 small text-muted">
+                            <span>Tạm tính (<span id="cartTotalQuantity">0</span> sản phẩm):</span>
+                            <span class="fw-semibold text-dark" id="cartSubtotal">0 đ</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="fw-bold text-dark">Tổng thanh toán:</span>
+                            <span class="fs-4 fw-bold text-danger" id="cartTotalAmount">0 đ</span>
+                        </div>
+
+                        <!-- Nút Thanh toán -->
+                        <button type="button" id="btnCheckout" class="btn btn-biz-primary w-100 py-3 fw-bold d-flex align-items-center justify-content-center gap-2" 
+                                onclick="handleCheckout()" disabled>
+                            <i class="bi bi-check2-circle fs-5"></i>
+                            <span id="btnCheckoutText">THANH TOÁN (TẠO ĐƠN)</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= MODAL: XÁC NHẬN XÓA TẤT CẢ GIỎ HÀNG ================= -->
+        <div class="modal fade" id="clearCartModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-body p-4 text-center">
+                        <div class="d-inline-flex p-3 rounded-circle bg-danger bg-opacity-10 text-danger mb-3">
+                            <i class="bi bi-cart-x-fill fs-2"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-2">Xóa toàn bộ giỏ?</h5>
+                        <p class="small text-muted mb-3">Toàn bộ sản phẩm đang chọn trong giỏ hàng sẽ bị xóa bỏ.</p>
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" class="btn btn-biz-outline flex-grow-1" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" class="btn btn-biz-danger flex-grow-1" onclick="executeClearCart()">Xóa bỏ</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: TẠO ĐƠN HÀNG THÀNH CÔNG (RECEIPT) ================= -->
+        <div class="modal fade" id="orderSuccessModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-success bg-opacity-10 border-bottom border-success-subtle py-3 px-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark mb-0">Tạo đơn hàng thành công!</h5>
+                                <span class="small text-muted" id="successOrderDate">06/10/2026 23:30</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <!-- Thông tin đơn -->
+                        <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded-3">
+                            <div>
+                                <span class="text-muted small d-block">Mã đơn hàng</span>
+                                <strong class="fs-5 text-dark" id="successOrderCode">ORD-20261006...</strong>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-muted small d-block">Khách hàng</span>
+                                <strong class="text-dark" id="successCustomerName">Khách vãng lai</strong>
+                            </div>
+                        </div>
+
+                        <!-- Ghi chú nếu có -->
+                        <div id="successNoteBlock" class="mb-3 p-2 px-3 bg-warning bg-opacity-10 border border-warning-subtle rounded small d-none">
+                            <strong>Ghi chú:</strong> <span id="successOrderNote"></span>
+                        </div>
+
+                        <!-- Danh sách món đã mua -->
+                        <h6 class="fw-bold text-dark mb-2 small text-uppercase text-muted">Chi tiết món hàng</h6>
+                        <div class="table-responsive mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th>Sản phẩm</th>
+                                        <th class="text-center" style="width: 60px;">SL</th>
+                                        <th class="text-end" style="width: 100px;">Đơn giá</th>
+                                        <th class="text-end" style="width: 110px;">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="successOrderItemsBody">
+                                    <!-- Nạp động -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Tổng tiền thanh toán -->
+                        <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border">
+                            <span class="fw-bold text-dark">Tổng tiền thanh toán:</span>
+                            <span class="fs-4 fw-bold text-danger" id="successTotalAmount">0 đ</span>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50 justify-content-between">
+                        <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                        <button type="button" class="btn btn-biz-primary" data-bs-dismiss="modal" onclick="resetPosForNewOrder()">
+                            <i class="bi bi-plus-lg me-1"></i>Tạo đơn mới
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= JAVASCRIPT XỬ LÝ POS (NẰM TRONG FRAGMENT ĐỂ ĐƯỢC CHÈN VÀO LAYOUT) ================= -->
+        <script>
+            // --- STATE CỦA ỨNG DỤNG POS ---
+            let allCategories = [];
+            let allProducts = [];
+            let selectedCategoryId = null;
+            let searchKeyword = '';
+            let searchDebounceTimer = null;
+
+            // Giỏ hàng: [{ product: {...}, quantity: 1 }]
+            let cart = [];
+
+            // Modal instances
+            let clearCartModalInstance = null;
+            let orderSuccessModalInstance = null;
+
+            function getClearCartModal() {
+                if (!clearCartModalInstance) {
+                    const el = document.getElementById('clearCartModal');
+                    if (el && window.bootstrap) clearCartModalInstance = new bootstrap.Modal(el);
+                }
+                return clearCartModalInstance;
+            }
+
+            function getOrderSuccessModal() {
+                if (!orderSuccessModalInstance) {
+                    const el = document.getElementById('orderSuccessModal');
+                    if (el && window.bootstrap) orderSuccessModalInstance = new bootstrap.Modal(el);
+                }
+                return orderSuccessModalInstance;
+            }
+
+            // ================= 1. AUTH HEADERS & CHECK =================
+            function getAuthHeaders() {
+                const token = localStorage.getItem('bizpos_token');
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                return headers;
+            }
+
+            function checkAuthError(status) {
+                if (status === 401) {
+                    showToast('Lỗi xác thực', 'Phiên làm việc đã hết hạn. Đang chuyển về trang Đăng nhập...', false);
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    return true;
+                }
+                if (status === 403) {
+                    showToast('Từ chối quyền', 'Bạn không có quyền thực hiện thao tác này!', false);
+                    return true;
+                }
+                return false;
+            }
+
+            // ================= 2. TOAST =================
+            function showToast(title, message, isSuccess = true) {
+                const toast = document.getElementById('bizToast');
+                const icon = document.getElementById('bizToastIcon');
+                const titleEl = document.getElementById('bizToastTitle');
+                const msgEl = document.getElementById('bizToastMessage');
+
+                if (!toast) return;
+
+                toast.className = `biz-toast alert alert-dismissible fade show shadow-lg ${isSuccess ? 'alert-success border-success' : 'alert-danger border-danger'}`;
+                icon.className = `bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-octagon-fill text-danger'} me-2 fs-5`;
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+                toast.style.display = 'block';
+
+                setTimeout(() => { hideToast(); }, 3500);
+            }
+
+            function hideToast() {
+                const toast = document.getElementById('bizToast');
+                if (toast) toast.style.display = 'none';
+            }
+
+            // ================= 3. ĐỊNH DẠNG TIỀN TỆ VND =================
+            function formatVND(amount) {
+                if (amount === null || amount === undefined || isNaN(amount)) return '0 đ';
+                return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+            }
+
+            // ================= 4. NẠP DANH MỤC TỪ /api/categories =================
+            async function loadCategories() {
+                try {
+                    const response = await fetch('/api/categories', {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) return;
+
+                    if (response.ok) {
+                        allCategories = await response.json();
+                        renderCategoryPills();
+                    }
+                } catch (err) {
+                    console.error('Lỗi nạp danh mục:', err);
+                }
+            }
+
+            function renderCategoryPills() {
+                const container = document.getElementById('categoryPillsList');
+                if (!container) return;
+
+                // Giữ nút "Tất cả"
+                container.innerHTML = `
+                    <button type="button" class="pos-cat-pill ${selectedCategoryId === null ? 'active' : ''}" onclick="selectCategory(null, this)">
+                        <i class="bi bi-grid-fill me-1"></i>Tất cả
+                    </button>
+                `;
+
+                allCategories.forEach(cat => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = `pos-cat-pill ${selectedCategoryId === cat.id ? 'active' : ''}`;
+                    btn.textContent = cat.name;
+                    btn.onclick = () => selectCategory(cat.id, btn);
+                    container.appendChild(btn);
+                });
+            }
+
+            function selectCategory(catId, btnElement) {
+                selectedCategoryId = catId;
+                const allPills = document.querySelectorAll('.pos-cat-pill');
+                allPills.forEach(p => p.classList.remove('active'));
+                if (btnElement) btnElement.classList.add('active');
+
+                loadProducts();
+            }
+
+            // ================= 5. NẠP SẢN PHẨM TỪ /api/products =================
+            async function loadProducts() {
+                const loadingEl = document.getElementById('catalogLoading');
+                const grid = document.getElementById('productGrid');
+                const emptyState = document.getElementById('catalogEmptyState');
+
+                if (loadingEl) {
+                    loadingEl.classList.remove('d-none');
+                    loadingEl.classList.add('d-flex');
+                }
+
+                const params = new URLSearchParams();
+                params.append('page', 0);
+                params.append('size', 100); // Lấy danh sách đủ lớn cho quầy POS
+                if (searchKeyword) params.append('keyword', searchKeyword);
+                if (selectedCategoryId) params.append('categoryId', selectedCategoryId);
+
+                try {
+                    const response = await fetch(`/api/products?${params.toString()}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (loadingEl) { loadingEl.classList.remove('d-flex'); loadingEl.classList.add('d-none'); }
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        allProducts = data.content || [];
+                        renderProductGrid(allProducts);
+                    } else {
+                        const err = await response.json();
+                        showToast('Lỗi', err.message || 'Không thể lấy dữ liệu sản phẩm!', false);
+                    }
+                } catch (err) {
+                    console.error('Fetch products error:', err);
+                    showToast('Lỗi kết nối', 'Không thể nạp danh sách sản phẩm!', false);
+                } finally {
+                    if (loadingEl) {
+                        loadingEl.classList.remove('d-flex');
+                        loadingEl.classList.add('d-none');
+                    }
+                }
+            }
+
+            function renderProductGrid(products) {
+                const grid = document.getElementById('productGrid');
+                const emptyState = document.getElementById('catalogEmptyState');
+                if (!grid) return;
+
+                grid.innerHTML = '';
+
+                if (!products || products.length === 0) {
+                    if (emptyState) emptyState.classList.remove('d-none');
+                    return;
+                }
+
+                if (emptyState) emptyState.classList.add('d-none');
+
+                products.forEach(p => {
+                    const col = document.createElement('div');
+                    col.className = 'col';
+
+                    const catName = p.category ? p.category.name : 'Chưa phân loại';
+                    const priceFormatted = formatVND(p.price);
+
+                    col.innerHTML = `
+                        <div class="pos-product-card shadow-sm" onclick="addToCart(${p.id})">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start gap-1 mb-2">
+                                    <span class="badge bg-light text-muted border small px-2 py-1" style="font-size: 0.72rem;">
+                                        ${catName}
+                                    </span>
+                                    <span class="pos-product-code font-monospace">${p.code || ''}</span>
+                                </div>
+                                <h6 class="pos-product-title mb-2 text-dark" title="${p.name}">
+                                    ${p.name}
+                                </h6>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-light">
+                                <span class="pos-product-price">${priceFormatted}</span>
+                                <button type="button" class="btn btn-sm btn-biz-primary rounded-circle d-flex align-items-center justify-content-center p-0" 
+                                        style="width: 30px; height: 30px;" 
+                                        onclick="event.stopPropagation(); addToCart(${p.id})" title="Thêm vào giỏ">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(col);
+                });
+            }
+
+            // Tìm kiếm sản phẩm
+            function handleSearchInput() {
+                const input = document.getElementById('posSearchInput');
+                const btnClear = document.getElementById('btnClearSearch');
+                const val = input ? input.value.trim() : '';
+
+                if (btnClear) {
+                    if (val) btnClear.classList.remove('d-none');
+                    else btnClear.classList.add('d-none');
+                }
+
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(() => {
+                    searchKeyword = val;
+                    loadProducts();
+                }, 300);
+            }
+
+            function clearSearch() {
+                const input = document.getElementById('posSearchInput');
+                const btnClear = document.getElementById('btnClearSearch');
+                if (input) input.value = '';
+                if (btnClear) btnClear.classList.add('d-none');
+                searchKeyword = '';
+                loadProducts();
+            }
+
+            // ================= 6. NẠP DANH SÁCH KHÁCH HÀNG TỪ /api/customers =================
+            async function loadCustomers() {
+                try {
+                    const response = await fetch('/api/customers?page=0&size=100', {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) return;
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const customers = data.content || [];
+                        const select = document.getElementById('posCustomerSelect');
+                        if (!select) return;
+
+                        // Giữ Khách vãng lai
+                        select.innerHTML = '<option value="">Khách vãng lai (Mặc định)</option>';
+
+                        customers.forEach(c => {
+                            const opt = document.createElement('option');
+                            opt.value = c.id;
+                            const phoneStr = c.phone ? ` - ${c.phone}` : '';
+                            opt.textContent = `${c.fullName}${phoneStr}`;
+                            select.appendChild(opt);
+                        });
+                    }
+                } catch (err) {
+                    console.error('Lỗi nạp khách hàng:', err);
+                }
+            }
+
+            // ================= 7. QUẢN LÝ GIỎ HÀNG (CART LOGIC) =================
+            function addToCart(productId) {
+                const product = allProducts.find(p => p.id === productId);
+                if (!product) {
+                    showToast('Lỗi', 'Không tìm thấy thông tin sản phẩm!', false);
+                    return;
+                }
+
+                const existingItem = cart.find(item => item.product.id === productId);
+                if (existingItem) {
+                    existingItem.quantity += 1;
+                } else {
+                    cart.push({
+                        product: product,
+                        quantity: 1
+                    });
+                }
+
+                renderCart();
+            }
+
+            function updateQuantity(productId, delta) {
+                const item = cart.find(i => i.product.id === productId);
+                if (!item) return;
+
+                const newQty = item.quantity + delta;
+                if (newQty <= 0) {
+                    removeFromCart(productId);
+                } else {
+                    item.quantity = newQty;
+                    renderCart();
+                }
+            }
+
+            function setItemQuantity(productId, inputEl) {
+                const val = parseInt(inputEl.value);
+                const item = cart.find(i => i.product.id === productId);
+                if (!item) return;
+
+                if (isNaN(val) || val <= 0) {
+                    inputEl.value = item.quantity;
+                    showToast('Cảnh báo', 'Số lượng sản phẩm phải lớn hơn 0!', false);
+                    return;
+                }
+
+                item.quantity = val;
+                renderCart();
+            }
+
+            function removeFromCart(productId) {
+                cart = cart.filter(i => i.product.id !== productId);
+                renderCart();
+            }
+
+            function confirmClearCart() {
+                if (cart.length === 0) return;
+                const modal = getClearCartModal();
+                if (modal) modal.show();
+            }
+
+            function executeClearCart() {
+                cart = [];
+                renderCart();
+                const modal = getClearCartModal();
+                if (modal) modal.hide();
+                showToast('Thông báo', 'Đã xóa tất cả sản phẩm trong giỏ!', true);
+            }
+
+            function renderCart() {
+                const container = document.getElementById('cartItemsList');
+                const emptyState = document.getElementById('cartEmptyState');
+                const badge = document.getElementById('cartItemBadge');
+                const btnClear = document.getElementById('btnClearCart');
+                const subtotalEl = document.getElementById('cartSubtotal');
+                const totalAmountEl = document.getElementById('cartTotalAmount');
+                const totalQtyEl = document.getElementById('cartTotalQuantity');
+                const btnCheckout = document.getElementById('btnCheckout');
+
+                let totalQuantity = 0;
+                let totalAmount = 0;
+
+                cart.forEach(item => {
+                    totalQuantity += item.quantity;
+                    const price = Number(item.product.price) || 0;
+                    totalAmount += (price * item.quantity);
+                });
+
+                if (badge) badge.textContent = `${totalQuantity} món`;
+                if (totalQtyEl) totalQtyEl.textContent = totalQuantity;
+                if (subtotalEl) subtotalEl.textContent = formatVND(totalAmount);
+                if (totalAmountEl) totalAmountEl.textContent = formatVND(totalAmount);
+
+                if (btnCheckout) {
+                    btnCheckout.disabled = cart.length === 0;
+                }
+                if (btnClear) {
+                    btnClear.disabled = cart.length === 0;
+                }
+
+                if (cart.length === 0) {
+                    if (container) {
+                        container.innerHTML = `
+                            <div id="cartEmptyState" class="text-center py-5">
+                                <div class="d-inline-flex p-3 rounded-circle bg-light text-muted mb-3">
+                                    <i class="bi bi-bag-x fs-2"></i>
+                                </div>
+                                <h6 class="fw-semibold text-dark mb-1">Giỏ hàng trống</h6>
+                                <p class="small text-muted mb-0">Nhấn vào sản phẩm bên trái để thêm vào đơn hàng</p>
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+
+                if (container) {
+                    container.innerHTML = '';
+                    cart.forEach(item => {
+                        const p = item.product;
+                        const lineTotal = (Number(p.price) || 0) * item.quantity;
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'pos-cart-item shadow-sm';
+                        itemEl.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="flex-grow-1 pe-2">
+                                    <h6 class="fw-semibold text-dark mb-1 small text-truncate" style="max-width: 190px;" title="${p.name}">
+                                        ${p.name}
+                                    </h6>
+                                    <span class="text-muted small">${formatVND(p.price)}</span>
+                                </div>
+                                <button type="button" class="btn btn-sm text-danger p-0 border-0" onclick="removeFromCart(${p.id})" title="Xóa món này">
+                                    <i class="bi bi-x-circle fs-6"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top border-light">
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="pos-qty-btn" onclick="updateQuantity(${p.id}, -1)">
+                                        <i class="bi bi-dash"></i>
+                                    </button>
+                                    <input type="number" class="pos-qty-input" min="1" value="${item.quantity}" 
+                                           onchange="setItemQuantity(${p.id}, this)">
+                                    <button type="button" class="pos-qty-btn" onclick="updateQuantity(${p.id}, 1)">
+                                        <i class="bi bi-plus"></i>
+                                    </button>
+                                </div>
+                                <strong class="text-danger small">${formatVND(lineTotal)}</strong>
+                            </div>
+                        `;
+                        container.appendChild(itemEl);
+                    });
+                }
+            }
+
+            // ================= 8. TẠO ĐƠN HÀNG (CHECKOUT / POST /api/orders) =================
+            async function handleCheckout() {
+                if (cart.length === 0) {
+                    showToast('Giỏ hàng trống', 'Vui lòng chọn ít nhất 1 sản phẩm trước khi thanh toán!', false);
+                    return;
+                }
+
+                // Chuẩn bị payload chuẩn CreateOrderRequest
+                // Backend tự lấy giá từ DB, frontend chỉ gửi productId và quantity
+                const customerSelect = document.getElementById('posCustomerSelect');
+                const selectedCustVal = customerSelect ? customerSelect.value : '';
+                const customerId = selectedCustVal ? parseInt(selectedCustVal) : null;
+
+                const noteInput = document.getElementById('posOrderNote');
+                const note = noteInput ? noteInput.value.trim() : null;
+
+                const orderItems = cart.map(i => ({
+                    productId: i.product.id,
+                    quantity: i.quantity
+                }));
+
+                const payload = {
+                    customerId: customerId,
+                    note: note || null,
+                    items: orderItems
+                };
+
+                const btnCheckout = document.getElementById('btnCheckout');
+                const btnCheckoutText = document.getElementById('btnCheckoutText');
+                if (btnCheckout) {
+                    btnCheckout.disabled = true;
+                    if (btnCheckoutText) btnCheckoutText.textContent = 'ĐANG XỬ LÝ...';
+                }
+
+                try {
+                    const response = await fetch('/api/orders', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (btnCheckout) btnCheckout.disabled = false;
+                        if (btnCheckoutText) btnCheckoutText.textContent = 'THANH TOÁN (TẠO ĐƠN)';
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (response.status === 201 || response.ok) {
+                        // Thành công: Xóa giỏ hàng & hiển thị popup Hóa đơn
+                        showOrderSuccessModal(data);
+                        showToast('Thành công', `Đơn hàng [${data.orderCode}] đã được tạo thành công!`, true);
+
+                        // Reset giỏ và input ghi chú
+                        cart = [];
+                        renderCart();
+                        if (noteInput) noteInput.value = '';
+                        if (customerSelect) customerSelect.value = '';
+                    } else if (response.status === 400) {
+                        showToast('Lỗi dữ liệu (400)', data.message || 'Dữ liệu tạo đơn không hợp lệ!', false);
+                    } else if (response.status === 404) {
+                        showToast('Không tìm thấy (404)', data.message || 'Sản phẩm hoặc khách hàng không tồn tại!', false);
+                    } else if (response.status === 409) {
+                        showToast('Xung đột (409)', data.message || 'Xung đột khi tạo đơn hàng!', false);
+                    } else {
+                        showToast('Thất bại', data.message || 'Không thể tạo đơn hàng!', false);
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi checkout:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnCheckout) {
+                        btnCheckout.disabled = cart.length === 0;
+                        if (btnCheckoutText) btnCheckoutText.textContent = 'THANH TOÁN (TẠO ĐƠN)';
+                    }
+                }
+            }
+
+            // Hiển thị modal hóa đơn thành công
+            function showOrderSuccessModal(orderData) {
+                const codeEl = document.getElementById('successOrderCode');
+                const custEl = document.getElementById('successCustomerName');
+                const totalEl = document.getElementById('successTotalAmount');
+                const dateEl = document.getElementById('successOrderDate');
+                const noteBlock = document.getElementById('successNoteBlock');
+                const noteEl = document.getElementById('successOrderNote');
+                const tbody = document.getElementById('successOrderItemsBody');
+
+                if (codeEl) codeEl.textContent = orderData.orderCode || '—';
+                if (custEl) custEl.textContent = (orderData.customer && orderData.customer.fullName) ? orderData.customer.fullName : 'Khách vãng lai';
+                if (totalEl) totalEl.textContent = formatVND(orderData.totalAmount);
+
+                if (dateEl) {
+                    const d = orderData.orderDate ? new Date(orderData.orderDate) : new Date();
+                    dateEl.textContent = d.toLocaleString('vi-VN');
+                }
+
+                if (noteBlock && noteEl) {
+                    if (orderData.note) {
+                        noteEl.textContent = orderData.note;
+                        noteBlock.classList.remove('d-none');
+                    } else {
+                        noteBlock.classList.add('d-none');
+                    }
+                }
+
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    const items = orderData.items || [];
+                    items.forEach(it => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong class="text-dark">${it.productName || 'Sản phẩm'}</strong></td>
+                            <td class="text-center">${it.quantity}</td>
+                            <td class="text-end">${formatVND(it.unitPrice)}</td>
+                            <td class="text-end fw-semibold text-danger">${formatVND(it.lineTotal)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                const modal = getOrderSuccessModal();
+                if (modal) modal.show();
+            }
+
+            function resetPosForNewOrder() {
+                cart = [];
+                renderCart();
+                const noteInput = document.getElementById('posOrderNote');
+                const customerSelect = document.getElementById('posCustomerSelect');
+                if (noteInput) noteInput.value = '';
+                if (customerSelect) customerSelect.value = '';
+                const searchInput = document.getElementById('posSearchInput');
+                if (searchInput) searchInput.focus();
+            }
+
+            // ================= 9. CẢNH BÁO RỜI KHỎI TRANG KHI GIỎ HÀNG CÒN HÀNG =================
+            window.addEventListener('beforeunload', (e) => {
+                if (cart && cart.length > 0) {
+                    e.preventDefault();
+                    e.returnValue = 'Giỏ hàng đang có sản phẩm chưa thanh toán. Bạn có chắc chắn muốn rời khỏi trang POS?';
+                    return e.returnValue;
+                }
+            });
+
+            // Gán các hàm cần thiết vào window
+            window.addToCart = addToCart;
+            window.updateQuantity = updateQuantity;
+            window.setItemQuantity = setItemQuantity;
+            window.removeFromCart = removeFromCart;
+            window.confirmClearCart = confirmClearCart;
+            window.executeClearCart = executeClearCart;
+            window.handleCheckout = handleCheckout;
+            window.resetPosForNewOrder = resetPosForNewOrder;
+            window.selectCategory = selectCategory;
+            window.handleSearchInput = handleSearchInput;
+            window.clearSearch = clearSearch;
+            window.hideToast = hideToast;
+
+            // Khởi chạy khi tải trang
+            async function initPos() {
+                await Promise.all([
+                    loadCategories(),
+                    loadProducts(),
+                    loadCustomers()
+                ]);
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initPos);
+            } else {
+                initPos();
+            }
+        </script>
+
+    </div>
+
+</body>
+</html>

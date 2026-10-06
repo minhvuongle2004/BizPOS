@@ -536,3 +536,168 @@ h1, h2, h3, h4, h5, h6 {
     }
 }
 
+/* ==============================================================
+ * POS (POINT OF SALE) SPECIFIC STYLES
+ * ============================================================== */
+
+/* Danh mục Pills */
+.pos-cat-pill {
+    padding: 6px 16px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--biz-border);
+    background-color: var(--biz-surface);
+    color: var(--biz-text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+
+.pos-cat-pill:hover {
+    border-color: var(--biz-primary);
+    color: var(--biz-primary);
+    background-color: var(--biz-primary-light);
+}
+
+.pos-cat-pill.active {
+    background-color: var(--biz-primary);
+    border-color: var(--biz-primary);
+    color: #ffffff;
+    box-shadow: 0 2px 8px var(--biz-primary-ring);
+}
+
+/* Product Card trong POS */
+.pos-product-card {
+    background: var(--biz-surface);
+    border: 1px solid var(--biz-border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.pos-product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+    border-color: var(--biz-primary);
+}
+
+.pos-product-card:active {
+    transform: scale(0.98);
+}
+
+.pos-product-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--biz-text-heading);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.5rem;
+}
+
+.pos-product-price {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--biz-primary);
+}
+
+.pos-product-code {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--biz-text-muted);
+    letter-spacing: 0.03em;
+}
+
+/* Cart Panel bên phải */
+.pos-cart-panel {
+    background: var(--biz-surface);
+    border: 1px solid var(--biz-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pos-cart-list {
+    max-height: 380px;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.pos-cart-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.pos-cart-list::-webkit-scrollbar-track {
+    background: var(--biz-surface-subtle);
+}
+
+.pos-cart-list::-webkit-scrollbar-thumb {
+    background: var(--biz-border-focus);
+    border-radius: 3px;
+}
+
+.pos-cart-item {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--biz-border);
+    background-color: var(--biz-surface);
+    margin-bottom: 8px;
+    transition: background-color var(--transition-fast);
+}
+
+.pos-cart-item:hover {
+    background-color: var(--biz-surface-subtle);
+}
+
+/* Nút tăng/giảm số lượng */
+.pos-qty-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--biz-border);
+    background-color: var(--biz-surface);
+    color: var(--biz-text-heading);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: all var(--transition-fast);
+}
+
+.pos-qty-btn:hover {
+    background-color: var(--biz-primary);
+    border-color: var(--biz-primary);
+    color: #ffffff;
+}
+
+.pos-qty-input {
+    width: 44px;
+    height: 28px;
+    text-align: center;
+    border: 1px solid var(--biz-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    background-color: var(--biz-surface);
+    color: var(--biz-text-heading);
+    outline: none;
+}
+
+.pos-qty-input:focus {
+    border-color: var(--biz-primary);
+}
+
