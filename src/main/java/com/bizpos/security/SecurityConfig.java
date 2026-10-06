@@ -56,7 +56,7 @@ public class SecurityConfig {
                 // Phân quyền request
                 .authorizeHttpRequests(authorize -> authorize
                         // 1. Các endpoint auth (đăng ký, đăng nhập) và trang chủ công khai
-                        .requestMatchers("/api/auth/**", "/", "/home", "/css/**", "/js/**", "/images/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/login", "/", "/home", "/css/**", "/js/**", "/images/**").permitAll()
 
                         // 2. Thao tác xóa (DELETE) các tài nguyên chỉ dành cho quyền ADMIN
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")

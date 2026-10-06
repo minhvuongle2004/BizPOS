@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BizPOS — Đăng nhập &amp; Đăng ký</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+        :root {
+            --primary-red: #e11d48;
+            --primary-hover: #be123c;
+            --dark-bg: #0f1117;
+            --text-dark: #111827;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --pill-btn-bg: #b8bec5;
+            --pill-btn-hover: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #f3f4f6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        /* Khung chứa chính (Double-slider Container) */
+        .auth-card {
+            position: relative;
+            width: 1060px;
+            max-width: 100%;
+            min-height: 680px;
+            background: #ffffff;
+            border-radius: 28px;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Banner bên trái (hình ảnh + text) */
+        .banner-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            background-image: linear-gradient(180deg, rgba(10, 10, 15, 0.3) 0%, rgba(10, 10, 15, 0.85) 100%),
+                              url('/images/tech-banner.jpg');
+            background-size: cover;
+            background-position: center;
+            color: #ffffff;
+            padding: 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            z-index: 10;
+            transition: transform 0.65s cubic-bezier(0.77, 0, 0.175, 1);
+        }
+
+        /* Form bên phải */
+        .form-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            background: #ffffff;
+            padding: 40px 52px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-y: auto;
+            z-index: 5;
+            transition: transform 0.65s cubic-bezier(0.77, 0, 0.175, 1);
+        }
+
+        /* TRẠNG THÁI SIGN UP MODE (TRƯỢT HOÁN ĐỔI VỊ TRÍ) */
+        /* Khi sang màn hình Đăng ký:
+           - Banner trượt sang PHẢI (translateX(100%))
+           - Form trượt sang TRÁI (translateX(-100%))
+        */
+        .auth-card.sign-up-mode .banner-panel {
+            transform: translateX(100%);
+        }
+
+        .auth-card.sign-up-mode .form-panel {
+            transform: translateX(-100%);
+        }
+
+        /* Biểu tượng logo tròn màu trắng */
+        .brand-circle-icon {
+            width: 44px;
+            height: 44px;
+            background: #ffffff;
+            border-radius: 50%;
+            margin-bottom: 28px;
+            box-shadow: 0 4px 14px rgba(255, 255, 255, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .brand-circle-icon i {
+            color: var(--primary-red);
+            font-size: 20px;
+        }
+
+        .banner-title {
+            font-size: 2.35rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 18px;
+            color: #ffffff;
+            line-height: 1.2;
+            transition: opacity 0.3s ease;
+        }
+
+        .banner-description {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.78);
+            max-width: 420px;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Header link trên góc phải của form */
+        .top-switch-bar {
+            text-align: right;
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            margin-bottom: 12px;
+        }
+
+        .top-switch-bar a, .switch-link {
+            color: var(--text-dark);
+            text-decoration: underline;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .top-switch-bar a:hover, .switch-link:hover {
+            color: var(--primary-red);
+        }
+
+        .form-heading {
+            font-size: 1.95rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        /* Nút Social Login hình viên thuốc */
+        .btn-social {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 12px 20px;
+            border: 1px solid #d1d5db;
+            border-radius: 50px;
+            background: #ffffff;
+            color: #374151;
+            font-size: 0.92rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 12px;
+        }
+
+        .btn-social:hover {
+            border-color: #9ca3af;
+            background-color: #f9fafb;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Divider đường kẻ OR */
+        .divider-container {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 20px 0 16px 0;
+            color: #9ca3af;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .divider-container::before,
+        .divider-container::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .divider-container span {
+            padding: 0 16px;
+        }
+
+        /* Form labels & Inputs */
+        .form-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            color: #4b5563;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .form-control-custom {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 0.92rem;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background-color: #ffffff;
+        }
+
+        .form-control-custom:focus {
+            border-color: #111827;
+            box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
+        }
+
+        /* Toggle Hide / Show Password */
+        .toggle-password-btn {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.82rem;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 0;
+            user-select: none;
+        }
+
+        .toggle-password-btn:hover {
+            color: #111827;
+        }
+
+        /* Link quên mật khẩu */
+        .forgot-link-wrapper {
+            text-align: right;
+            margin-top: 6px;
+            margin-bottom: 20px;
+        }
+
+        .forgot-link {
+            font-size: 0.82rem;
+            color: var(--text-dark);
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .forgot-link:hover {
+            color: var(--primary-red);
+        }
+
+        /* Nút Submit hình viên thuốc (Pill Button) */
+        .btn-submit-pill {
+            width: 100%;
+            padding: 13px;
+            border-radius: 50px;
+            background-color: var(--pill-btn-bg);
+            color: #ffffff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .btn-submit-pill:hover,
+        .btn-submit-pill:focus {
+            background-color: var(--pill-btn-hover);
+            color: #ffffff;
+            box-shadow: 0 6px 16px rgba(30, 41, 59, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .btn-submit-pill:active {
+            transform: translateY(0);
+        }
+
+        /* Dòng chữ chuyển đổi dưới cùng */
+        .bottom-switch-text {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            margin-top: 18px;
+        }
+
+        /* Container chuyển đổi form (Fade in/out) */
+        .form-content-view {
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+
+        .form-content-view.d-none {
+            display: none !important;
+        }
+
+        /* Toast thông báo */
+        .toast-notification {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 9999;
+            min-width: 320px;
+            max-width: 420px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            display: none;
+            animation: slideInRight 0.3s ease;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .auth-card {
+                flex-direction: column;
+                min-height: auto;
+                width: 480px;
+            }
+
+            .banner-panel {
+                position: relative;
+                width: 100%;
+                height: 240px;
+                padding: 24px;
+                transform: none !important;
+            }
+
+            .banner-title {
+                font-size: 1.8rem;
+            }
+
+            .form-panel {
+                position: relative;
+                width: 100%;
+                height: auto;
+                padding: 32px 24px;
+                transform: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Thông báo Toast động -->
+    <div id="toastNotification" class="toast-notification alert alert-dismissible fade show p-3" role="alert">
+        <div class="d-flex align-items-center">
+            <i id="toastIcon" class="bi bi-info-circle-fill me-2 fs-5"></i>
+            <span id="toastMessage" class="fw-medium small">Nội dung thông báo</span>
+        </div>
+    </div>
+
+    <!-- MAIN CARD -->
+    <div class="auth-card" id="authCard">
+
+        <!-- 1. BANNER PANEL (Hình ảnh + Text) -->
+        <div class="banner-panel" id="bannerPanel">
+            <div class="brand-circle-icon">
+                <i class="bi bi-shop-window"></i>
+            </div>
+            <h1 class="banner-title" id="bannerTitle">BizPOS System</h1>
+            <p class="banner-description" id="bannerDesc">
+                Giải pháp quản lý bán hàng thông minh, tối ưu quy trình kinh doanh và vận hành cửa hàng chuyên nghiệp.
+            </p>
+        </div>
+
+        <!-- 2. FORM PANEL (Chứa cả Form Sign In và Sign Up) -->
+        <div class="form-panel">
+
+            <!-- ================= VIEW 1: SIGN IN ================= -->
+            <div id="signInView" class="form-content-view">
+                <div class="top-switch-bar">
+                    Don't have an acount? <a class="switch-link" onclick="switchToSignUp()">Sign up</a>
+                </div>
+
+                <h2 class="form-heading">Sign in</h2>
+
+                <!-- Nút Continue with Google -->
+                <button type="button" class="btn-social" onclick="handleSocialLogin('Google')">
+                    <svg width="18" height="18" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Continue with Google
+                </button>
+
+                <div class="divider-container">
+                    <span>OR</span>
+                </div>
+
+                <!-- Form đăng nhập -->
+                <form id="signInForm" onsubmit="handleSignInSubmit(event)">
+                    <div class="form-group">
+                        <label class="form-label">User name or email address</label>
+                        <input type="text" id="signInUsername" class="form-control-custom" placeholder="Nhập tên đăng nhập hoặc email" required autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Your password</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="signInPassword" class="form-control-custom" placeholder="Nhập mật khẩu" required autocomplete="current-password">
+                            <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('signInPassword', 'signInToggleText', 'signInToggleIcon')">
+                                <i id="signInToggleIcon" class="bi bi-eye-slash"></i>
+                                <span id="signInToggleText">Hide</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="forgot-link-wrapper">
+                        <a href="javascript:void(0)" class="forgot-link" onclick="handleForgotPassword()">Forget your password</a>
+                    </div>
+
+                    <button type="submit" id="btnSignInSubmit" class="btn-submit-pill">
+                        Sign in
+                    </button>
+                </form>
+
+                <div class="bottom-switch-text">
+                    Don't have an acount? <a class="switch-link" onclick="switchToSignUp()">Sign up</a>
+                </div>
+            </div>
+
+            <!-- ================= VIEW 2: SIGN UP ================= -->
+            <div id="signUpView" class="form-content-view d-none">
+                <div class="top-switch-bar">
+                    Already have an account? <a class="switch-link" onclick="switchToSignIn()">Sign in</a>
+                </div>
+
+                <h2 class="form-heading">Sign up</h2>
+
+                <!-- Nút Continue with Google -->
+                <button type="button" class="btn-social" onclick="handleSocialLogin('Google')">
+                    <svg width="18" height="18" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Continue with Google
+                </button>
+
+                <div class="divider-container">
+                    <span>OR</span>
+                </div>
+
+                <!-- Form đăng ký -->
+                <form id="signUpForm" onsubmit="handleSignUpSubmit(event)">
+                    <div class="form-group">
+                        <label class="form-label">User name</label>
+                        <input type="text" id="signUpUsername" class="form-control-custom" placeholder="Chọn tên đăng nhập (3-50 ký tự)" required autocomplete="username">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Your password</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="signUpPassword" class="form-control-custom" placeholder="Tối thiểu 6 ký tự" required autocomplete="new-password">
+                            <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('signUpPassword', 'signUpToggleText', 'signUpToggleIcon')">
+                                <i id="signUpToggleIcon" class="bi bi-eye-slash"></i>
+                                <span id="signUpToggleText">Hide</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label class="form-label">Confirm password</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="signUpConfirmPassword" class="form-control-custom" placeholder="Nhập lại mật khẩu" required autocomplete="new-password">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnSignUpSubmit" class="btn-submit-pill">
+                        Sign up
+                    </button>
+                </form>
+
+                <div class="bottom-switch-text">
+                    Already have an account? <a class="switch-link" onclick="switchToSignIn()">Sign in</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Vanilla JavaScript xử lý trượt giao diện & gọi API -->
+    <script>
+        const authCard = document.getElementById('authCard');
+        const signInView = document.getElementById('signInView');
+        const signUpView = document.getElementById('signUpView');
+        const bannerTitle = document.getElementById('bannerTitle');
+        const bannerDesc = document.getElementById('bannerDesc');
+
+        // Chuyển sang màn hình Đăng ký (Sign Up): trượt form sang trái, banner sang phải
+        function switchToSignUp() {
+            authCard.classList.add('sign-up-mode');
+            
+            // Đổi hiệu ứng nội dung form
+            signInView.style.opacity = '0';
+            setTimeout(() => {
+                signInView.classList.add('d-none');
+                signUpView.classList.remove('d-none');
+                signUpView.style.opacity = '0';
+                setTimeout(() => {
+                    signUpView.style.opacity = '1';
+                }, 50);
+            }, 250);
+
+            // Đổi text banner
+            bannerTitle.style.opacity = '0';
+            bannerDesc.style.opacity = '0';
+            setTimeout(() => {
+                bannerTitle.innerText = 'Join BizPOS';
+                bannerDesc.innerText = 'Tạo tài khoản ngay hôm nay để bắt đầu tối ưu hóa việc quản lý cửa hàng và nâng cao doanh số bán hàng.';
+                bannerTitle.style.opacity = '1';
+                bannerDesc.style.opacity = '1';
+            }, 300);
+        }
+
+        // Chuyển sang màn hình Đăng nhập (Sign In): trượt form sang phải, banner sang trái
+        function switchToSignIn() {
+            authCard.classList.remove('sign-up-mode');
+
+            // Đổi hiệu ứng nội dung form
+            signUpView.style.opacity = '0';
+            setTimeout(() => {
+                signUpView.classList.add('d-none');
+                signInView.classList.remove('d-none');
+                signInView.style.opacity = '0';
+                setTimeout(() => {
+                    signInView.style.opacity = '1';
+                }, 50);
+            }, 250);
+
+            // Đổi text banner
+            bannerTitle.style.opacity = '0';
+            bannerDesc.style.opacity = '0';
+            setTimeout(() => {
+                bannerTitle.innerText = 'BizPOS System';
+                bannerDesc.innerText = 'Giải pháp quản lý bán hàng thông minh, tối ưu quy trình kinh doanh và vận hành cửa hàng chuyên nghiệp.';
+                bannerTitle.style.opacity = '1';
+                bannerDesc.style.opacity = '1';
+            }, 300);
+        }
+
+        // Ẩn/Hiện mật khẩu
+        function togglePasswordVisibility(inputId, textId, iconId) {
+            const input = document.getElementById(inputId);
+            const text = document.getElementById(textId);
+            const icon = document.getElementById(iconId);
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                text.innerText = 'Show';
+                icon.className = 'bi bi-eye';
+            } else {
+                input.type = 'password';
+                text.innerText = 'Hide';
+                icon.className = 'bi bi-eye-slash';
+            }
+        }
+
+        // Hiển thị Toast thông báo
+        function showToast(message, isSuccess = true) {
+            const toast = document.getElementById('toastNotification');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+
+            toast.className = `toast-notification alert ${isSuccess ? 'alert-success border-success' : 'alert-danger border-danger'} fade show p-3`;
+            icon.className = `bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger'} me-2 fs-5`;
+            msg.innerText = message;
+
+            toast.style.display = 'block';
+
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 4000);
+        }
+
+        // Thông báo tính năng Google
+        function handleSocialLogin(provider) {
+            showToast(`Tính năng đăng nhập với ${provider} đang được phát triển!`, false);
+        }
+
+        function handleForgotPassword() {
+            showToast('Vui lòng liên hệ quản trị viên (ADMIN) để được cấp lại mật khẩu!', false);
+        }
+
+        // Xử lý nộp form Đăng nhập (Sign In)
+        async function handleSignInSubmit(event) {
+            event.preventDefault();
+            const btn = document.getElementById('btnSignInSubmit');
+            const username = document.getElementById('signInUsername').value.trim();
+            const password = document.getElementById('signInPassword').value;
+
+            if (!username || !password) {
+                showToast('Vui lòng điền đầy đủ tên đăng nhập và mật khẩu!', false);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = 'Signing in...';
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Lưu JWT token vào localStorage
+                    localStorage.setItem('bizpos_token', data.token);
+                    localStorage.setItem('bizpos_username', data.username);
+                    localStorage.setItem('bizpos_role', data.role);
+
+                    showToast(`Đăng nhập thành công! Chào mừng ${data.username} (${data.role})`, true);
+
+                    // Chuyển hướng sau 1.5 giây về trang chủ
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1500);
+                } else {
+                    showToast(data.message || 'Đăng nhập thất bại!', false);
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối máy chủ! Vui lòng thử lại sau.', false);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Sign in';
+            }
+        }
+
+        // Xử lý nộp form Đăng ký (Sign Up)
+        async function handleSignUpSubmit(event) {
+            event.preventDefault();
+            const btn = document.getElementById('btnSignUpSubmit');
+            const username = document.getElementById('signUpUsername').value.trim();
+            const password = document.getElementById('signUpPassword').value;
+            const confirmPassword = document.getElementById('signUpConfirmPassword').value;
+
+            if (!username || !password || !confirmPassword) {
+                showToast('Vui lòng điền đầy đủ các thông tin!', false);
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showToast('Mật khẩu xác nhận không khớp! Vui lòng nhập lại.', false);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = 'Signing up...';
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, role: 'STAFF' })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Đăng ký tài khoản '${data.username}' thành công! Vui lòng đăng nhập.`, true);
+
+                    // Điền sẵn username vào form đăng nhập và trượt về Sign In
+                    document.getElementById('signInUsername').value = data.username;
+                    document.getElementById('signInPassword').value = '';
+                    setTimeout(() => {
+                        switchToSignIn();
+                    }, 1200);
+                } else {
+                    showToast(data.message || 'Đăng ký thất bại!', false);
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối máy chủ! Vui lòng thử lại sau.', false);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Sign up';
+            }
+        }
+    </script>
+</body>
+</html>
