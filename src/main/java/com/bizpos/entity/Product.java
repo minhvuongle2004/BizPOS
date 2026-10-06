@@ -30,6 +30,7 @@ public class Product extends BaseEntity {
     @Column(name = "description", length = 500)
     private String description;
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
