@@ -83,12 +83,13 @@
                 <table class="biz-table">
                     <thead>
                         <tr>
-                            <th style="width: 130px;">Mã SP</th>
+                            <th style="width: 120px;">Mã SP</th>
                             <th>Tên sản phẩm</th>
-                            <th style="width: 180px;">Danh mục</th>
-                            <th class="text-end" style="width: 160px;">Giá bán</th>
+                            <th style="width: 160px;">Danh mục</th>
+                            <th class="text-end" style="width: 140px;">Giá bán</th>
+                            <th style="width: 150px;">Tồn kho</th>
                             <th>Mô tả</th>
-                            <th class="text-center" style="width: 130px;">Thao tác</th>
+                            <th class="text-center" style="width: 150px;">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="productTableBody">
@@ -153,15 +154,22 @@
                                     <div id="priceError" class="small text-danger mt-1" style="display: none;"></div>
                                 </div>
 
-                                <!-- Danh mục -->
+                                <!-- Số lượng tồn kho -->
                                 <div class="col-md-6">
-                                    <label class="biz-label" for="modalProductCategory">Danh mục <span class="text-danger">*</span></label>
-                                    <select id="modalProductCategory" class="biz-input" required>
-                                        <option value="">-- Chọn danh mục --</option>
-                                        <!-- Options load động từ /api/categories -->
-                                    </select>
-                                    <div id="categoryError" class="small text-danger mt-1" style="display: none;"></div>
+                                    <label class="biz-label" for="modalProductStock">Số lượng tồn kho <span class="text-danger">*</span></label>
+                                    <input type="number" id="modalProductStock" class="biz-input" placeholder="Ví dụ: 50" required min="0" step="1" value="0">
+                                    <div id="stockError" class="small text-danger mt-1" style="display: none;"></div>
                                 </div>
+                            </div>
+
+                            <!-- Danh mục -->
+                            <div class="mb-3">
+                                <label class="biz-label" for="modalProductCategory">Danh mục <span class="text-danger">*</span></label>
+                                <select id="modalProductCategory" class="biz-input" required>
+                                    <option value="">-- Chọn danh mục --</option>
+                                    <!-- Options load động từ /api/categories -->
+                                </select>
+                                <div id="categoryError" class="small text-danger mt-1" style="display: none;"></div>
                             </div>
 
                             <!-- Mô tả -->
@@ -176,6 +184,42 @@
                             <button type="submit" id="btnSaveProduct" class="btn btn-biz-primary d-inline-flex align-items-center gap-2">
                                 <i class="bi bi-check-lg"></i>
                                 <span>Lưu sản phẩm</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: CẬP NHẬT TỒN KHO THỦ CÔNG ================= -->
+        <div class="modal fade" id="stockModal" tabindex="-1" aria-labelledby="stockModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header border-bottom py-3 px-4">
+                        <h5 class="modal-title fw-bold text-dark" id="stockModalLabel">
+                            <i class="bi bi-boxes text-success me-2"></i>Cập nhật tồn kho
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <form id="stockForm" onsubmit="handleSaveStock(event)">
+                        <div class="modal-body p-4">
+                            <input type="hidden" id="stockProductId">
+                            <div class="mb-3">
+                                <label class="biz-label mb-1">Sản phẩm</label>
+                                <div class="fw-semibold text-dark text-truncate" id="stockProductName">Tên sản phẩm</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="biz-label" for="stockInputQuantity">Số lượng tồn mới <span class="text-danger">*</span></label>
+                                <input type="number" id="stockInputQuantity" class="biz-input" required min="0" step="1" placeholder="Nhập số lượng (>= 0)">
+                                <div id="stockModalError" class="small text-danger mt-1" style="display: none;"></div>
+                                <div class="form-text small text-muted mt-1">Số lượng tồn kho phải là số nguyên &ge; 0.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50">
+                            <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Hủy</button>
+                            <button type="submit" id="btnSaveStock" class="btn btn-biz-primary d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-check-lg"></i>
+                                <span>Cập nhật</span>
                             </button>
                         </div>
                     </form>
@@ -218,6 +262,7 @@
 
             // Tham chiếu Bootstrap Modals
             let productModalInstance = null;
+            let stockModalInstance = null;
             let deleteModalInstance = null;
 
             // Khởi tạo các Modal an toàn
@@ -229,6 +274,16 @@
                     }
                 }
                 return productModalInstance;
+            }
+
+            function getStockModal() {
+                if (!stockModalInstance) {
+                    const el = document.getElementById('stockModal');
+                    if (el && window.bootstrap) {
+                        stockModalInstance = new bootstrap.Modal(el);
+                    }
+                }
+                return stockModalInstance;
             }
 
             function getDeleteModal() {
@@ -353,9 +408,11 @@
                         </td>
                         <td><span class="biz-skeleton biz-skeleton-badge" style="width: 90px; height: 22px;"></span></td>
                         <td class="text-end"><span class="biz-skeleton biz-skeleton-text" style="width: 85px;"></span></td>
+                        <td><span class="biz-skeleton biz-skeleton-badge" style="width: 95px; height: 22px;"></span></td>
                         <td><span class="biz-skeleton biz-skeleton-text" style="width: 140px;"></span></td>
                         <td class="text-center">
                             <div class="d-inline-flex gap-1">
+                                <span class="biz-skeleton biz-skeleton-btn"></span>
                                 <span class="biz-skeleton biz-skeleton-btn"></span>
                                 <span class="biz-skeleton biz-skeleton-btn"></span>
                             </div>
@@ -425,6 +482,17 @@
                             items.forEach(p => {
                                 const tr = document.createElement('tr');
                                 const safeName = (p.name || '').replace(/'/g, "\\'");
+                                const stock = (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0;
+
+                                let stockBadgeHtml = '';
+                                if (stock <= 0) {
+                                    stockBadgeHtml = `<span class="biz-badge biz-badge-danger"><i class="bi bi-x-circle-fill me-1"></i>Hết hàng (0)</span>`;
+                                } else if (stock <= 5) {
+                                    stockBadgeHtml = `<span class="biz-badge biz-badge-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>Sắp hết (${stock})</span>`;
+                                } else {
+                                    stockBadgeHtml = `<span class="biz-badge biz-badge-success"><i class="bi bi-check-circle-fill me-1"></i>Còn hàng (${stock})</span>`;
+                                }
+
                                 tr.innerHTML = `
                                     <td>
                                         <span class="badge bg-light text-dark border fw-medium" style="font-size: 0.82rem;">${p.code || ''}</span>
@@ -441,10 +509,16 @@
                                         <span class="fw-bold" style="color: var(--biz-primary);">${formatVND(p.price)}</span>
                                     </td>
                                     <td>
+                                        ${stockBadgeHtml}
+                                    </td>
+                                    <td>
                                         <span class="text-muted small">${p.description ? p.description : '—'}</span>
                                     </td>
                                     <td class="text-center">
                                         <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Cập nhật tồn kho" onclick="openStockModal(${p.id}, '${safeName}', ${stock})">
+                                                <i class="bi bi-boxes text-success"></i>
+                                            </button>
                                             <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Chỉnh sửa" onclick="openEditModal(${p.id})">
                                                 <i class="bi bi-pencil-square text-primary"></i>
                                             </button>
@@ -540,10 +614,12 @@
                 const ce = document.getElementById('codeError');
                 const ne = document.getElementById('nameError');
                 const pe = document.getElementById('priceError');
+                const se = document.getElementById('stockError');
                 const cfe = document.getElementById('categoryError');
                 if (ce) ce.style.display = 'none';
                 if (ne) ne.style.display = 'none';
                 if (pe) pe.style.display = 'none';
+                if (se) se.style.display = 'none';
                 if (cfe) cfe.style.display = 'none';
             }
 
@@ -552,6 +628,7 @@
                 const form = document.getElementById('productForm');
                 if (form) form.reset();
                 document.getElementById('modalProductId').value = '';
+                document.getElementById('modalProductStock').value = '0';
                 document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-danger me-2"></i>Thêm sản phẩm mới';
                 document.getElementById('btnSaveProduct').innerHTML = '<i class="bi bi-check-lg"></i><span>Thêm sản phẩm</span>';
                 
@@ -574,6 +651,7 @@
                         document.getElementById('modalProductCode').value = p.code;
                         document.getElementById('modalProductName').value = p.name;
                         document.getElementById('modalProductPrice').value = p.price;
+                        document.getElementById('modalProductStock').value = (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0;
                         document.getElementById('modalProductCategory').value = p.category ? p.category.id : '';
                         document.getElementById('modalProductDescription').value = p.description || '';
 
@@ -601,6 +679,7 @@
                 const code = document.getElementById('modalProductCode').value.trim();
                 const name = document.getElementById('modalProductName').value.trim();
                 const price = document.getElementById('modalProductPrice').value;
+                const stock = document.getElementById('modalProductStock').value;
                 const categoryId = document.getElementById('modalProductCategory').value;
                 const description = document.getElementById('modalProductDescription').value.trim();
 
@@ -621,6 +700,11 @@
                     if (el) { el.textContent = 'Giá bán phải lớn hơn 0!'; el.style.display = 'block'; }
                     hasError = true;
                 }
+                if (stock === '' || isNaN(parseInt(stock)) || parseInt(stock) < 0) {
+                    const el = document.getElementById('stockError');
+                    if (el) { el.textContent = 'Số lượng tồn kho phải là số nguyên >= 0!'; el.style.display = 'block'; }
+                    hasError = true;
+                }
                 if (!categoryId) {
                     const el = document.getElementById('categoryError');
                     if (el) { el.textContent = 'Vui lòng chọn danh mục cho sản phẩm!'; el.style.display = 'block'; }
@@ -633,6 +717,7 @@
                     code: code,
                     name: name,
                     price: parseFloat(price),
+                    stockQuantity: parseInt(stock),
                     categoryId: parseInt(categoryId),
                     description: description
                 };
@@ -666,9 +751,14 @@
                         if (modal) modal.hide();
                         showToast('Thành công', isEdit ? `Đã cập nhật sản phẩm '${data.name}'!` : `Đã thêm sản phẩm '${data.name}'!`, true);
                         loadProducts();
+                    } else if (response.status === 400) {
+                        showToast('Lỗi dữ liệu (400)', data.message || 'Dữ liệu sản phẩm không hợp lệ!', false);
+                    } else if (response.status === 404) {
+                        showToast('Không tìm thấy (404)', data.message || 'Sản phẩm hoặc danh mục không tồn tại!', false);
+                    } else if (response.status === 409) {
+                        showToast('Xung đột (409)', data.message || 'Mã sản phẩm đã tồn tại!', false);
                     } else {
-                        // Xử lý lỗi validation hoặc lỗi trùng mã
-                        showToast('Thất bại', data.message || 'Không thể lưu sản phẩm. Vui lòng kiểm tra lại thông tin!', false);
+                        showToast('Lỗi máy chủ (500)', data.message || 'Không thể lưu sản phẩm. Vui lòng thử lại!', false);
                     }
                 } catch (err) {
                     console.error(err);
@@ -681,7 +771,85 @@
                 }
             }
 
-            // ================= 7. XÓA SẢN PHẨM (XỬ LÝ 409 & 403 & 401) =================
+            // ================= 7. CẬP NHẬT TỒN KHO THỦ CÔNG (PATCH /api/products/{id}/stock) =================
+            function openStockModal(id, name, currentStock) {
+                const stockErr = document.getElementById('stockModalError');
+                if (stockErr) stockErr.style.display = 'none';
+
+                document.getElementById('stockProductId').value = id;
+                document.getElementById('stockProductName').textContent = name;
+                document.getElementById('stockInputQuantity').value = (currentStock !== null && currentStock !== undefined) ? currentStock : 0;
+
+                const modal = getStockModal();
+                if (modal) modal.show();
+            }
+
+            async function handleSaveStock(event) {
+                event.preventDefault();
+                const stockErr = document.getElementById('stockModalError');
+                if (stockErr) stockErr.style.display = 'none';
+
+                const id = document.getElementById('stockProductId').value;
+                const qtyVal = document.getElementById('stockInputQuantity').value.trim();
+                const qty = parseInt(qtyVal);
+
+                if (qtyVal === '' || isNaN(qty) || qty < 0) {
+                    if (stockErr) {
+                        stockErr.textContent = 'Số lượng tồn kho phải là số nguyên >= 0!';
+                        stockErr.style.display = 'block';
+                    }
+                    return;
+                }
+
+                const btnSave = document.getElementById('btnSaveStock');
+                if (btnSave) {
+                    btnSave.disabled = true;
+                    btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...';
+                }
+
+                try {
+                    const response = await fetch(`/api/products/${id}/stock?quantity=${qty}`, {
+                        method: 'PATCH',
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (btnSave) btnSave.disabled = false;
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        const modal = getStockModal();
+                        if (modal) modal.hide();
+                        showToast('Thành công', `Đã cập nhật tồn kho sản phẩm "${data.name}" thành ${data.stockQuantity}!`, true);
+                        loadProducts();
+                    } else if (response.status === 400) {
+                        if (stockErr) {
+                            stockErr.textContent = data.message || 'Số lượng tồn kho không hợp lệ!';
+                            stockErr.style.display = 'block';
+                        }
+                        showToast('Lỗi (400)', data.message || 'Dữ liệu không hợp lệ!', false);
+                    } else if (response.status === 404) {
+                        showToast('Không tìm thấy (404)', data.message || 'Sản phẩm không tồn tại!', false);
+                    } else if (response.status === 409) {
+                        showToast('Xung đột (409)', data.message || 'Dữ liệu tồn kho bị xung đột!', false);
+                    } else {
+                        showToast('Lỗi máy chủ (500)', data.message || 'Không thể cập nhật tồn kho!', false);
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi cập nhật tồn kho:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnSave) {
+                        btnSave.disabled = false;
+                        btnSave.innerHTML = '<i class="bi bi-check-lg"></i><span>Cập nhật</span>';
+                    }
+                }
+            }
+
+            // ================= 8. XÓA SẢN PHẨM (XỬ LÝ 409 & 403 & 401) =================
             function openDeleteModal(id, name) {
                 document.getElementById('deleteProductId').value = id;
                 document.getElementById('deleteProductName').textContent = `'${name}'`;
@@ -730,6 +898,11 @@
                             currentPage--;
                         }
                         loadProducts();
+                    } else if (response.status === 404) {
+                        const err = await response.json();
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Không tìm thấy (404)', err.message || 'Sản phẩm không tồn tại!', false);
                     } else {
                         const err = await response.json();
                         const modal = getDeleteModal();
@@ -752,6 +925,8 @@
             // Gán hàm vào window để gọi an toàn từ HTML onclick
             window.openAddModal = openAddModal;
             window.openEditModal = openEditModal;
+            window.openStockModal = openStockModal;
+            window.handleSaveStock = handleSaveStock;
             window.handleSearch = handleSearch;
             window.handleFilterCategory = handleFilterCategory;
             window.resetFilters = resetFilters;

@@ -718,6 +718,27 @@ h1, h2, h3, h4, h5, h6 {
     color: #ffffff;
 }
 
+.pos-qty-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: var(--biz-surface-subtle);
+    border-color: var(--biz-border);
+    color: var(--biz-text-disabled);
+    pointer-events: none;
+}
+
+.pos-product-card.out-of-stock {
+    opacity: 0.65;
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+.pos-product-card.out-of-stock:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: #cbd5e1;
+}
+
 .pos-qty-input {
     width: 44px;
     height: 28px;

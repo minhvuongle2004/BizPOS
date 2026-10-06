@@ -468,15 +468,43 @@
 
                     const catName = p.category ? p.category.name : 'Chưa phân loại';
                     const priceFormatted = formatVND(p.price);
+                    const stock = (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0;
+                    const isOutOfStock = stock <= 0;
+                    const isLowStock = stock > 0 && stock <= 5;
+
+                    let stockBadgeHtml = '';
+                    if (isOutOfStock) {
+                        stockBadgeHtml = `<span class="biz-badge biz-badge-danger" style="font-size: 0.72rem; padding: 2px 7px;"><i class="bi bi-x-circle-fill me-1"></i>Hết hàng (0)</span>`;
+                    } else if (isLowStock) {
+                        stockBadgeHtml = `<span class="biz-badge biz-badge-warning" style="font-size: 0.72rem; padding: 2px 7px;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Sắp hết (${stock})</span>`;
+                    } else {
+                        stockBadgeHtml = `<span class="biz-badge biz-badge-success" style="font-size: 0.72rem; padding: 2px 7px;"><i class="bi bi-check-circle-fill me-1"></i>Kho: ${stock}</span>`;
+                    }
+
+                    const cardClass = isOutOfStock ? 'pos-product-card out-of-stock shadow-sm' : 'pos-product-card shadow-sm';
+                    const actionButtonHtml = isOutOfStock
+                        ? `<button type="button" class="btn btn-sm btn-biz-outline rounded-circle d-flex align-items-center justify-content-center p-0" 
+                                   style="width: 30px; height: 30px; opacity: 0.5;" 
+                                   title="Hết hàng" disabled>
+                               <i class="bi bi-slash-circle"></i>
+                           </button>`
+                        : `<button type="button" class="btn btn-sm btn-biz-primary rounded-circle d-flex align-items-center justify-content-center p-0" 
+                                   style="width: 30px; height: 30px;" 
+                                   onclick="event.stopPropagation(); addToCart(${p.id})" title="Thêm vào giỏ">
+                               <i class="bi bi-plus-lg"></i>
+                           </button>`;
 
                     col.innerHTML = `
-                        <div class="pos-product-card shadow-sm" onclick="addToCart(${p.id})">
+                        <div class="${cardClass}" onclick="addToCart(${p.id})">
                             <div>
                                 <div class="d-flex justify-content-between align-items-start gap-1 mb-2">
                                     <span class="badge bg-light text-muted border small px-2 py-1" style="font-size: 0.72rem;">
                                         ${catName}
                                     </span>
-                                    <span class="pos-product-code font-monospace">${p.code || ''}</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        ${stockBadgeHtml}
+                                        <span class="pos-product-code font-monospace">${p.code || ''}</span>
+                                    </div>
                                 </div>
                                 <h6 class="pos-product-title mb-2 text-dark" title="${p.name}">
                                     ${p.name}
@@ -484,11 +512,7 @@
                             </div>
                             <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-light">
                                 <span class="pos-product-price">${priceFormatted}</span>
-                                <button type="button" class="btn btn-sm btn-biz-primary rounded-circle d-flex align-items-center justify-content-center p-0" 
-                                        style="width: 30px; height: 30px;" 
-                                        onclick="event.stopPropagation(); addToCart(${p.id})" title="Thêm vào giỏ">
-                                    <i class="bi bi-plus-lg"></i>
-                                </button>
+                                ${actionButtonHtml}
                             </div>
                         </div>
                     `;
@@ -562,14 +586,28 @@
                     return;
                 }
 
+                const stock = (product.stockQuantity !== null && product.stockQuantity !== undefined) ? product.stockQuantity : 0;
+                if (stock <= 0) {
+                    showToast('Hết hàng', `Sản phẩm "${product.name}" đã hết hàng trong kho! Không thể thêm vào giỏ.`, false);
+                    return;
+                }
+
                 const existingItem = cart.find(item => item.product.id === productId);
                 if (existingItem) {
+                    if (existingItem.quantity + 1 > stock) {
+                        showToast('Không đủ tồn kho', `Không thể thêm quá số lượng tồn kho hiện có (${stock}) của "${product.name}"!`, false);
+                        return;
+                    }
                     existingItem.quantity += 1;
                 } else {
                     cart.push({
                         product: product,
                         quantity: 1
                     });
+                }
+
+                if (stock <= 5) {
+                    showToast('Cảnh báo tồn kho', `Sản phẩm "${product.name}" sắp hết hàng (chỉ còn ${stock} món trong kho)!`, true);
                 }
 
                 renderCart();
@@ -579,9 +617,12 @@
                 const item = cart.find(i => i.product.id === productId);
                 if (!item) return;
 
+                const stock = (item.product.stockQuantity !== null && item.product.stockQuantity !== undefined) ? item.product.stockQuantity : 0;
                 const newQty = item.quantity + delta;
                 if (newQty <= 0) {
                     removeFromCart(productId);
+                } else if (newQty > stock) {
+                    showToast('Không đủ tồn kho', `Không thể tăng số lượng vượt quá tồn kho hiện có (${stock}) của "${item.product.name}"!`, false);
                 } else {
                     item.quantity = newQty;
                     renderCart();
@@ -593,9 +634,19 @@
                 const item = cart.find(i => i.product.id === productId);
                 if (!item) return;
 
+                const stock = (item.product.stockQuantity !== null && item.product.stockQuantity !== undefined) ? item.product.stockQuantity : 0;
+
                 if (isNaN(val) || val <= 0) {
                     inputEl.value = item.quantity;
                     showToast('Cảnh báo', 'Số lượng sản phẩm phải lớn hơn 0!', false);
+                    return;
+                }
+
+                if (val > stock) {
+                    inputEl.value = stock;
+                    item.quantity = stock;
+                    showToast('Không đủ tồn kho', `Đã tự động điều chỉnh về số lượng tồn tối đa (${stock}) của "${item.product.name}"!`, false);
+                    renderCart();
                     return;
                 }
 
@@ -672,6 +723,7 @@
                     container.innerHTML = '';
                     cart.forEach(item => {
                         const p = item.product;
+                        const stock = (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0;
                         const lineTotal = (Number(p.price) || 0) * item.quantity;
                         const itemEl = document.createElement('div');
                         itemEl.className = 'pos-cart-item shadow-sm';
@@ -681,7 +733,11 @@
                                     <h6 class="fw-semibold text-dark mb-1 small text-truncate" style="max-width: 190px;" title="${p.name}">
                                         ${p.name}
                                     </h6>
-                                    <span class="text-muted small">${formatVND(p.price)}</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span class="text-muted small">${formatVND(p.price)}</span>
+                                        <span class="text-muted small">&bull;</span>
+                                        <span class="small ${stock <= 5 ? 'text-warning fw-bold' : 'text-muted'}">Kho: ${stock}</span>
+                                    </div>
                                 </div>
                                 <button type="button" class="btn btn-sm text-danger p-0 border-0" onclick="removeFromCart(${p.id})" title="Xóa món này">
                                     <i class="bi bi-x-circle fs-6"></i>
@@ -692,9 +748,9 @@
                                     <button type="button" class="pos-qty-btn" onclick="updateQuantity(${p.id}, -1)">
                                         <i class="bi bi-dash"></i>
                                     </button>
-                                    <input type="number" class="pos-qty-input" min="1" value="${item.quantity}" 
+                                    <input type="number" class="pos-qty-input" min="1" max="${stock}" value="${item.quantity}" 
                                            onchange="setItemQuantity(${p.id}, this)">
-                                    <button type="button" class="pos-qty-btn" onclick="updateQuantity(${p.id}, 1)">
+                                    <button type="button" class="pos-qty-btn" ${item.quantity >= stock ? 'disabled title="Đã đạt số lượng tồn tối đa"' : ''} onclick="updateQuantity(${p.id}, 1)">
                                         <i class="bi bi-plus"></i>
                                     </button>
                                 </div>
@@ -765,14 +821,20 @@
                         renderCart();
                         if (noteInput) noteInput.value = '';
                         if (customerSelect) customerSelect.value = '';
+
+                        // Cập nhật lại tồn kho ngay lập tức trên POS
+                        await loadProducts();
                     } else if (response.status === 400) {
-                        showToast('Lỗi dữ liệu (400)', data.message || 'Dữ liệu tạo đơn không hợp lệ!', false);
+                        showToast('Lỗi tồn kho (400)', data.message || 'Số lượng trong kho không đủ để thực hiện đơn hàng!', false);
+                        // Tải lại để cập nhật số tồn thực tế
+                        await loadProducts();
                     } else if (response.status === 404) {
                         showToast('Không tìm thấy (404)', data.message || 'Sản phẩm hoặc khách hàng không tồn tại!', false);
                     } else if (response.status === 409) {
                         showToast('Xung đột (409)', data.message || 'Xung đột khi tạo đơn hàng!', false);
+                        await loadProducts();
                     } else {
-                        showToast('Thất bại', data.message || 'Không thể tạo đơn hàng!', false);
+                        showToast('Lỗi máy chủ (500)', data.message || 'Không thể tạo đơn hàng!', false);
                     }
                 } catch (err) {
                     console.error('Lỗi khi checkout:', err);
@@ -832,7 +894,7 @@
                 if (modal) modal.show();
             }
 
-            function resetPosForNewOrder() {
+            async function resetPosForNewOrder() {
                 cart = [];
                 renderCart();
                 const noteInput = document.getElementById('posOrderNote');
@@ -841,6 +903,7 @@
                 if (customerSelect) customerSelect.value = '';
                 const searchInput = document.getElementById('posSearchInput');
                 if (searchInput) searchInput.focus();
+                await loadProducts();
             }
 
             // ================= 9. CẢNH BÁO RỜI KHỎI TRANG KHI GIỎ HÀNG CÒN HÀNG =================
