@@ -1,0 +1,289 @@
+/**
+ * ==============================================================
+ * BIZPOS - UNIFIED DESIGN SYSTEM & CORE TOKENS
+ * Định hình phong cách thiết kế nhất quán cho toàn bộ ứng dụng BizPOS
+ * Tone màu: Slate & Crimson Ruby (Hiện đại, tinh tế, chuẩn POS chuyên nghiệp)
+ * ==============================================================
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    /* --- Bảng màu chủ đạo (Brand Palette) --- */
+    --biz-primary: #e11d48;         /* Đỏ Crimson Ruby */
+    --biz-primary-hover: #be123c;   /* Đậm hơn khi hover */
+    --biz-primary-light: #ffe4e6;   /* Nền phụ, badge */
+    --biz-primary-ring: rgba(225, 29, 72, 0.18);
+
+    /* --- Bảng màu trung tính (Neutrals - Slate) --- */
+    --biz-bg: #f8fafc;              /* Nền app Slate 50 */
+    --biz-surface: #ffffff;         /* Nền card, modal, panel */
+    --biz-surface-subtle: #f1f5f9;  /* Nền bảng header, input disabled */
+    
+    --biz-text-heading: #0f172a;    /* Slate 900 - Tiêu đề chính */
+    --biz-text-body: #334155;       /* Slate 700 - Chữ văn bản */
+    --biz-text-muted: #64748b;      /* Slate 500 - Nhãn, mô tả phụ */
+    --biz-text-disabled: #94a3b8;   /* Slate 400 */
+
+    --biz-border: #e2e8f0;          /* Slate 200 - Viền mảnh tinh tế */
+    --biz-border-focus: #cbd5e1;    /* Slate 300 */
+
+    /* --- Màu trạng thái ngữ nghĩa (Semantic Status) --- */
+    --biz-success: #10b981;
+    --biz-success-bg: #ecfdf5;
+    --biz-success-border: #a7f3d0;
+
+    --biz-warning: #f59e0b;
+    --biz-warning-bg: #fffbeb;
+    --biz-warning-border: #fde68a;
+
+    --biz-danger: #ef4444;
+    --biz-danger-bg: #fef2f2;
+    --biz-danger-border: #fecaca;
+
+    --biz-info: #0284c7;
+    --biz-info-bg: #f0f9ff;
+    --biz-info-border: #bae6fd;
+
+    /* --- Độ bo góc nhất quán (Border Radii) --- */
+    --radius-sm: 6px;
+    --radius-md: 10px;              /* Chuẩn cho Button, Input */
+    --radius-lg: 16px;              /* Chuẩn cho Card, Table wrapper */
+    --radius-xl: 24px;              /* Chuẩn cho Modal, Auth Card */
+    --radius-full: 9999px;          /* Pill Buttons, Badges */
+
+    /* --- Độ nổi bóng đổ (Shadows) --- */
+    --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-hover: 0 10px 20px -5px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+
+    /* --- Hiệu ứng chuyển động (Transitions) --- */
+    --transition-fast: 0.15s ease-in-out;
+    --transition-normal: 0.25s ease-in-out;
+}
+
+/* Base Reset & Typography */
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--biz-bg);
+    color: var(--biz-text-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--biz-text-heading);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+/* Cards & Surfaces */
+.biz-card {
+    background: var(--biz-surface);
+    border: 1px solid var(--biz-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+
+.biz-card:hover {
+    box-shadow: var(--shadow-hover);
+}
+
+/* Buttons */
+.btn-biz-primary {
+    background-color: var(--biz-primary);
+    border: 1px solid var(--biz-primary);
+    color: #ffffff;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    padding: 10px 18px;
+    font-size: 0.92rem;
+    transition: all var(--transition-fast);
+}
+
+.btn-biz-primary:hover, .btn-biz-primary:focus {
+    background-color: var(--biz-primary-hover);
+    border-color: var(--biz-primary-hover);
+    color: #ffffff;
+    box-shadow: 0 4px 12px var(--biz-primary-ring);
+    transform: translateY(-1px);
+}
+
+.btn-biz-primary:active {
+    transform: translateY(0);
+}
+
+.btn-biz-outline {
+    background-color: transparent;
+    border: 1px solid var(--biz-border);
+    color: var(--biz-text-body);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    padding: 10px 18px;
+    font-size: 0.92rem;
+    transition: all var(--transition-fast);
+}
+
+.btn-biz-outline:hover {
+    background-color: var(--biz-surface-subtle);
+    border-color: var(--biz-border-focus);
+    color: var(--biz-text-heading);
+}
+
+.btn-biz-danger {
+    background-color: var(--biz-danger-bg);
+    border: 1px solid var(--biz-danger-border);
+    color: var(--biz-danger);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    padding: 8px 16px;
+    transition: all var(--transition-fast);
+}
+
+.btn-biz-danger:hover {
+    background-color: var(--biz-danger);
+    color: #ffffff;
+}
+
+/* Forms & Inputs */
+.biz-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+    border: 1px solid var(--biz-border);
+    border-radius: var(--radius-md);
+    background-color: var(--biz-surface);
+    color: var(--biz-text-heading);
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.biz-input:focus {
+    border-color: var(--biz-primary);
+    box-shadow: 0 0 0 3px var(--biz-primary-ring);
+}
+
+.biz-input::placeholder {
+    color: var(--biz-text-disabled);
+}
+
+.biz-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--biz-text-muted);
+    margin-bottom: 6px;
+}
+
+/* Badges */
+.biz-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+}
+
+.biz-badge-success {
+    background-color: var(--biz-success-bg);
+    color: var(--biz-success);
+    border: 1px solid var(--biz-success-border);
+}
+
+.biz-badge-danger {
+    background-color: var(--biz-danger-bg);
+    color: var(--biz-danger);
+    border: 1px solid var(--biz-danger-border);
+}
+
+.biz-badge-warning {
+    background-color: var(--biz-warning-bg);
+    color: var(--biz-warning);
+    border: 1px solid var(--biz-warning-border);
+}
+
+.biz-badge-info {
+    background-color: var(--biz-info-bg);
+    color: var(--biz-info);
+    border: 1px solid var(--biz-info-border);
+}
+
+.biz-badge-primary {
+    background-color: var(--biz-primary-light);
+    color: var(--biz-primary);
+    border: 1px solid rgba(225, 29, 72, 0.2);
+}
+
+/* Tables */
+.biz-table-wrapper {
+    background: var(--biz-surface);
+    border: 1px solid var(--biz-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.biz-table {
+    width: 100%;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.biz-table th {
+    background-color: var(--biz-surface-subtle);
+    color: var(--biz-text-muted);
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--biz-border);
+}
+
+.biz-table td {
+    padding: 14px 18px;
+    color: var(--biz-text-body);
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--biz-border);
+    vertical-align: middle;
+}
+
+.biz-table tr:last-child td {
+    border-bottom: none;
+}
+
+.biz-table tr:hover td {
+    background-color: #f8fafc;
+}
+
+/* Toast / Alerts */
+.biz-toast {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 9999;
+    min-width: 320px;
+    max-width: 420px;
+    background: var(--biz-surface);
+    border: 1px solid var(--biz-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-modal);
+    padding: 14px 18px;
+    display: none;
+    animation: bizSlideIn 0.25s ease-out;
+}
+
+@keyframes bizSlideIn {
+    from {
+        transform: translateY(-12px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
