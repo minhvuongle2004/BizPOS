@@ -26,6 +26,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final com.bizpos.repository.OrderRepository orderRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -84,10 +85,78 @@ public class DataInitializer implements CommandLineRunner {
             log.info(">> [GHI DB THÀNH CÔNG] Đã tạo khách hàng mẫu: {} (SĐT: {})", sampleCustomer.getFullName(), sampleCustomer.getPhone());
         }
 
-        // 4. Kiểm tra Đọc dữ liệu (Read)
+        // 4. Kiểm tra bảng Đơn hàng (Order)
+        if (orderRepository.count() == 0) {
+            Customer customer = customerRepository.findAll().stream().findFirst().orElse(null);
+            Product product = productRepository.findAll().stream().findFirst().orElse(null);
+
+            if (product != null) {
+                // Đơn hàng 1: Hôm nay
+                com.bizpos.entity.Order order1 = com.bizpos.entity.Order.builder()
+                        .orderCode("HD-" + System.currentTimeMillis() % 100000)
+                        .customer(customer)
+                        .orderDate(java.time.LocalDateTime.now().minusHours(2))
+                        .totalAmount(product.getPrice().multiply(new BigDecimal("2")))
+                        .note("Thanh toán tiền mặt tại quầy")
+                        .build();
+
+                com.bizpos.entity.OrderItem item1 = com.bizpos.entity.OrderItem.builder()
+                        .product(product)
+                        .productName(product.getName())
+                        .unitPrice(product.getPrice())
+                        .quantity(2)
+                        .lineTotal(product.getPrice().multiply(new BigDecimal("2")))
+                        .build();
+                order1.addItem(item1);
+                orderRepository.save(order1);
+
+                // Đơn hàng 2: Hôm qua
+                com.bizpos.entity.Order order2 = com.bizpos.entity.Order.builder()
+                        .orderCode("HD-" + (System.currentTimeMillis() + 1) % 100000)
+                        .customer(customer)
+                        .orderDate(java.time.LocalDateTime.now().minusDays(1).minusHours(4))
+                        .totalAmount(product.getPrice())
+                        .note("Khách mang về")
+                        .build();
+
+                com.bizpos.entity.OrderItem item2 = com.bizpos.entity.OrderItem.builder()
+                        .product(product)
+                        .productName(product.getName())
+                        .unitPrice(product.getPrice())
+                        .quantity(1)
+                        .lineTotal(product.getPrice())
+                        .build();
+                order2.addItem(item2);
+                orderRepository.save(order2);
+
+                // Đơn hàng 3: 2 ngày trước (Khách vãng lai)
+                com.bizpos.entity.Order order3 = com.bizpos.entity.Order.builder()
+                        .orderCode("HD-" + (System.currentTimeMillis() + 2) % 100000)
+                        .customer(null)
+                        .orderDate(java.time.LocalDateTime.now().minusDays(2).minusHours(1))
+                        .totalAmount(product.getPrice().multiply(new BigDecimal("3")))
+                        .note("Khách vãng lai chuyển khoản")
+                        .build();
+
+                com.bizpos.entity.OrderItem item3 = com.bizpos.entity.OrderItem.builder()
+                        .product(product)
+                        .productName(product.getName())
+                        .unitPrice(product.getPrice())
+                        .quantity(3)
+                        .lineTotal(product.getPrice().multiply(new BigDecimal("3")))
+                        .build();
+                order3.addItem(item3);
+                orderRepository.save(order3);
+
+                log.info(">> [GHI DB THÀNH CÔNG] Đã tạo 3 đơn hàng mẫu vào CSDL.");
+            }
+        }
+
+        // 5. Kiểm tra Đọc dữ liệu (Read)
         log.info(">> [ĐỌC DB THÀNH CÔNG] Số lượng danh mục: {}", categoryRepository.count());
         log.info(">> [ĐỌC DB THÀNH CÔNG] Số lượng sản phẩm: {}", productRepository.count());
         log.info(">> [ĐỌC DB THÀNH CÔNG] Số lượng khách hàng: {}", customerRepository.count());
+        log.info(">> [ĐỌC DB THÀNH CÔNG] Số lượng đơn hàng: {}", orderRepository.count());
         log.info("===============================================================================");
     }
 }

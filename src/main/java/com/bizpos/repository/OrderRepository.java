@@ -20,4 +20,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByCustomerIdOrderByOrderDateDesc(Long customerId);
 
     List<Order> findAllByOrderByOrderDateDesc();
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o")
+    java.math.BigDecimal calculateTotalRevenue();
+
+    @org.springframework.data.jpa.repository.Query("SELECT o FROM Order o LEFT JOIN FETCH o.customer ORDER BY o.orderDate DESC")
+    List<Order> findRecentOrders(org.springframework.data.domain.Pageable pageable);
 }

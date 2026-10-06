@@ -62,9 +62,4 @@ public class HomeController {
     public String loginPage() {
         return "auth";
     }
-
-    @GetMapping("/dashboard")
-    public String dashboardPage() {
-        return "dashboard";
-    }
 }
