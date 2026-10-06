@@ -294,7 +294,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Sidebar cố định bên trái */
 .biz-sidebar {
-    width: 260px;
+    width: 270px;
     height: 100vh;
     position: fixed;
     top: 0;
@@ -309,11 +309,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .biz-sidebar-header {
-    padding: 20px 24px;
+    padding: 24px 22px;
     border-bottom: 1px solid var(--biz-border);
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
 }
 
 .biz-sidebar-logo {
@@ -332,7 +332,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .biz-sidebar-menu {
-    padding: 16px 12px;
+    padding: 22px 16px;
     flex: 1;
     overflow-y: auto;
 }
@@ -342,29 +342,33 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
     text-transform: uppercase;
     color: var(--biz-text-disabled);
-    letter-spacing: 0.05em;
-    padding: 8px 12px 4px 12px;
-    margin-bottom: 4px;
+    letter-spacing: 0.06em;
+    padding: 10px 18px 8px 18px;
+    margin-bottom: 6px;
 }
 
 .biz-nav-link {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 11px 16px;
+    gap: 14px;
+    padding: 12px 20px;
     border-radius: var(--radius-md);
     color: var(--biz-text-body);
-    font-size: 0.92rem;
+    font-size: 0.93rem;
     font-weight: 500;
     text-decoration: none;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     transition: all var(--transition-fast);
 }
 
 .biz-nav-link i {
-    font-size: 1.15rem;
+    font-size: 1.2rem;
     color: var(--biz-text-muted);
     transition: color var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
 }
 
 .biz-nav-link:hover {
@@ -381,7 +385,7 @@ h1, h2, h3, h4, h5, h6 {
     background-color: var(--biz-primary);
     color: #ffffff !important;
     font-weight: 600;
-    box-shadow: 0 4px 12px var(--biz-primary-ring);
+    box-shadow: 0 4px 14px var(--biz-primary-ring);
 }
 
 .biz-nav-link.active i {
@@ -389,7 +393,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .biz-sidebar-footer {
-    padding: 16px 12px;
+    padding: 18px 16px;
     border-top: 1px solid var(--biz-border);
 }
 
@@ -408,7 +412,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Wrapper nội dung chính (bên phải sidebar) */
 .biz-main-wrapper {
-    margin-left: 260px;
+    margin-left: 270px;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
