@@ -1,6 +1,7 @@
 package com.bizpos.controller;
 
 import com.bizpos.dto.ProductRequest;
+import com.bizpos.dto.ProductResponse;
 import com.bizpos.entity.Product;
 import com.bizpos.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/products")
@@ -25,11 +27,16 @@ public class ProductController {
      * GET /api/products?keyword=cafe
      */
     @GetMapping
-    public ResponseEntity<List<Product>> getProducts(@RequestParam(required = false) String keyword) {
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            return ResponseEntity.ok(productService.searchProducts(keyword));
-        }
-        return ResponseEntity.ok(productService.getAllProducts());
+    public ResponseEntity<List<ProductResponse>> getProducts(@RequestParam(required = false) String keyword) {
+        List<Product> products = (keyword != null && !keyword.trim().isEmpty())
+                ? productService.searchProducts(keyword)
+                : productService.getAllProducts();
+
+        List<ProductResponse> responses = products.stream()
+                .map(ProductResponse::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -37,9 +44,9 @@ public class ProductController {
      * GET /api/products/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
+    public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
         Product product = productService.getProductById(id);
-        return ResponseEntity.ok(product);
+        return ResponseEntity.ok(ProductResponse.fromEntity(product));
     }
 
     /**
@@ -47,9 +54,9 @@ public class ProductController {
      * POST /api/products
      */
     @PostMapping
-    public ResponseEntity<Product> createProduct(@RequestBody ProductRequest request) {
+    public ResponseEntity<ProductResponse> createProduct(@RequestBody ProductRequest request) {
         Product createdProduct = productService.createProduct(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ProductResponse.fromEntity(createdProduct));
     }
 
     /**
@@ -57,11 +64,11 @@ public class ProductController {
      * PUT /api/products/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Product> updateProduct(
+    public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long id,
             @RequestBody ProductRequest request) {
         Product updatedProduct = productService.updateProduct(id, request);
-        return ResponseEntity.ok(updatedProduct);
+        return ResponseEntity.ok(ProductResponse.fromEntity(updatedProduct));
     }
 
     /**
@@ -81,8 +88,10 @@ public class ProductController {
      * GET /api/products/category/{categoryId}
      */
     @GetMapping("/category/{categoryId}")
-    public ResponseEntity<List<Product>> getProductsByCategory(@PathVariable Long categoryId) {
-        List<Product> products = productService.getProductsByCategory(categoryId);
-        return ResponseEntity.ok(products);
+    public ResponseEntity<List<ProductResponse>> getProductsByCategory(@PathVariable Long categoryId) {
+        List<ProductResponse> responses = productService.getProductsByCategory(categoryId).stream()
+                .map(ProductResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
     }
 }

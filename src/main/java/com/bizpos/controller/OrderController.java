@@ -1,6 +1,7 @@
 package com.bizpos.controller;
 
 import com.bizpos.dto.CreateOrderRequest;
+import com.bizpos.dto.OrderResponse;
 import com.bizpos.entity.Order;
 import com.bizpos.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -8,7 +9,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -22,9 +26,9 @@ public class OrderController {
      * POST /api/orders
      */
     @PostMapping
-    public ResponseEntity<Order> createOrder(@RequestBody CreateOrderRequest request) {
+    public ResponseEntity<OrderResponse> createOrder(@RequestBody CreateOrderRequest request) {
         Order order = orderService.createOrder(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(order);
+        return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.fromEntity(order));
     }
 
     /**
@@ -32,9 +36,11 @@ public class OrderController {
      * GET /api/orders
      */
     @GetMapping
-    public ResponseEntity<List<Order>> getAllOrders() {
-        List<Order> orders = orderService.getAllOrders();
-        return ResponseEntity.ok(orders);
+    public ResponseEntity<List<OrderResponse>> getAllOrders() {
+        List<OrderResponse> responses = orderService.getAllOrders().stream()
+                .map(OrderResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -42,9 +48,9 @@ public class OrderController {
      * GET /api/orders/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
         Order order = orderService.getOrderById(id);
-        return ResponseEntity.ok(order);
+        return ResponseEntity.ok(OrderResponse.fromEntity(order));
     }
 
     /**
@@ -52,11 +58,11 @@ public class OrderController {
      * PUT /api/orders/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Order> updateOrder(
+    public ResponseEntity<OrderResponse> updateOrder(
             @PathVariable Long id,
             @RequestBody CreateOrderRequest request) {
         Order updatedOrder = orderService.updateOrder(id, request);
-        return ResponseEntity.ok(updatedOrder);
+        return ResponseEntity.ok(OrderResponse.fromEntity(updatedOrder));
     }
 
     /**
@@ -64,9 +70,9 @@ public class OrderController {
      * DELETE /api/orders/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<java.util.Map<String, String>> deleteOrder(@PathVariable Long id) {
+    public ResponseEntity<Map<String, String>> deleteOrder(@PathVariable Long id) {
         orderService.deleteOrder(id);
-        java.util.Map<String, String> response = new java.util.HashMap<>();
+        Map<String, String> response = new HashMap<>();
         response.put("message", "Xóa đơn hàng thành công với ID: " + id);
         return ResponseEntity.ok(response);
     }

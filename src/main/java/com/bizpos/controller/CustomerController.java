@@ -1,6 +1,7 @@
 package com.bizpos.controller;
 
 import com.bizpos.dto.CustomerRequest;
+import com.bizpos.dto.CustomerResponse;
 import com.bizpos.entity.Customer;
 import com.bizpos.service.CustomerService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/customers")
@@ -25,11 +27,16 @@ public class CustomerController {
      * GET /api/customers?keyword=0987
      */
     @GetMapping
-    public ResponseEntity<List<Customer>> getCustomers(@RequestParam(required = false) String keyword) {
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            return ResponseEntity.ok(customerService.searchCustomers(keyword));
-        }
-        return ResponseEntity.ok(customerService.getAllCustomers());
+    public ResponseEntity<List<CustomerResponse>> getCustomers(@RequestParam(required = false) String keyword) {
+        List<Customer> customers = (keyword != null && !keyword.trim().isEmpty())
+                ? customerService.searchCustomers(keyword)
+                : customerService.getAllCustomers();
+
+        List<CustomerResponse> responses = customers.stream()
+                .map(CustomerResponse::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -37,9 +44,9 @@ public class CustomerController {
      * GET /api/customers/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Customer> getCustomerById(@PathVariable Long id) {
+    public ResponseEntity<CustomerResponse> getCustomerById(@PathVariable Long id) {
         Customer customer = customerService.getCustomerById(id);
-        return ResponseEntity.ok(customer);
+        return ResponseEntity.ok(CustomerResponse.fromEntity(customer));
     }
 
     /**
@@ -47,9 +54,9 @@ public class CustomerController {
      * POST /api/customers
      */
     @PostMapping
-    public ResponseEntity<Customer> createCustomer(@RequestBody CustomerRequest request) {
+    public ResponseEntity<CustomerResponse> createCustomer(@RequestBody CustomerRequest request) {
         Customer createdCustomer = customerService.createCustomer(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdCustomer);
+        return ResponseEntity.status(HttpStatus.CREATED).body(CustomerResponse.fromEntity(createdCustomer));
     }
 
     /**
@@ -57,11 +64,11 @@ public class CustomerController {
      * PUT /api/customers/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Customer> updateCustomer(
+    public ResponseEntity<CustomerResponse> updateCustomer(
             @PathVariable Long id,
             @RequestBody CustomerRequest request) {
         Customer updatedCustomer = customerService.updateCustomer(id, request);
-        return ResponseEntity.ok(updatedCustomer);
+        return ResponseEntity.ok(CustomerResponse.fromEntity(updatedCustomer));
     }
 
     /**

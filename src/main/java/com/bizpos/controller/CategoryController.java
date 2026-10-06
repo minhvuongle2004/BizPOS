@@ -1,6 +1,7 @@
 package com.bizpos.controller;
 
 import com.bizpos.dto.CategoryRequest;
+import com.bizpos.dto.CategoryResponse;
 import com.bizpos.entity.Category;
 import com.bizpos.service.CategoryService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/categories")
@@ -24,9 +26,11 @@ public class CategoryController {
      * GET /api/categories
      */
     @GetMapping
-    public ResponseEntity<List<Category>> getAllCategories() {
-        List<Category> categories = categoryService.getAllCategories();
-        return ResponseEntity.ok(categories);
+    public ResponseEntity<List<CategoryResponse>> getAllCategories() {
+        List<CategoryResponse> responses = categoryService.getAllCategories().stream()
+                .map(CategoryResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -34,9 +38,9 @@ public class CategoryController {
      * GET /api/categories/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Category> getCategoryById(@PathVariable Long id) {
+    public ResponseEntity<CategoryResponse> getCategoryById(@PathVariable Long id) {
         Category category = categoryService.getCategoryById(id);
-        return ResponseEntity.ok(category);
+        return ResponseEntity.ok(CategoryResponse.fromEntity(category));
     }
 
     /**
@@ -44,9 +48,9 @@ public class CategoryController {
      * POST /api/categories
      */
     @PostMapping
-    public ResponseEntity<Category> createCategory(@RequestBody CategoryRequest request) {
+    public ResponseEntity<CategoryResponse> createCategory(@RequestBody CategoryRequest request) {
         Category createdCategory = categoryService.createCategory(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory);
+        return ResponseEntity.status(HttpStatus.CREATED).body(CategoryResponse.fromEntity(createdCategory));
     }
 
     /**
@@ -54,11 +58,11 @@ public class CategoryController {
      * PUT /api/categories/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Category> updateCategory(
+    public ResponseEntity<CategoryResponse> updateCategory(
             @PathVariable Long id,
             @RequestBody CategoryRequest request) {
         Category updatedCategory = categoryService.updateCategory(id, request);
-        return ResponseEntity.ok(updatedCategory);
+        return ResponseEntity.ok(CategoryResponse.fromEntity(updatedCategory));
     }
 
     /**
