@@ -25,16 +25,26 @@
             </div>
         </div>
 
-        <!-- 1. TOOLBAR: TIÊU ĐỀ + NÚT THÊM MỚI -->
+        <!-- 1. TOOLBAR: TIÊU ĐỀ + NÚT THAO TÁC (EXPORT, IMPORT, THÊM MỚI) -->
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
             <div>
                 <h4 class="mb-1 fw-bold text-dark">Danh sách Sản phẩm</h4>
                 <p class="text-muted small mb-0">Quản lý mã hàng, tên sản phẩm, giá bán và phân loại danh mục</p>
             </div>
-            <button type="button" class="btn btn-biz-primary d-inline-flex align-items-center gap-2" onclick="openAddModal()">
-                <i class="bi bi-plus-circle-fill"></i>
-                <span>Thêm sản phẩm</span>
-            </button>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-biz-outline d-inline-flex align-items-center gap-2" id="btnExportExcel" onclick="handleExportExcel()" title="Xuất toàn bộ sản phẩm ra file Excel">
+                    <i class="bi bi-file-earmark-excel-fill text-success"></i>
+                    <span>Export Excel</span>
+                </button>
+                <button type="button" class="btn btn-biz-outline d-inline-flex align-items-center gap-2" id="btnImportExcel" onclick="openImportModal()" title="Nhập danh sách sản phẩm từ file Excel">
+                    <i class="bi bi-file-earmark-arrow-up-fill text-primary"></i>
+                    <span>Import Excel</span>
+                </button>
+                <button type="button" class="btn btn-biz-primary d-inline-flex align-items-center gap-2" onclick="openAddModal()">
+                    <i class="bi bi-plus-circle-fill"></i>
+                    <span>Thêm sản phẩm</span>
+                </button>
+            </div>
         </div>
 
         <!-- 2. KHỐI TÌM KIẾM & BỘ LỌC (SEARCH & FILTER) -->
@@ -227,6 +237,85 @@
             </div>
         </div>
 
+        <!-- ================= MODAL: IMPORT SẢN PHẨM TỪ EXCEL ================= -->
+        <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header border-bottom py-3 px-4">
+                        <h5 class="modal-title fw-bold text-dark d-flex align-items-center" id="importModalLabel">
+                            <i class="bi bi-file-earmark-excel-fill text-success me-2"></i>
+                            <span>Import Sản phẩm từ file Excel (.xlsx)</span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <form id="importExcelForm" onsubmit="handleImportExcel(event)">
+                        <div class="modal-body p-4">
+                            <div class="alert alert-light border small text-secondary mb-3">
+                                <div class="fw-semibold text-dark mb-1"><i class="bi bi-info-circle-fill text-primary me-1"></i> Định dạng file Excel yêu cầu (.xlsx):</div>
+                                <div>Các cột theo thứ tự: <strong>Mã sản phẩm</strong>, <strong>Tên sản phẩm</strong>, <strong>Danh mục</strong>, <strong>Giá</strong>, <strong>Tồn kho</strong>. Dòng tiêu đề đầu tiên sẽ được bỏ qua.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="biz-label" for="excelFileInput">Chọn file Excel (.xlsx) <span class="text-danger">*</span></label>
+                                <input type="file" class="form-control" id="excelFileInput" accept=".xlsx" required onchange="handleFileSelected(this)">
+                                <div id="importFileError" class="small text-danger mt-1" style="display: none;"></div>
+                            </div>
+
+                            <!-- Khung hiển thị kết quả Import -->
+                            <div id="importResultBox" class="mt-4" style="display: none;">
+                                <h6 class="fw-bold text-dark mb-3">Kết quả thực hiện:</h6>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-4">
+                                        <div class="p-3 bg-light rounded text-center border">
+                                            <div class="small text-muted mb-1">Tổng số dòng</div>
+                                            <div id="resTotalRows" class="fs-4 fw-bold text-dark">0</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="p-3 bg-success bg-opacity-10 rounded text-center border border-success-subtle">
+                                            <div class="small text-success fw-semibold mb-1">Thành công</div>
+                                            <div id="resSuccessCount" class="fs-4 fw-bold text-success">0</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="p-3 bg-danger bg-opacity-10 rounded text-center border border-danger-subtle">
+                                            <div class="small text-danger fw-semibold mb-1">Dòng lỗi</div>
+                                            <div id="resErrorCount" class="fs-4 fw-bold text-danger">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="importErrorsWrapper" style="display: none;">
+                                    <div class="fw-semibold small text-danger mb-2">Chi tiết danh sách dòng lỗi:</div>
+                                    <div class="table-responsive border rounded" style="max-height: 220px; overflow-y: auto;">
+                                        <table class="table table-sm table-striped mb-0 small">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th style="width: 80px;" class="text-center">Dòng</th>
+                                                    <th style="width: 140px;">Mã SP</th>
+                                                    <th>Nguyên nhân lỗi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="importErrorsTableBody">
+                                                <!-- Chi tiết lỗi sẽ render ở đây -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50">
+                            <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Đóng</button>
+                            <button type="submit" id="btnSubmitImport" class="btn btn-biz-primary d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-cloud-arrow-up-fill"></i>
+                                <span>Tải lên & Import</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- ================= MODAL: XÁC NHẬN XÓA SẢN PHẨM ================= -->
         <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -264,6 +353,7 @@
             let productModalInstance = null;
             let stockModalInstance = null;
             let deleteModalInstance = null;
+            let importModalInstance = null;
 
             // Khởi tạo các Modal an toàn
             function getProductModal() {
@@ -294,6 +384,16 @@
                     }
                 }
                 return deleteModalInstance;
+            }
+
+            function getImportModal() {
+                if (!importModalInstance) {
+                    const el = document.getElementById('importModal');
+                    if (el && window.bootstrap) {
+                        importModalInstance = new bootstrap.Modal(el);
+                    }
+                }
+                return importModalInstance;
             }
 
             // ================= HÀM TIỆN ÍCH AUTH & HEADERS =================
@@ -607,6 +707,201 @@
                 if (c) c.value = '';
                 currentPage = 0;
                 loadProducts();
+            }
+
+            // ================= EXCEL EXPORT & IMPORT =================
+            function openImportModal() {
+                const fileInput = document.getElementById('excelFileInput');
+                if (fileInput) fileInput.value = '';
+                const errEl = document.getElementById('importFileError');
+                if (errEl) errEl.style.display = 'none';
+                const resBox = document.getElementById('importResultBox');
+                if (resBox) resBox.style.display = 'none';
+                const errWrap = document.getElementById('importErrorsWrapper');
+                if (errWrap) errWrap.style.display = 'none';
+                const tbody = document.getElementById('importErrorsTableBody');
+                if (tbody) tbody.innerHTML = '';
+                const modal = getImportModal();
+                if (modal) modal.show();
+            }
+
+            function handleFileSelected(input) {
+                const file = input.files ? input.files[0] : null;
+                const errEl = document.getElementById('importFileError');
+                if (errEl) errEl.style.display = 'none';
+                if (file && !file.name.toLowerCase().endsWith('.xlsx')) {
+                    if (errEl) {
+                        errEl.textContent = 'Chỉ chấp nhận file định dạng .xlsx';
+                        errEl.style.display = 'block';
+                    }
+                    input.value = '';
+                }
+            }
+
+            async function handleExportExcel() {
+                const btn = document.getElementById('btnExportExcel');
+                const originalHtml = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Đang xuất...';
+                }
+
+                try {
+                    const token = localStorage.getItem('bizpos_token');
+                    const headers = {};
+                    if (token) {
+                        headers['Authorization'] = 'Bearer ' + token;
+                    }
+
+                    const response = await fetch('/api/products/export', {
+                        method: 'GET',
+                        headers: headers
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        let msg = 'Không thể xuất danh sách sản phẩm ra Excel!';
+                        try {
+                            const err = await response.json();
+                            if (err && err.message) msg = err.message;
+                        } catch (e) {}
+                        showToast('Lỗi Export Excel', msg, false);
+                        return;
+                    }
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    const contentDisposition = response.headers.get('content-disposition');
+                    let filename = 'products_export.xlsx';
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                        if (match && match[1]) {
+                            filename = match[1].replace(/['"]/g, '');
+                        }
+                    }
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    showToast('Thành công', 'Đã tải xuống file Excel sản phẩm thành công!', true);
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ khi xuất Excel!', false);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                }
+            }
+
+            async function handleImportExcel(event) {
+                event.preventDefault();
+                const fileInput = document.getElementById('excelFileInput');
+                const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+                const errEl = document.getElementById('importFileError');
+                if (errEl) errEl.style.display = 'none';
+
+                if (!file) {
+                    if (errEl) {
+                        errEl.textContent = 'Vui lòng chọn file .xlsx để import!';
+                        errEl.style.display = 'block';
+                    }
+                    return;
+                }
+
+                if (!file.name.toLowerCase().endsWith('.xlsx')) {
+                    if (errEl) {
+                        errEl.textContent = 'Chỉ chấp nhận file định dạng .xlsx!';
+                        errEl.style.display = 'block';
+                    }
+                    return;
+                }
+
+                const btnSubmit = document.getElementById('btnSubmitImport');
+                const originalHtml = btnSubmit ? btnSubmit.innerHTML : '';
+                if (btnSubmit) {
+                    btnSubmit.disabled = true;
+                    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Đang xử lý...';
+                }
+
+                try {
+                    const token = localStorage.getItem('bizpos_token');
+                    const headers = {};
+                    if (token) {
+                        headers['Authorization'] = 'Bearer ' + token;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('/api/products/import', {
+                        method: 'POST',
+                        headers: headers,
+                        body: formData
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        return;
+                    }
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        const resBox = document.getElementById('importResultBox');
+                        const totalEl = document.getElementById('resTotalRows');
+                        const successEl = document.getElementById('resSuccessCount');
+                        const errorEl = document.getElementById('resErrorCount');
+                        const errWrapper = document.getElementById('importErrorsWrapper');
+                        const tbody = document.getElementById('importErrorsTableBody');
+
+                        if (resBox) resBox.style.display = 'block';
+                        if (totalEl) totalEl.textContent = result.totalRows ?? 0;
+                        if (successEl) successEl.textContent = result.successCount ?? 0;
+                        if (errorEl) errorEl.textContent = result.errorCount ?? 0;
+
+                        if (result.errors && result.errors.length > 0) {
+                            if (errWrapper) errWrapper.style.display = 'block';
+                            if (tbody) {
+                                tbody.innerHTML = result.errors.map(err => `
+                                    <tr>
+                                        <td class="text-center fw-semibold text-danger">${err.rowNumber}</td>
+                                        <td><code>${err.productCode || '-'}</code></td>
+                                        <td class="text-danger">${err.reason || ''}</td>
+                                    </tr>
+                                `).join('');
+                            }
+                        } else {
+                            if (errWrapper) errWrapper.style.display = 'none';
+                            if (tbody) tbody.innerHTML = '';
+                        }
+
+                        if (result.successCount > 0) {
+                            showToast('Import thành công', `Đã import ${result.successCount}/${result.totalRows} sản phẩm!`, true);
+                            loadProducts();
+                        } else {
+                            showToast('Import không thành công', `Có ${result.errorCount} lỗi, không có dòng nào được thêm.`, false);
+                        }
+                    } else {
+                        showToast('Lỗi Import', result.message || 'Có lỗi xảy ra khi import file!', false);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ khi import file!', false);
+                } finally {
+                    if (btnSubmit) {
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerHTML = originalHtml;
+                    }
+                }
             }
 
             // ================= 5. MODAL THÊM / SỬA =================
@@ -926,6 +1221,10 @@
             window.openAddModal = openAddModal;
             window.openEditModal = openEditModal;
             window.openStockModal = openStockModal;
+            window.openImportModal = openImportModal;
+            window.handleFileSelected = handleFileSelected;
+            window.handleExportExcel = handleExportExcel;
+            window.handleImportExcel = handleImportExcel;
             window.handleSaveStock = handleSaveStock;
             window.handleSearch = handleSearch;
             window.handleFilterCategory = handleFilterCategory;

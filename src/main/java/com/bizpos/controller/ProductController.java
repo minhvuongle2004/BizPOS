@@ -1,15 +1,22 @@
 package com.bizpos.controller;
 
 import com.bizpos.dto.PageResponse;
+import com.bizpos.dto.ProductImportResultResponse;
 import com.bizpos.dto.ProductRequest;
 import com.bizpos.dto.ProductResponse;
 import com.bizpos.entity.Product;
+import com.bizpos.service.ProductExcelService;
 import com.bizpos.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +28,7 @@ import java.util.stream.Collectors;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductExcelService productExcelService;
 
     /**
      * 1. Lấy danh sách sản phẩm có phân trang, kết hợp tìm kiếm và lọc theo danh mục
@@ -103,5 +111,33 @@ public class ProductController {
             @RequestParam Integer quantity) {
         Product updatedProduct = productService.updateStock(id, quantity);
         return ResponseEntity.ok(ProductResponse.fromEntity(updatedProduct));
+    }
+
+    /**
+     * 8. Xuất danh sách sản phẩm ra file Excel (.xlsx)
+     * GET /api/products/export
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportProducts() {
+        byte[] excelBytes = productExcelService.exportProductsToExcel();
+        String filename = "products_export_" + LocalDate.now().toString() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
+
+    /**
+     * 9. Nhập danh sách sản phẩm từ file Excel (.xlsx)
+     * POST /api/products/import
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductImportResultResponse> importProducts(
+            @RequestParam("file") MultipartFile file) {
+        ProductImportResultResponse result = productExcelService.importProductsFromExcel(file);
+        return ResponseEntity.ok(result);
     }
 }
