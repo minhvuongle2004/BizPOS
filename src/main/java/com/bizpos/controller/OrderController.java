@@ -26,7 +26,7 @@ public class OrderController {
      * POST /api/orders
      */
     @PostMapping
-    public ResponseEntity<OrderResponse> createOrder(@RequestBody CreateOrderRequest request) {
+    public ResponseEntity<OrderResponse> createOrder(@jakarta.validation.Valid @RequestBody CreateOrderRequest request) {
         Order order = orderService.createOrder(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.fromEntity(order));
     }
@@ -60,7 +60,7 @@ public class OrderController {
     @PutMapping("/{id}")
     public ResponseEntity<OrderResponse> updateOrder(
             @PathVariable Long id,
-            @RequestBody CreateOrderRequest request) {
+            @jakarta.validation.Valid @RequestBody CreateOrderRequest request) {
         Order updatedOrder = orderService.updateOrder(id, request);
         return ResponseEntity.ok(OrderResponse.fromEntity(updatedOrder));
     }

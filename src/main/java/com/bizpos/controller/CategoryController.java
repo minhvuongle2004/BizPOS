@@ -48,7 +48,7 @@ public class CategoryController {
      * POST /api/categories
      */
     @PostMapping
-    public ResponseEntity<CategoryResponse> createCategory(@RequestBody CategoryRequest request) {
+    public ResponseEntity<CategoryResponse> createCategory(@jakarta.validation.Valid @RequestBody CategoryRequest request) {
         Category createdCategory = categoryService.createCategory(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(CategoryResponse.fromEntity(createdCategory));
     }
@@ -60,7 +60,7 @@ public class CategoryController {
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponse> updateCategory(
             @PathVariable Long id,
-            @RequestBody CategoryRequest request) {
+            @jakarta.validation.Valid @RequestBody CategoryRequest request) {
         Category updatedCategory = categoryService.updateCategory(id, request);
         return ResponseEntity.ok(CategoryResponse.fromEntity(updatedCategory));
     }

@@ -69,14 +69,17 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Xử lý validation errors (nếu dùng @Valid)
+     * Xử lý validation errors từ Jakarta Bean Validation (@Valid) -> 400 Bad Request
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
         String errorMessage = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .findFirst()
-                .orElse("Dữ liệu không hợp lệ!");
+                .map(org.springframework.context.support.DefaultMessageSourceResolvable::getDefaultMessage)
+                .collect(java.util.stream.Collectors.joining("; "));
+
+        if (errorMessage == null || errorMessage.trim().isEmpty()) {
+            errorMessage = "Dữ liệu không hợp lệ!";
+        }
 
         ErrorResponse response = ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())

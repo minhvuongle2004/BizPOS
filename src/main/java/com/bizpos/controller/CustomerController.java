@@ -54,7 +54,7 @@ public class CustomerController {
      * POST /api/customers
      */
     @PostMapping
-    public ResponseEntity<CustomerResponse> createCustomer(@RequestBody CustomerRequest request) {
+    public ResponseEntity<CustomerResponse> createCustomer(@jakarta.validation.Valid @RequestBody CustomerRequest request) {
         Customer createdCustomer = customerService.createCustomer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(CustomerResponse.fromEntity(createdCustomer));
     }
@@ -66,7 +66,7 @@ public class CustomerController {
     @PutMapping("/{id}")
     public ResponseEntity<CustomerResponse> updateCustomer(
             @PathVariable Long id,
-            @RequestBody CustomerRequest request) {
+            @jakarta.validation.Valid @RequestBody CustomerRequest request) {
         Customer updatedCustomer = customerService.updateCustomer(id, request);
         return ResponseEntity.ok(CustomerResponse.fromEntity(updatedCustomer));
     }
