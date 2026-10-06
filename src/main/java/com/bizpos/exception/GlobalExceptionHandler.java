@@ -53,13 +53,27 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Nhóm 3: Dữ liệu request không hợp lệ (Giá âm, tên rỗng, số lượng <= 0, danh mục có ràng buộc, định dạng JSON sai) -> 400 Bad Request
+     * Nhóm 2b: Xung đột dữ liệu / ràng buộc nghiệp vụ (Sản phẩm trong đơn hàng, danh mục có sản phẩm liên kết) -> 409 Conflict
      */
     @ExceptionHandler({
-            IllegalArgumentException.class,
-            IllegalStateException.class
+            IllegalStateException.class,
+            org.springframework.dao.DataIntegrityViolationException.class
     })
-    public ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException ex) {
+    public ResponseEntity<ErrorResponse> handleConflictState(Exception ex) {
+        String msg = ex instanceof IllegalStateException ? ex.getMessage() : "Dữ liệu đang bị ràng buộc và không thể thực hiện thao tác!";
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.CONFLICT.value())
+                .message(msg)
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * Nhóm 3: Dữ liệu request không hợp lệ (Giá âm, tên rỗng, số lượng <= 0, định dạng JSON sai) -> 400 Bad Request
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException ex) {
         ErrorResponse response = ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
                 .message(ex.getMessage())

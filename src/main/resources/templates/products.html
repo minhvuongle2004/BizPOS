@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main-layout(
+          ~{::title},
+          'Quản lý Sản phẩm',
+          'products',
+          ~{::#products-content}
+      )}">
+<head>
+    <title>Sản phẩm — BizPOS</title>
+</head>
+<body>
+
+    <div id="products-content">
+
+        <!-- THÔNG BÁO TOAST NỔI GÓC PHẢI -->
+        <div id="bizToast" class="biz-toast alert alert-dismissible fade show shadow-lg" role="alert" style="display: none; position: fixed; top: 24px; right: 24px; z-index: 1060; min-width: 320px;">
+            <div class="d-flex align-items-center">
+                <i id="bizToastIcon" class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                <div class="flex-grow-1">
+                    <strong id="bizToastTitle" class="d-block small fw-bold">Thông báo</strong>
+                    <span id="bizToastMessage" class="small text-secondary">Nội dung thông báo</span>
+                </div>
+                <button type="button" class="btn-close ms-2" onclick="hideToast()" aria-label="Close"></button>
+            </div>
+        </div>
+
+        <!-- 1. TOOLBAR: TIÊU ĐỀ + NÚT THÊM MỚI -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+            <div>
+                <h4 class="mb-1 fw-bold text-dark">Danh sách Sản phẩm</h4>
+                <p class="text-muted small mb-0">Quản lý mã hàng, tên sản phẩm, giá bán và phân loại danh mục</p>
+            </div>
+            <button type="button" class="btn btn-biz-primary d-inline-flex align-items-center gap-2" onclick="openAddModal()">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span>Thêm sản phẩm</span>
+            </button>
+        </div>
+
+        <!-- 2. KHỐI TÌM KIẾM & BỘ LỌC (SEARCH & FILTER) -->
+        <div class="biz-card p-3 p-md-4 mb-4">
+            <div class="row g-3 align-items-center">
+                <!-- Ô tìm kiếm keyword -->
+                <div class="col-md-5 col-sm-12">
+                    <div class="position-relative">
+                        <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                        <input type="text" id="searchInput" class="biz-input ps-5" placeholder="Tìm theo mã hoặc tên sản phẩm..." onkeydown="if(event.key === 'Enter') handleSearch()">
+                    </div>
+                </div>
+
+                <!-- Dropdown lọc theo Danh mục -->
+                <div class="col-md-4 col-sm-8">
+                    <select id="categoryFilter" class="biz-input" onchange="handleFilterCategory()">
+                        <option value="">Tất cả danh mục</option>
+                        <!-- Danh mục sẽ được nạp động từ /api/categories -->
+                    </select>
+                </div>
+
+                <!-- Nút thao tác Tìm & Đặt lại -->
+                <div class="col-md-3 col-sm-4 d-flex gap-2">
+                    <button type="button" class="btn btn-biz-primary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1" onclick="handleSearch()">
+                        <i class="bi bi-search"></i>
+                        <span>Tìm</span>
+                    </button>
+                    <button type="button" class="btn btn-biz-outline" title="Đặt lại bộ lọc" onclick="resetFilters()">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. BẢNG DANH SÁCH SẢN PHẨM -->
+        <div class="biz-card mb-4 overflow-hidden position-relative">
+            <!-- Loading Overlay -->
+            <div id="tableLoading" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center bg-white bg-opacity-75" style="z-index: 10; display: none;">
+                <div class="spinner-border text-danger" role="status" style="width: 2.2rem; height: 2.2rem;">
+                    <span class="visually-hidden">Đang tải...</span>
+                </div>
+                <span class="small text-muted mt-2 fw-medium">Đang tải danh sách sản phẩm...</span>
+            </div>
+
+            <div class="biz-table-wrapper border-0 rounded-0">
+                <table class="biz-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Mã SP</th>
+                            <th>Tên sản phẩm</th>
+                            <th style="width: 180px;">Danh mục</th>
+                            <th class="text-end" style="width: 160px;">Giá bán</th>
+                            <th>Mô tả</th>
+                            <th class="text-center" style="width: 130px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productTableBody">
+                        <!-- Danh sách sản phẩm được render qua JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State: Khi không có dữ liệu -->
+            <div id="emptyState" class="text-center py-5" style="display: none;">
+                <i class="bi bi-box-seam display-4 text-muted d-block mb-3"></i>
+                <h6 class="fw-bold text-dark">Không tìm thấy sản phẩm nào</h6>
+                <p class="text-muted small mb-3">Thử thay đổi từ khóa tìm kiếm hoặc thêm sản phẩm mới vào hệ thống.</p>
+                <button type="button" class="btn btn-biz-primary btn-sm" onclick="openAddModal()">
+                    <i class="bi bi-plus-lg me-1"></i> Thêm sản phẩm mới
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. THANH PHÂN TRANG (PAGINATION) -->
+        <div id="paginationContainer" class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+            <span id="paginationInfo" class="small text-muted">Hiển thị 0 - 0 trong tổng số 0 sản phẩm</span>
+            <ul id="paginationUl" class="pagination mb-0 gap-1">
+                <!-- Các nút trang được render qua JavaScript -->
+            </ul>
+        </div>
+
+        <!-- ================= MODAL: THÊM / SỬA SẢN PHẨM ================= -->
+        <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header border-bottom py-3 px-4">
+                        <h5 class="modal-title fw-bold text-dark" id="productModalLabel">
+                            <i class="bi bi-box-seam text-danger me-2"></i>Thêm sản phẩm mới
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <form id="productForm" onsubmit="handleSaveProduct(event)">
+                        <div class="modal-body p-4">
+                            <!-- ID ẩn phục vụ cho Edit -->
+                            <input type="hidden" id="modalProductId">
+
+                            <!-- Mã sản phẩm -->
+                            <div class="mb-3">
+                                <label class="biz-label" for="modalProductCode">Mã sản phẩm <span class="text-danger">*</span></label>
+                                <input type="text" id="modalProductCode" class="biz-input" placeholder="Ví dụ: SP001, CAFE-01" required maxlength="50">
+                                <div id="codeError" class="small text-danger mt-1" style="display: none;"></div>
+                            </div>
+
+                            <!-- Tên sản phẩm -->
+                            <div class="mb-3">
+                                <label class="biz-label" for="modalProductName">Tên sản phẩm <span class="text-danger">*</span></label>
+                                <input type="text" id="modalProductName" class="biz-input" placeholder="Ví dụ: Cà phê sữa đá" required maxlength="150">
+                                <div id="nameError" class="small text-danger mt-1" style="display: none;"></div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <!-- Giá bán -->
+                                <div class="col-md-6">
+                                    <label class="biz-label" for="modalProductPrice">Giá bán (VNĐ) <span class="text-danger">*</span></label>
+                                    <input type="number" id="modalProductPrice" class="biz-input" placeholder="Ví dụ: 25000" required min="1" step="1000">
+                                    <div id="priceError" class="small text-danger mt-1" style="display: none;"></div>
+                                </div>
+
+                                <!-- Danh mục -->
+                                <div class="col-md-6">
+                                    <label class="biz-label" for="modalProductCategory">Danh mục <span class="text-danger">*</span></label>
+                                    <select id="modalProductCategory" class="biz-input" required>
+                                        <option value="">-- Chọn danh mục --</option>
+                                        <!-- Options load động từ /api/categories -->
+                                    </select>
+                                    <div id="categoryError" class="small text-danger mt-1" style="display: none;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Mô tả -->
+                            <div class="mb-2">
+                                <label class="biz-label" for="modalProductDescription">Mô tả sản phẩm</label>
+                                <textarea id="modalProductDescription" class="biz-input" rows="3" placeholder="Nhập ghi chú hoặc mô tả chi tiết sản phẩm..." maxlength="500"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50">
+                            <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Hủy</button>
+                            <button type="submit" id="btnSaveProduct" class="btn btn-biz-primary d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-check-lg"></i>
+                                <span>Lưu sản phẩm</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: XÁC NHẬN XÓA SẢN PHẨM ================= -->
+        <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-body p-4 text-center">
+                        <div class="d-inline-flex p-3 rounded-circle bg-danger bg-opacity-10 text-danger mb-3">
+                            <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-2">Xác nhận xóa?</h5>
+                        <p class="small text-muted mb-3">
+                            Bạn có chắc chắn muốn xóa sản phẩm <strong id="deleteProductName" class="text-dark">SP</strong>? Thao tác này không thể hoàn tác.
+                        </p>
+                        <input type="hidden" id="deleteProductId">
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" class="btn btn-biz-outline flex-grow-1" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" id="btnConfirmDelete" class="btn btn-biz-danger flex-grow-1" onclick="executeDeleteProduct()">
+                                Xóa bỏ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JAVASCRIPT XỬ LÝ QUẢN LÝ SẢN PHẨM -->
+    <script>
+        // Trạng thái phân trang & lọc hiện tại
+        let currentPage = 0;
+        const pageSize = 10;
+        let totalPages = 0;
+        let totalElements = 0;
+        let categoriesList = [];
+
+        // Tham chiếu Bootstrap Modals
+        let productModalInstance = null;
+        let deleteModalInstance = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            productModalInstance = new bootstrap.Modal(document.getElementById('productModal'));
+            deleteModalInstance = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+
+            // 1. Tải danh mục trước để đổ vào filter và form
+            loadCategories();
+
+            // 2. Tải danh sách sản phẩm trang đầu tiên
+            loadProducts();
+        });
+
+        // ================= HÀM TIỆN ÍCH AUTH & HEADERS =================
+        function getAuthHeaders() {
+            const token = localStorage.getItem('bizpos_token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
+            return headers;
+        }
+
+        function checkAuthError(status) {
+            if (status === 401) {
+                showToast('Lỗi xác thực', 'Phiên làm việc đã hết hạn hoặc chưa đăng nhập. Đang chuyển về trang Đăng nhập...', false);
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 1500);
+                return true;
+            }
+            if (status === 403) {
+                showToast('Từ chối quyền', 'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho ADMIN)!', false);
+                return true;
+            }
+            return false;
+        }
+
+        // ================= TOAST NOTIFICATION =================
+        function showToast(title, message, isSuccess = true) {
+            const toast = document.getElementById('bizToast');
+            const icon = document.getElementById('bizToastIcon');
+            const titleEl = document.getElementById('bizToastTitle');
+            const msgEl = document.getElementById('bizToastMessage');
+
+            toast.className = `biz-toast alert alert-dismissible fade show shadow-lg ${isSuccess ? 'alert-success border-success' : 'alert-danger border-danger'}`;
+            icon.className = `bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-octagon-fill text-danger'} me-2 fs-5`;
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+            toast.style.display = 'block';
+
+            setTimeout(() => {
+                hideToast();
+            }, 3500);
+        }
+
+        function hideToast() {
+            const toast = document.getElementById('bizToast');
+            if (toast) toast.style.display = 'none';
+        }
+
+        function formatVND(amount) {
+            if (amount === null || amount === undefined) return '0 ₫';
+            return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
+        }
+
+        // ================= 1. NẠP DANH MỤC (CATEGORIES) =================
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories', {
+                    headers: getAuthHeaders()
+                });
+
+                if (checkAuthError(response.status)) return;
+
+                if (response.ok) {
+                    categoriesList = await response.json();
+
+                    // Đổ vào Filter dropdown
+                    const filterSelect = document.getElementById('categoryFilter');
+                    filterSelect.innerHTML = '<option value="">Tất cả danh mục</option>';
+                    categoriesList.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.name;
+                        filterSelect.appendChild(opt);
+                    });
+
+                    // Đổ vào Form Modal dropdown
+                    const modalSelect = document.getElementById('modalProductCategory');
+                    modalSelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
+                    categoriesList.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.name;
+                        modalSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error('Lỗi khi tải danh mục:', err);
+            }
+        }
+
+        // ================= 2. NẠP DANH SÁCH SẢN PHẨM (PAGINATION + SEARCH + FILTER) =================
+        async function loadProducts() {
+            const loadingEl = document.getElementById('tableLoading');
+            const tbody = document.getElementById('productTableBody');
+            const emptyState = document.getElementById('emptyState');
+            const paginationContainer = document.getElementById('paginationContainer');
+
+            loadingEl.style.display = 'flex';
+
+            const keyword = document.getElementById('searchInput').value.trim();
+            const categoryId = document.getElementById('categoryFilter').value;
+
+            // Xây dựng URL truy vấn
+            const params = new URLSearchParams();
+            params.append('page', currentPage);
+            params.append('size', pageSize);
+            if (keyword) params.append('keyword', keyword);
+            if (categoryId) params.append('categoryId', categoryId);
+
+            try {
+                const response = await fetch(`/api/products?${params.toString()}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (checkAuthError(response.status)) {
+                    loadingEl.style.display = 'none';
+                    return;
+                }
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const items = data.content || [];
+                    totalPages = data.totalPages || 0;
+                    totalElements = data.totalElements || 0;
+
+                    tbody.innerHTML = '';
+
+                    if (items.length === 0) {
+                        emptyState.style.display = 'block';
+                        paginationContainer.style.display = 'none';
+                    } else {
+                        emptyState.style.display = 'none';
+                        paginationContainer.style.display = 'flex';
+
+                        items.forEach(p => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td>
+                                    <span class="badge bg-light text-dark border fw-medium" style="font-size: 0.82rem;">${p.code}</span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">${p.name}</div>
+                                </td>
+                                <td>
+                                    <span class="biz-badge biz-badge-info">
+                                        <i class="bi bi-tag-fill me-1" style="font-size: 0.7rem;"></i>${p.category ? p.category.name : '—'}
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold" style="color: var(--biz-primary);">${formatVND(p.price)}</span>
+                                </td>
+                                <td>
+                                    <span class="text-muted small">${p.description ? p.description : '—'}</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-inline-flex gap-1">
+                                        <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Chỉnh sửa" onclick="openEditModal(${p.id})">
+                                            <i class="bi bi-pencil-square text-primary"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Xóa sản phẩm" onclick="openDeleteModal(${p.id}, '${p.name.replace(/'/g, "\\'")}')">
+                                            <i class="bi bi-trash3 text-danger"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+
+                        renderPagination(data);
+                    }
+                } else {
+                    const err = await response.json();
+                    showToast('Lỗi nạp sản phẩm', err.message || 'Không thể lấy dữ liệu sản phẩm!', false);
+                }
+            } catch (err) {
+                console.error('Fetch error:', err);
+                showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        // ================= 3. RENDER PHÂN TRANG =================
+        function renderPagination(pageData) {
+            const paginationUl = document.getElementById('paginationUl');
+            const infoEl = document.getElementById('paginationInfo');
+
+            const startItem = pageData.totalElements === 0 ? 0 : (currentPage * pageSize) + 1;
+            const endItem = Math.min((currentPage + 1) * pageSize, pageData.totalElements);
+            infoEl.textContent = `Hiển thị ${startItem} - ${endItem} trong tổng số ${pageData.totalElements} sản phẩm`;
+
+            paginationUl.innerHTML = '';
+            if (totalPages <= 1) return;
+
+            // Nút Trước
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${currentPage === 0 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage - 1})"><i class="bi bi-chevron-left"></i></button>`;
+            paginationUl.appendChild(prevLi);
+
+            // Các số trang
+            for (let i = 0; i < totalPages; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                li.innerHTML = `<button class="page-link" onclick="goToPage(${i})">${i + 1}</button>`;
+                paginationUl.appendChild(li);
+            }
+
+            // Nút Sau
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage + 1})"><i class="bi bi-chevron-right"></i></button>`;
+            paginationUl.appendChild(nextLi);
+        }
+
+        function goToPage(page) {
+            if (page < 0 || page >= totalPages || page === currentPage) return;
+            currentPage = page;
+            loadProducts();
+        }
+
+        // ================= 4. XỬ LÝ SEARCH & FILTER =================
+        function handleSearch() {
+            currentPage = 0; // Reset về trang 0 theo yêu cầu
+            loadProducts();
+        }
+
+        function handleFilterCategory() {
+            currentPage = 0; // Reset về trang 0 theo yêu cầu
+            loadProducts();
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('categoryFilter').value = '';
+            currentPage = 0;
+            loadProducts();
+        }
+
+        // ================= 5. MODAL THÊM / SỬA =================
+        function clearModalErrors() {
+            document.getElementById('codeError').style.display = 'none';
+            document.getElementById('nameError').style.display = 'none';
+            document.getElementById('priceError').style.display = 'none';
+            document.getElementById('categoryError').style.display = 'none';
+        }
+
+        function openAddModal() {
+            clearModalErrors();
+            document.getElementById('productForm').reset();
+            document.getElementById('modalProductId').value = '';
+            document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-danger me-2"></i>Thêm sản phẩm mới';
+            document.getElementById('btnSaveProduct').innerHTML = '<i class="bi bi-check-lg"></i><span>Thêm sản phẩm</span>';
+            productModalInstance.show();
+        }
+
+        async function openEditModal(productId) {
+            clearModalErrors();
+            try {
+                const response = await fetch(`/api/products/${productId}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (checkAuthError(response.status)) return;
+
+                if (response.ok) {
+                    const p = await response.json();
+                    document.getElementById('modalProductId').value = p.id;
+                    document.getElementById('modalProductCode').value = p.code;
+                    document.getElementById('modalProductName').value = p.name;
+                    document.getElementById('modalProductPrice').value = p.price;
+                    document.getElementById('modalProductCategory').value = p.category ? p.category.id : '';
+                    document.getElementById('modalProductDescription').value = p.description || '';
+
+                    document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-pencil-square text-danger me-2"></i>Chỉnh sửa sản phẩm';
+                    document.getElementById('btnSaveProduct').innerHTML = '<i class="bi bi-check-lg"></i><span>Lưu thay đổi</span>';
+                    productModalInstance.show();
+                } else {
+                    const err = await response.json();
+                    showToast('Lỗi', err.message || 'Không thể lấy thông tin sản phẩm!', false);
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Lỗi kết nối', 'Không thể kết nối máy chủ!', false);
+            }
+        }
+
+        // ================= 6. LƯU SẢN PHẨM (POST / PUT) =================
+        async function handleSaveProduct(event) {
+            event.preventDefault();
+            clearModalErrors();
+
+            const id = document.getElementById('modalProductId').value;
+            const code = document.getElementById('modalProductCode').value.trim();
+            const name = document.getElementById('modalProductName').value.trim();
+            const price = document.getElementById('modalProductPrice').value;
+            const categoryId = document.getElementById('modalProductCategory').value;
+            const description = document.getElementById('modalProductDescription').value.trim();
+
+            // Client Validation cơ bản
+            let hasError = false;
+            if (!code) {
+                document.getElementById('codeError').textContent = 'Vui lòng nhập mã sản phẩm!';
+                document.getElementById('codeError').style.display = 'block';
+                hasError = true;
+            }
+            if (!name) {
+                document.getElementById('nameError').textContent = 'Vui lòng nhập tên sản phẩm!';
+                document.getElementById('nameError').style.display = 'block';
+                hasError = true;
+            }
+            if (!price || parseFloat(price) <= 0) {
+                document.getElementById('priceError').textContent = 'Giá bán phải lớn hơn 0!';
+                document.getElementById('priceError').style.display = 'block';
+                hasError = true;
+            }
+            if (!categoryId) {
+                document.getElementById('categoryError').textContent = 'Vui lòng chọn danh mục cho sản phẩm!';
+                document.getElementById('categoryError').style.display = 'block';
+                hasError = true;
+            }
+
+            if (hasError) return;
+
+            const payload = {
+                code: code,
+                name: name,
+                price: parseFloat(price),
+                categoryId: parseInt(categoryId),
+                description: description
+            };
+
+            const isEdit = !!id;
+            const url = isEdit ? `/api/products/${id}` : '/api/products';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const btnSave = document.getElementById('btnSaveProduct');
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(payload)
+                });
+
+                if (checkAuthError(response.status)) {
+                    btnSave.disabled = false;
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    productModalInstance.hide();
+                    showToast('Thành công', isEdit ? `Đã cập nhật sản phẩm '${data.name}'!` : `Đã thêm sản phẩm '${data.name}'!`, true);
+                    loadProducts();
+                } else {
+                    // Xử lý lỗi validation hoặc lỗi trùng mã
+                    showToast('Thất bại', data.message || 'Không thể lưu sản phẩm. Vui lòng kiểm tra lại thông tin!', false);
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = `<i class="bi bi-check-lg"></i><span>${isEdit ? 'Lưu thay đổi' : 'Thêm sản phẩm'}</span>`;
+            }
+        }
+
+        // ================= 7. XÓA SẢN PHẨM (XỬ LÝ 409 & 403 & 401) =================
+        function openDeleteModal(id, name) {
+            document.getElementById('deleteProductId').value = id;
+            document.getElementById('deleteProductName').textContent = `'${name}'`;
+            deleteModalInstance.show();
+        }
+
+        async function executeDeleteProduct() {
+            const id = document.getElementById('deleteProductId').value;
+            if (!id) return;
+
+            const btnConfirm = document.getElementById('btnConfirmDelete');
+            btnConfirm.disabled = true;
+            btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch(`/api/products/${id}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+
+                if (checkAuthError(response.status)) {
+                    deleteModalInstance.hide();
+                    btnConfirm.disabled = false;
+                    btnConfirm.innerHTML = 'Xóa bỏ';
+                    return;
+                }
+
+                // Xử lý mã lỗi 409 Conflict: Sản phẩm đã có trong đơn hàng
+                if (response.status === 409) {
+                    const err = await response.json();
+                    deleteModalInstance.hide();
+                    showToast('Không thể xóa (409 Conflict)', err.message || 'Sản phẩm này đã tồn tại trong đơn hàng nên không thể xóa!', false);
+                    return;
+                }
+
+                if (response.ok) {
+                    deleteModalInstance.hide();
+                    showToast('Thành công', 'Đã xóa sản phẩm thành công!', true);
+                    // Nếu sau khi xóa trang hiện tại trống thì lùi về 1 trang
+                    if (currentPage > 0 && totalElements % pageSize === 1) {
+                        currentPage--;
+                    }
+                    loadProducts();
+                } else {
+                    const err = await response.json();
+                    deleteModalInstance.hide();
+                    showToast('Lỗi xóa sản phẩm', err.message || 'Không thể xóa sản phẩm!', false);
+                }
+            } catch (err) {
+                console.error(err);
+                deleteModalInstance.hide();
+                showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+            } finally {
+                btnConfirm.disabled = false;
+                btnConfirm.innerHTML = 'Xóa bỏ';
+            }
+        }
+    </script>
+</body>
+</html>
