@@ -287,3 +287,248 @@ h1, h2, h3, h4, h5, h6 {
         opacity: 1;
     }
 }
+
+/* ==============================================================
+   BIZPOS SHARED LAYOUT: SIDEBAR + TOP HEADER + CONTENT AREA
+   ============================================================== */
+
+/* Sidebar cố định bên trái */
+.biz-sidebar {
+    width: 260px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: var(--biz-surface);
+    border-right: 1px solid var(--biz-border);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 1000;
+    transition: transform var(--transition-normal);
+}
+
+.biz-sidebar-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--biz-border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.biz-sidebar-logo {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+}
+
+.biz-sidebar-brand-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--biz-text-heading);
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.biz-sidebar-menu {
+    padding: 16px 12px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.biz-nav-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--biz-text-disabled);
+    letter-spacing: 0.05em;
+    padding: 8px 12px 4px 12px;
+    margin-bottom: 4px;
+}
+
+.biz-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+    border-radius: var(--radius-md);
+    color: var(--biz-text-body);
+    font-size: 0.92rem;
+    font-weight: 500;
+    text-decoration: none;
+    margin-bottom: 4px;
+    transition: all var(--transition-fast);
+}
+
+.biz-nav-link i {
+    font-size: 1.15rem;
+    color: var(--biz-text-muted);
+    transition: color var(--transition-fast);
+}
+
+.biz-nav-link:hover {
+    background-color: var(--biz-surface-subtle);
+    color: var(--biz-text-heading);
+}
+
+.biz-nav-link:hover i {
+    color: var(--biz-primary);
+}
+
+/* Active State: Crimson Ruby */
+.biz-nav-link.active {
+    background-color: var(--biz-primary);
+    color: #ffffff !important;
+    font-weight: 600;
+    box-shadow: 0 4px 12px var(--biz-primary-ring);
+}
+
+.biz-nav-link.active i {
+    color: #ffffff !important;
+}
+
+.biz-sidebar-footer {
+    padding: 16px 12px;
+    border-top: 1px solid var(--biz-border);
+}
+
+.biz-nav-link.logout-link {
+    color: var(--biz-danger);
+}
+
+.biz-nav-link.logout-link i {
+    color: var(--biz-danger);
+}
+
+.biz-nav-link.logout-link:hover {
+    background-color: var(--biz-danger-bg);
+    color: var(--biz-danger);
+}
+
+/* Wrapper nội dung chính (bên phải sidebar) */
+.biz-main-wrapper {
+    margin-left: 260px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--biz-bg);
+    transition: margin-left var(--transition-normal);
+}
+
+/* Top Header */
+.biz-top-header {
+    height: 70px;
+    background: var(--biz-surface);
+    border-bottom: 1px solid var(--biz-border);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 900;
+}
+
+.biz-header-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--biz-text-heading);
+    margin: 0;
+}
+
+.biz-header-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.biz-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background-color: var(--biz-primary-light);
+    color: var(--biz-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border: 1px solid rgba(225, 29, 72, 0.2);
+}
+
+.biz-user-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    text-align: left;
+}
+
+.biz-user-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--biz-text-heading);
+}
+
+.biz-user-role {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--biz-text-muted);
+}
+
+/* Content Area */
+.biz-content-area {
+    padding: 28px;
+    flex: 1;
+}
+
+/* Mobile Sidebar Toggle & Overlay */
+.biz-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    color: var(--biz-text-heading);
+    padding: 4px;
+    margin-right: 12px;
+    cursor: pointer;
+}
+
+.biz-sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.5);
+    z-index: 999;
+}
+
+@media (max-width: 991.98px) {
+    .biz-sidebar {
+        transform: translateX(-100%);
+    }
+
+    .biz-sidebar.show {
+        transform: translateX(0);
+    }
+
+    .biz-sidebar-overlay.show {
+        display: block;
+    }
+
+    .biz-main-wrapper {
+        margin-left: 0;
+    }
+
+    .biz-menu-toggle {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .biz-content-area {
+        padding: 20px 16px;
+    }
+}
+

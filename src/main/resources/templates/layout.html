@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org" th:fragment="main-layout(title, pageTitle, activeMenu, content)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:replace="${title} ?: ~{::title}">BizPOS — Quản lý bán hàng</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- BizPOS Core Design System -->
+    <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+    <!-- Overlay cho thiết bị di động khi mở Sidebar -->
+    <div class="biz-sidebar-overlay" id="bizSidebarOverlay"></div>
+
+    <!-- 1. SIDEBAR CỐ ĐỊNH -->
+    <aside class="biz-sidebar" id="bizSidebar">
+        <!-- Logo & Thương hiệu BizPOS -->
+        <div class="biz-sidebar-header">
+            <a href="/" class="d-flex align-items-center gap-2 text-decoration-none">
+                <img src="/images/bizpos-logo.png" alt="BizPOS Logo" class="biz-sidebar-logo">
+                <div class="d-flex flex-column">
+                    <span class="biz-sidebar-brand-name">BizPOS</span>
+                    <span class="text-muted" style="font-size: 0.7rem; font-weight: 500; line-height: 1;">Bán hàng &amp; Vận hành</span>
+                </div>
+            </a>
+        </div>
+
+        <!-- Menu điều hướng chính -->
+        <div class="biz-sidebar-menu">
+            <div class="biz-nav-label">Quản trị &amp; Bán hàng</div>
+            
+            <a href="/dashboard" class="biz-nav-link" th:classappend="${activeMenu == 'dashboard'} ? 'active' : ''">
+                <i class="bi bi-grid-1x2-fill"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="/pos" class="biz-nav-link" th:classappend="${activeMenu == 'pos'} ? 'active' : ''">
+                <i class="bi bi-calculator-fill"></i>
+                <span>POS</span>
+            </a>
+
+            <a href="/products" class="biz-nav-link" th:classappend="${activeMenu == 'products'} ? 'active' : ''">
+                <i class="bi bi-box-seam-fill"></i>
+                <span>Sản phẩm</span>
+            </a>
+
+            <a href="/categories" class="biz-nav-link" th:classappend="${activeMenu == 'categories'} ? 'active' : ''">
+                <i class="bi bi-tags-fill"></i>
+                <span>Danh mục</span>
+            </a>
+
+            <a href="/customers" class="biz-nav-link" th:classappend="${activeMenu == 'customers'} ? 'active' : ''">
+                <i class="bi bi-people-fill"></i>
+                <span>Khách hàng</span>
+            </a>
+
+            <a href="/orders" class="biz-nav-link" th:classappend="${activeMenu == 'orders'} ? 'active' : ''">
+                <i class="bi bi-receipt-cutoff"></i>
+                <span>Đơn hàng</span>
+            </a>
+        </div>
+
+        <!-- Chân Sidebar: Nút Đăng xuất -->
+        <div class="biz-sidebar-footer">
+            <a href="javascript:void(0)" onclick="bizLogout()" class="biz-nav-link logout-link">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Đăng xuất</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- 2. WRAPPER NỘI DUNG CHÍNH (BÊN PHẢI SIDEBAR) -->
+    <div class="biz-main-wrapper">
+
+        <!-- TOP HEADER -->
+        <header class="biz-top-header">
+            <!-- Nút Toggle Mobile & Tên trang hiện tại -->
+            <div class="d-flex align-items-center">
+                <button type="button" class="biz-menu-toggle me-3" id="bizSidebarToggle" aria-label="Mở menu điều hướng">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h1 class="biz-header-title mb-0" th:text="${pageTitle}">Trang quản trị</h1>
+            </div>
+
+            <!-- Người dùng: Avatar chữ cái + Tên + Role (Không search/notification giả) -->
+            <div class="biz-header-user">
+                <div class="biz-avatar" id="bizUserAvatar">Q</div>
+                <div class="biz-user-info d-none d-sm-flex">
+                    <span class="biz-user-name" id="bizUserName">Quản trị viên</span>
+                    <span class="biz-user-role" id="bizUserRole">ADMIN</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 3. KHU VỰC NỘI DUNG (CONTENT AREA) -->
+        <main class="biz-content-area" th:replace="${content}">
+            <!-- Nội dung riêng của các màn hình con sẽ được render tại đây -->
+        </main>
+
+    </div>
+
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Layout Common JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // 1. Đồng bộ thông tin người dùng từ localStorage vào Header
+            const username = localStorage.getItem('bizpos_username');
+            const role = localStorage.getItem('bizpos_role');
+
+            if (username) {
+                const nameEl = document.getElementById('bizUserName');
+                const avatarEl = document.getElementById('bizUserAvatar');
+                if (nameEl) nameEl.textContent = username;
+                if (avatarEl) {
+                    // Lấy ký tự đầu tiên viết hoa làm Avatar
+                    avatarEl.textContent = username.trim().charAt(0).toUpperCase();
+                }
+            }
+
+            if (role) {
+                const roleEl = document.getElementById('bizUserRole');
+                if (roleEl) {
+                    roleEl.textContent = role.replace('ROLE_', '');
+                }
+            }
+
+            // 2. Responsive Mobile Sidebar Toggle
+            const sidebar = document.getElementById('bizSidebar');
+            const overlay = document.getElementById('bizSidebarOverlay');
+            const toggleBtn = document.getElementById('bizSidebarToggle');
+
+            if (toggleBtn && sidebar && overlay) {
+                toggleBtn.addEventListener('click', function () {
+                    sidebar.classList.toggle('show');
+                    overlay.classList.toggle('show');
+                });
+
+                overlay.addEventListener('click', function () {
+                    sidebar.classList.remove('show');
+                    overlay.classList.remove('show');
+                });
+            }
+        });
+
+        // 3. Hàm Đăng xuất
+        function bizLogout() {
+            if (confirm('Bạn có chắc chắn muốn đăng xuất khỏi hệ thống BizPOS?')) {
+                localStorage.removeItem('bizpos_token');
+                localStorage.removeItem('bizpos_username');
+                localStorage.removeItem('bizpos_role');
+                window.location.href = '/login';
+            }
+        }
+    </script>
+</body>
+</html>
