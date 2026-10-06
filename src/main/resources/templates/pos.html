@@ -379,15 +379,39 @@
             }
 
             // ================= 5. NẠP SẢN PHẨM TỪ /api/products =================
+            function renderPosCatalogSkeleton() {
+                const grid = document.getElementById('productGrid');
+                if (!grid) return;
+                grid.innerHTML = Array(6).fill(0).map(() => `
+                    <div class="col">
+                        <div class="pos-product-card shadow-sm" style="pointer-events: none; opacity: 0.85;">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start gap-1 mb-2">
+                                    <span class="biz-skeleton biz-skeleton-badge" style="width: 60px; height: 18px;"></span>
+                                    <span class="biz-skeleton biz-skeleton-text" style="width: 45px;"></span>
+                                </div>
+                                <div class="d-flex flex-column gap-1 mb-2">
+                                    <span class="biz-skeleton biz-skeleton-text" style="width: 85%;"></span>
+                                    <span class="biz-skeleton biz-skeleton-text" style="width: 60%;"></span>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-light">
+                                <span class="biz-skeleton biz-skeleton-text" style="width: 75px; height: 18px;"></span>
+                                <span class="biz-skeleton biz-skeleton-avatar" style="width: 30px; height: 30px;"></span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
             async function loadProducts() {
                 const loadingEl = document.getElementById('catalogLoading');
                 const grid = document.getElementById('productGrid');
                 const emptyState = document.getElementById('catalogEmptyState');
 
-                if (loadingEl) {
-                    loadingEl.classList.remove('d-none');
-                    loadingEl.classList.add('d-flex');
-                }
+                // Render skeleton cards thay vì để khoảng trống
+                renderPosCatalogSkeleton();
+                if (emptyState) emptyState.classList.add('d-none');
 
                 const params = new URLSearchParams();
                 params.append('page', 0);

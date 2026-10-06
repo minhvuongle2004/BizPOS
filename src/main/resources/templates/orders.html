@@ -360,12 +360,45 @@
             }
 
             // ================= 1. NẠP TOÀN BỘ ĐƠN HÀNG TỪ /api/orders =================
+            function renderOrderSkeleton() {
+                const tbody = document.getElementById('orderTableBody');
+                if (!tbody) return;
+                tbody.innerHTML = Array(5).fill(0).map(() => `
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="biz-skeleton biz-skeleton-avatar" style="width: 20px; height: 20px;"></span>
+                                <span class="biz-skeleton biz-skeleton-text" style="width: 140px;"></span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="biz-skeleton biz-skeleton-avatar"></span>
+                                <div class="d-flex flex-column gap-1">
+                                    <span class="biz-skeleton biz-skeleton-text" style="width: 120px;"></span>
+                                    <span class="biz-skeleton biz-skeleton-text" style="width: 80px; height: 10px;"></span>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="biz-skeleton biz-skeleton-text" style="width: 110px;"></span></td>
+                        <td class="text-end"><span class="biz-skeleton biz-skeleton-text" style="width: 90px;"></span></td>
+                        <td class="text-center pe-4">
+                            <div class="d-inline-flex gap-1">
+                                <span class="biz-skeleton biz-skeleton-btn"></span>
+                                <span class="biz-skeleton biz-skeleton-btn"></span>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
             async function loadOrders() {
                 const loadingEl = document.getElementById('tableLoading');
-                if (loadingEl) {
-                    loadingEl.classList.remove('d-none');
-                    loadingEl.classList.add('d-flex');
-                }
+                const emptyState = document.getElementById('emptyState');
+
+                // Hiển thị skeleton loading
+                renderOrderSkeleton();
+                if (emptyState) emptyState.classList.add('d-none');
 
                 try {
                     const response = await fetch('/api/orders', {

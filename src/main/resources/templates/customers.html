@@ -258,16 +258,39 @@
             }
 
             // ================= 1. NẠP DANH SÁCH KHÁCH HÀNG (API BACKEND PAGINATION + SEARCH) =================
+            function renderCustomerSkeleton() {
+                const tbody = document.getElementById('customerTableBody');
+                if (!tbody) return;
+                tbody.innerHTML = Array(5).fill(0).map(() => `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="biz-skeleton biz-skeleton-avatar"></span>
+                                <span class="biz-skeleton biz-skeleton-text" style="width: 130px;"></span>
+                            </div>
+                        </td>
+                        <td><span class="biz-skeleton biz-skeleton-text" style="width: 100px;"></span></td>
+                        <td><span class="biz-skeleton biz-skeleton-text" style="width: 150px;"></span></td>
+                        <td><span class="biz-skeleton biz-skeleton-text" style="width: 180px;"></span></td>
+                        <td class="text-center">
+                            <div class="d-inline-flex gap-1">
+                                <span class="biz-skeleton biz-skeleton-btn"></span>
+                                <span class="biz-skeleton biz-skeleton-btn"></span>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
             async function loadCustomers() {
                 const loadingEl = document.getElementById('tableLoading');
                 const tbody = document.getElementById('customerTableBody');
                 const emptyState = document.getElementById('emptyState');
                 const paginationContainer = document.getElementById('paginationContainer');
 
-                if (loadingEl) {
-                    loadingEl.classList.remove('d-none');
-                    loadingEl.classList.add('d-flex');
-                }
+                // Hiển thị skeleton loading
+                renderCustomerSkeleton();
+                if (emptyState) emptyState.classList.add('d-none');
 
                 const searchInput = document.getElementById('searchInput');
                 const keyword = searchInput ? searchInput.value.trim() : '';

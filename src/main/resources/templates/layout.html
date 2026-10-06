@@ -34,9 +34,12 @@
         </div>
 
         <!-- Menu điều hướng chính -->
-        <div class="biz-sidebar-menu">
+        <div class="biz-sidebar-menu" id="bizSidebarMenu">
             <div class="biz-nav-label">Quản trị &amp; Bán hàng</div>
             
+            <!-- Sliding Highlight Indicator (Hiệu ứng trượt mượt mà) -->
+            <div class="biz-nav-indicator" id="bizNavIndicator"></div>
+
             <a href="/dashboard" class="biz-nav-link" th:classappend="${activeMenu == 'dashboard'} ? 'active' : ''">
                 <i class="bi bi-grid-1x2-fill"></i>
                 <span>Dashboard</span>
@@ -148,6 +151,83 @@
                 overlay.addEventListener('click', function () {
                     sidebar.classList.remove('show');
                     overlay.classList.remove('show');
+                });
+            }
+
+            // 3. Hiệu ứng trượt Highlight Indicator trên Sidebar (Sliding Active Indicator)
+            const menu = document.getElementById('bizSidebarMenu');
+            const indicator = document.getElementById('bizNavIndicator');
+            if (menu && indicator) {
+                const activeLink = menu.querySelector('.biz-nav-link.active');
+                const allLinks = menu.querySelectorAll('.biz-nav-link');
+
+                function positionIndicator(targetEl, animate = true) {
+                    if (!targetEl) {
+                        indicator.style.opacity = '0';
+                        return;
+                    }
+                    const targetTop = targetEl.offsetTop;
+                    const targetHeight = targetEl.offsetHeight;
+
+                    if (!animate) {
+                        indicator.style.transition = 'none';
+                    } else {
+                        indicator.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease';
+                    }
+
+                    indicator.style.transform = `translateY(${targetTop}px)`;
+                    indicator.style.height = `${targetHeight}px`;
+                    indicator.style.opacity = '1';
+
+                    if (!animate) {
+                        indicator.offsetHeight; // trigger reflow
+                    }
+                }
+
+                // Kiểm tra xem trang trước có lưu vị trí indicator không để tạo hiệu ứng lướt qua trang
+                const prevTop = sessionStorage.getItem('bizpos_nav_prev_top');
+                const prevHeight = sessionStorage.getItem('bizpos_nav_prev_height');
+
+                if (prevTop !== null && activeLink) {
+                    // Khởi tạo tại vị trí trang trước (không animation)
+                    indicator.style.transition = 'none';
+                    indicator.style.transform = `translateY(${prevTop}px)`;
+                    indicator.style.height = `${prevHeight || activeLink.offsetHeight}px`;
+                    indicator.style.opacity = '1';
+                    indicator.offsetHeight; // force reflow
+
+                    // Ngay trong animation frame kế tiếp, trượt mượt mà đến vị trí menu trang hiện tại!
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            positionIndicator(activeLink, true);
+                            sessionStorage.removeItem('bizpos_nav_prev_top');
+                            sessionStorage.removeItem('bizpos_nav_prev_height');
+                        });
+                    });
+                } else if (activeLink) {
+                    positionIndicator(activeLink, false);
+                    indicator.style.opacity = '1';
+                }
+
+                // Khi click vào bất kỳ menu nào: trượt indicator ngay lập tức đến mục đó và lưu lại
+                allLinks.forEach(link => {
+                    link.addEventListener('click', function () {
+                        const clickTop = this.offsetTop;
+                        const clickHeight = this.offsetHeight;
+                        sessionStorage.setItem('bizpos_nav_prev_top', clickTop);
+                        sessionStorage.setItem('bizpos_nav_prev_height', clickHeight);
+
+                        positionIndicator(this, true);
+
+                        allLinks.forEach(l => l.classList.remove('active'));
+                        this.classList.add('active');
+                    });
+                });
+
+                // Cập nhật lại vị trí nếu cửa sổ resize
+                window.addEventListener('resize', () => {
+                    const currentActive = menu.querySelector('.biz-nav-link.active');
+                    if (currentActive) positionIndicator(currentActive, false);
                 });
             }
         });
