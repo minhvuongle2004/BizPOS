@@ -1,6 +1,8 @@
 package com.bizpos.service.impl;
 
+import com.bizpos.dto.PageResponse;
 import com.bizpos.dto.ProductRequest;
+import com.bizpos.dto.ProductResponse;
 import com.bizpos.entity.Category;
 import com.bizpos.entity.Product;
 import com.bizpos.exception.DuplicateResourceException;
@@ -10,6 +12,10 @@ import com.bizpos.repository.OrderItemRepository;
 import com.bizpos.repository.ProductRepository;
 import com.bizpos.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +30,17 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final OrderItemRepository orderItemRepository;
+
+    @Override
+    public PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by("id").descending());
+        String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
+
+        Page<Product> productPage = productRepository.searchProducts(cleanKeyword, categoryId, pageable);
+        Page<ProductResponse> responsePage = productPage.map(ProductResponse::fromEntity);
+
+        return PageResponse.from(responsePage);
+    }
 
     @Override
     public List<Product> getAllProducts() {

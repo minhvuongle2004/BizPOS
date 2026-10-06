@@ -1,11 +1,18 @@
 package com.bizpos.service;
 
 import com.bizpos.dto.CustomerRequest;
+import com.bizpos.dto.CustomerResponse;
+import com.bizpos.dto.PageResponse;
 import com.bizpos.entity.Customer;
 
 import java.util.List;
 
 public interface CustomerService {
+
+    /**
+     * Lấy danh sách khách hàng có phân trang, kết hợp tìm kiếm theo họ tên hoặc SĐT
+     */
+    PageResponse<CustomerResponse> getCustomers(int page, int size, String keyword);
 
     /**
      * Lấy danh sách toàn bộ khách hàng

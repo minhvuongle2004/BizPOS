@@ -1,11 +1,18 @@
 package com.bizpos.service;
 
+import com.bizpos.dto.PageResponse;
 import com.bizpos.dto.ProductRequest;
+import com.bizpos.dto.ProductResponse;
 import com.bizpos.entity.Product;
 
 import java.util.List;
 
 public interface ProductService {
+
+    /**
+     * Lấy danh sách sản phẩm có phân trang, kết hợp tìm kiếm theo từ khóa và lọc theo danh mục
+     */
+    PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId);
 
     /**
      * Lấy danh sách toàn bộ sản phẩm

@@ -1,12 +1,18 @@
 package com.bizpos.service.impl;
 
 import com.bizpos.dto.CustomerRequest;
+import com.bizpos.dto.CustomerResponse;
+import com.bizpos.dto.PageResponse;
 import com.bizpos.entity.Customer;
 import com.bizpos.exception.DuplicateResourceException;
 import com.bizpos.exception.ResourceNotFoundException;
 import com.bizpos.repository.CustomerRepository;
 import com.bizpos.service.CustomerService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +27,17 @@ public class CustomerServiceImpl implements CustomerService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final CustomerRepository customerRepository;
+
+    @Override
+    public PageResponse<CustomerResponse> getCustomers(int page, int size, String keyword) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by("id").descending());
+        String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
+
+        Page<Customer> customerPage = customerRepository.searchCustomers(cleanKeyword, pageable);
+        Page<CustomerResponse> responsePage = customerPage.map(CustomerResponse::fromEntity);
+
+        return PageResponse.from(responsePage);
+    }
 
     @Override
     public List<Customer> getAllCustomers() {

@@ -1,5 +1,6 @@
 package com.bizpos.controller;
 
+import com.bizpos.dto.PageResponse;
 import com.bizpos.dto.ProductRequest;
 import com.bizpos.dto.ProductResponse;
 import com.bizpos.entity.Product;
@@ -22,21 +23,18 @@ public class ProductController {
     private final ProductService productService;
 
     /**
-     * 1. Lấy danh sách sản phẩm (có hỗ trợ tìm kiếm qua query param ?keyword=...)
-     * GET /api/products
-     * GET /api/products?keyword=cafe
+     * 1. Lấy danh sách sản phẩm có phân trang, kết hợp tìm kiếm và lọc theo danh mục
+     * GET /api/products?page=0&size=10
+     * GET /api/products?page=0&size=10&keyword=cafe&categoryId=1
      */
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getProducts(@RequestParam(required = false) String keyword) {
-        List<Product> products = (keyword != null && !keyword.trim().isEmpty())
-                ? productService.searchProducts(keyword)
-                : productService.getAllProducts();
-
-        List<ProductResponse> responses = products.stream()
-                .map(ProductResponse::fromEntity)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(responses);
+    public ResponseEntity<PageResponse<ProductResponse>> getProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId) {
+        PageResponse<ProductResponse> response = productService.getProducts(page, size, keyword, categoryId);
+        return ResponseEntity.ok(response);
     }
 
     /**

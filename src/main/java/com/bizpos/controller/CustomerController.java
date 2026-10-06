@@ -2,6 +2,7 @@ package com.bizpos.controller;
 
 import com.bizpos.dto.CustomerRequest;
 import com.bizpos.dto.CustomerResponse;
+import com.bizpos.dto.PageResponse;
 import com.bizpos.entity.Customer;
 import com.bizpos.service.CustomerService;
 import lombok.RequiredArgsConstructor;
@@ -22,21 +23,17 @@ public class CustomerController {
     private final CustomerService customerService;
 
     /**
-     * 1. Lấy danh sách khách hàng (hỗ trợ tìm kiếm theo họ tên hoặc SĐT qua ?keyword=...)
-     * GET /api/customers
-     * GET /api/customers?keyword=0987
+     * 1. Lấy danh sách khách hàng có phân trang, hỗ trợ tìm kiếm theo họ tên hoặc SĐT qua ?keyword=...
+     * GET /api/customers?page=0&size=10
+     * GET /api/customers?page=0&size=10&keyword=0987
      */
     @GetMapping
-    public ResponseEntity<List<CustomerResponse>> getCustomers(@RequestParam(required = false) String keyword) {
-        List<Customer> customers = (keyword != null && !keyword.trim().isEmpty())
-                ? customerService.searchCustomers(keyword)
-                : customerService.getAllCustomers();
-
-        List<CustomerResponse> responses = customers.stream()
-                .map(CustomerResponse::fromEntity)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(responses);
+    public ResponseEntity<PageResponse<CustomerResponse>> getCustomers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword) {
+        PageResponse<CustomerResponse> response = customerService.getCustomers(page, size, keyword);
+        return ResponseEntity.ok(response);
     }
 
     /**

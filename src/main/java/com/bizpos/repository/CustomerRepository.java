@@ -23,4 +23,12 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     boolean existsByEmailAndIdNot(String email, Long id);
 
     List<Customer> findByFullNameContainingIgnoreCaseOrPhoneContaining(String fullName, String phone);
+
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM Customer c WHERE " +
+           "(:keyword IS NULL OR :keyword = '' OR " +
+           " LOWER(c.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           " c.phone LIKE CONCAT('%', :keyword, '%'))")
+    org.springframework.data.domain.Page<Customer> searchCustomers(
+            @org.springframework.data.repository.query.Param("keyword") String keyword,
+            org.springframework.data.domain.Pageable pageable);
 }
