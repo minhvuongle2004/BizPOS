@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main-layout(
+          ~{::title},
+          'Quản lý Đơn hàng',
+          'orders',
+          ~{::#orders-content}
+      )}">
+<head>
+    <title>Đơn hàng — BizPOS</title>
+</head>
+<body>
+
+    <div id="orders-content">
+
+        <!-- THÔNG BÁO TOAST NỔI GÓC PHẢI -->
+        <div id="bizToast" class="biz-toast alert alert-dismissible fade show shadow-lg" role="alert" style="display: none; position: fixed; top: 24px; right: 24px; z-index: 1060; min-width: 320px;">
+            <div class="d-flex align-items-center">
+                <i id="bizToastIcon" class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                <div class="flex-grow-1">
+                    <strong id="bizToastTitle" class="d-block small fw-bold">Thông báo</strong>
+                    <span id="bizToastMessage" class="small text-secondary">Nội dung thông báo</span>
+                </div>
+                <button type="button" class="btn-close ms-2" onclick="hideToast()" aria-label="Close"></button>
+            </div>
+        </div>
+
+        <!-- 1. TOOLBAR: TIÊU ĐỀ + NÚT TẠO ĐƠN QUA POS -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+            <div>
+                <h4 class="mb-1 fw-bold text-dark">Danh sách Đơn hàng</h4>
+                <p class="text-muted small mb-0">Theo dõi, tra cứu và xem chi tiết toàn bộ đơn hàng bán từ POS</p>
+            </div>
+            <a href="/pos" class="btn btn-biz-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-cart-plus-fill"></i>
+                <span>Tạo đơn mới (POS)</span>
+            </a>
+        </div>
+
+        <!-- 2. THỐNG KÊ NHANH (SUMMARY STATS) -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="biz-card p-3 d-flex align-items-center gap-3">
+                    <div class="rounded-3 p-3 bg-danger bg-opacity-10 text-danger d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-receipt fs-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-muted small d-block">Tổng số đơn hàng</span>
+                        <h5 class="fw-bold text-dark mb-0" id="statTotalOrders">0</h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="biz-card p-3 d-flex align-items-center gap-3">
+                    <div class="rounded-3 p-3 bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-currency-dollar fs-4"></i>
+                    </div>
+                    <div>
+                        <span class="text-muted small d-block">Tổng doanh thu</span>
+                        <h5 class="fw-bold text-danger mb-0" id="statTotalRevenue">0 đ</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. BỘ LỌC TÌM KIẾM (SEARCH & DATE RANGE) -->
+        <div class="biz-card p-3 p-md-4 mb-4">
+            <div class="row g-3 align-items-end">
+                <!-- Ô tìm kiếm keyword -->
+                <div class="col-md-5 col-sm-12">
+                    <label class="form-label small fw-semibold text-dark mb-1">
+                        <i class="bi bi-search text-muted me-1"></i>Tìm kiếm đơn hàng
+                    </label>
+                    <div class="position-relative">
+                        <input type="text" id="searchInput" class="biz-input" 
+                               placeholder="Tìm theo mã đơn hoặc tên khách hàng..." 
+                               onkeydown="if(event.key === 'Enter') handleSearch()">
+                    </div>
+                </div>
+
+                <!-- Lọc từ ngày -->
+                <div class="col-md-3 col-sm-6">
+                    <label class="form-label small fw-semibold text-dark mb-1">
+                        <i class="bi bi-calendar-event text-muted me-1"></i>Từ ngày
+                    </label>
+                    <input type="date" id="startDateInput" class="biz-input" onchange="handleSearch()">
+                </div>
+
+                <!-- Lọc đến ngày -->
+                <div class="col-md-3 col-sm-6">
+                    <label class="form-label small fw-semibold text-dark mb-1">
+                        <i class="bi bi-calendar-check text-muted me-1"></i>Đến ngày
+                    </label>
+                    <input type="date" id="endDateInput" class="biz-input" onchange="handleSearch()">
+                </div>
+
+                <!-- Nút Đặt lại bộ lọc -->
+                <div class="col-md-1 col-sm-12 d-flex">
+                    <button type="button" class="btn btn-biz-outline w-100" onclick="resetFilters()" title="Đặt lại bộ lọc">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. BẢNG DANH SÁCH ĐƠN HÀNG -->
+        <div class="biz-card p-0 overflow-hidden mb-4 position-relative">
+
+            <!-- Loading Overlay -->
+            <div id="tableLoading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex align-items-center justify-content-center" style="z-index: 10;">
+                <div class="spinner-border text-danger" role="status">
+                    <span class="visually-hidden">Đang tải đơn hàng...</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4 py-3" style="width: 200px;">Mã đơn</th>
+                            <th class="py-3">Khách hàng</th>
+                            <th class="py-3" style="width: 180px;">Ngày đặt</th>
+                            <th class="py-3 text-end" style="width: 170px;">Tổng tiền</th>
+                            <th class="text-center py-3 pe-4" style="width: 140px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orderTableBody">
+                        <!-- Danh sách đơn hàng được nạp động qua JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Trạng thái trống (Empty State) -->
+            <div id="emptyState" class="text-center py-5 d-none">
+                <div class="d-inline-flex p-3 rounded-circle bg-light text-muted mb-3">
+                    <i class="bi bi-receipt-cutoff fs-1"></i>
+                </div>
+                <h6 class="fw-bold text-dark mb-1">Không có đơn hàng nào</h6>
+                <p class="small text-muted mb-3">Chưa có đơn hàng nào hoặc không có đơn hàng phù hợp với điều kiện tìm kiếm.</p>
+                <a href="/pos" class="btn btn-biz-primary btn-sm">
+                    <i class="bi bi-cart-plus-fill me-1"></i>Tạo đơn hàng tại POS
+                </a>
+            </div>
+
+            <!-- PHÂN TRANG (PAGINATION) -->
+            <div id="paginationContainer" class="p-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <span class="small text-muted" id="paginationInfo">Hiển thị 0 - 0 trong tổng số 0 đơn hàng</span>
+                <nav aria-label="Phân trang đơn hàng">
+                    <ul class="pagination pagination-sm mb-0 gap-1" id="paginationUl">
+                        <!-- Nút phân trang tạo động -->
+                    </ul>
+                </nav>
+            </div>
+
+        </div>
+
+        <!-- ================= MODAL: XEM CHI TIẾT ĐƠN HÀNG ================= -->
+        <div class="modal fade" id="orderDetailModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header border-bottom py-3 px-4 bg-light bg-opacity-50">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="p-2 rounded-circle bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-receipt fs-5"></i>
+                            </div>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark mb-0">Chi tiết đơn hàng</h5>
+                                <span class="small font-monospace text-danger fw-semibold" id="detailOrderCode">ORD-...</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+
+                        <!-- Thông tin tóm tắt đơn hàng & khách hàng -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-3 bg-light border h-100">
+                                    <span class="small text-muted text-uppercase fw-semibold d-block mb-2">Thông tin khách hàng</span>
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                             id="detailCustomerAvatar"
+                                             style="width: 32px; height: 32px; font-size: 0.82rem; font-weight: 700; background-color: var(--biz-primary-light); color: var(--biz-primary); border: 1px solid rgba(225, 29, 72, 0.2);">
+                                            K
+                                        </div>
+                                        <strong class="text-dark" id="detailCustomerName">Khách vãng lai</strong>
+                                    </div>
+                                    <div class="small text-muted">
+                                        <div id="detailPhoneRow"><i class="bi bi-telephone me-1"></i><span id="detailCustomerPhone">—</span></div>
+                                        <div id="detailEmailRow"><i class="bi bi-envelope me-1"></i><span id="detailCustomerEmail">—</span></div>
+                                        <div id="detailAddressRow"><i class="bi bi-geo-alt me-1"></i><span id="detailCustomerAddress">—</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 rounded-3 bg-light border h-100">
+                                    <span class="small text-muted text-uppercase fw-semibold d-block mb-2">Thông tin giao dịch</span>
+                                    <div class="small mb-1">
+                                        <span class="text-muted">Ngày đặt hàng:</span>
+                                        <strong class="text-dark ms-1" id="detailOrderDate">—</strong>
+                                    </div>
+                                    <div class="small mb-2">
+                                        <span class="text-muted">Trạng thái:</span>
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle ms-1">Đã hoàn thành</span>
+                                    </div>
+                                    <div id="detailNoteContainer" class="p-2 rounded bg-warning bg-opacity-10 border border-warning-subtle small d-none">
+                                        <strong>Ghi chú:</strong> <span id="detailOrderNote"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bảng chi tiết sản phẩm trong đơn -->
+                        <h6 class="fw-bold text-dark mb-2 small text-uppercase">Danh sách sản phẩm</h6>
+                        <div class="table-responsive border rounded-3 mb-3">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th class="ps-3 py-2" style="width: 50px;">#</th>
+                                        <th class="py-2">Tên sản phẩm</th>
+                                        <th class="text-center py-2" style="width: 90px;">Số lượng</th>
+                                        <th class="text-end py-2" style="width: 140px;">Đơn giá</th>
+                                        <th class="text-end pe-3 py-2" style="width: 150px;">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detailItemsTableBody">
+                                    <!-- Nạp động qua JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Khối Tổng thanh toán (Lấy từ backend) -->
+                        <div class="p-3 rounded-3 bg-light border d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-dark">Tổng tiền thanh toán:</span>
+                            <span class="fs-4 fw-bold text-danger" id="detailTotalAmount">0 đ</span>
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50">
+                        <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: XÁC NHẬN XÓA ĐƠN HÀNG ================= -->
+        <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-body p-4 text-center">
+                        <div class="d-inline-flex p-3 rounded-circle bg-danger bg-opacity-10 text-danger mb-3">
+                            <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-2">Xác nhận xóa?</h5>
+                        <p class="small text-muted mb-3">
+                            Bạn có chắc chắn muốn xóa đơn hàng <strong id="deleteOrderCode" class="text-dark font-monospace">ORD</strong>? Thao tác này sẽ xóa vĩnh viễn các dòng hàng liên kết và không thể hoàn tác.
+                        </p>
+                        <input type="hidden" id="deleteOrderId">
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" class="btn btn-biz-outline flex-grow-1" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" id="btnConfirmDelete" class="btn btn-biz-danger flex-grow-1" onclick="executeDeleteOrder()">
+                                Xóa bỏ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JAVASCRIPT XỬ LÝ QUẢN LÝ ĐƠN HÀNG (NẰM TRONG FRAGMENT ĐỂ ĐƯỢC CHÈN VÀO LAYOUT) -->
+        <script>
+            // --- STATE QUẢN LÝ ĐƠN HÀNG ---
+            let rawOrders = [];       // Dữ liệu gốc từ /api/orders
+            let filteredOrders = [];  // Dữ liệu sau khi tìm kiếm / lọc ngày
+            let currentPage = 0;
+            const pageSize = 10;
+            let totalPages = 0;
+
+            // Modals
+            let detailModalInstance = null;
+            let deleteModalInstance = null;
+
+            function getDetailModal() {
+                if (!detailModalInstance) {
+                    const el = document.getElementById('orderDetailModal');
+                    if (el && window.bootstrap) detailModalInstance = new bootstrap.Modal(el);
+                }
+                return detailModalInstance;
+            }
+
+            function getDeleteModal() {
+                if (!deleteModalInstance) {
+                    const el = document.getElementById('deleteConfirmModal');
+                    if (el && window.bootstrap) deleteModalInstance = new bootstrap.Modal(el);
+                }
+                return deleteModalInstance;
+            }
+
+            // ================= AUTH HEADERS & CHECK =================
+            function getAuthHeaders() {
+                const token = localStorage.getItem('bizpos_token');
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                return headers;
+            }
+
+            function checkAuthError(status) {
+                if (status === 401) {
+                    showToast('Lỗi xác thực', 'Phiên làm việc đã hết hạn. Đang chuyển về trang Đăng nhập...', false);
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    return true;
+                }
+                if (status === 403) {
+                    showToast('Từ chối quyền', 'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho ADMIN)!', false);
+                    return true;
+                }
+                return false;
+            }
+
+            // ================= TOAST =================
+            function showToast(title, message, isSuccess = true) {
+                const toast = document.getElementById('bizToast');
+                const icon = document.getElementById('bizToastIcon');
+                const titleEl = document.getElementById('bizToastTitle');
+                const msgEl = document.getElementById('bizToastMessage');
+
+                if (!toast) return;
+
+                toast.className = `biz-toast alert alert-dismissible fade show shadow-lg ${isSuccess ? 'alert-success border-success' : 'alert-danger border-danger'}`;
+                icon.className = `bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-octagon-fill text-danger'} me-2 fs-5`;
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+                toast.style.display = 'block';
+
+                setTimeout(() => { hideToast(); }, 3500);
+            }
+
+            function hideToast() {
+                const toast = document.getElementById('bizToast');
+                if (toast) toast.style.display = 'none';
+            }
+
+            // ================= FORMATTERS =================
+            function formatVND(amount) {
+                if (amount === null || amount === undefined || isNaN(amount)) return '0 đ';
+                return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+            }
+
+            function formatDateTime(isoString) {
+                if (!isoString) return '—';
+                const d = new Date(isoString);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                const hours = String(d.getHours()).padStart(2, '0');
+                const mins = String(d.getMinutes()).padStart(2, '0');
+                return `${day}/${month}/${year} ${hours}:${mins}`;
+            }
+
+            // ================= 1. NẠP TOÀN BỘ ĐƠN HÀNG TỪ /api/orders =================
+            async function loadOrders() {
+                const loadingEl = document.getElementById('tableLoading');
+                if (loadingEl) {
+                    loadingEl.classList.remove('d-none');
+                    loadingEl.classList.add('d-flex');
+                }
+
+                try {
+                    const response = await fetch('/api/orders', {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (loadingEl) { loadingEl.classList.remove('d-flex'); loadingEl.classList.add('d-none'); }
+                        return;
+                    }
+
+                    if (response.ok) {
+                        rawOrders = await response.json();
+                        applyFiltersAndRender();
+                    } else {
+                        const err = await response.json();
+                        showToast('Lỗi', err.message || 'Không thể lấy dữ liệu đơn hàng!', false);
+                    }
+                } catch (err) {
+                    console.error('Fetch orders error:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (loadingEl) {
+                        loadingEl.classList.remove('d-flex');
+                        loadingEl.classList.add('d-none');
+                    }
+                }
+            }
+
+            // ================= 2. BỘ LỌC TÌM KIẾM & NGÀY =================
+            function applyFiltersAndRender() {
+                const searchInput = document.getElementById('searchInput');
+                const startDateInput = document.getElementById('startDateInput');
+                const endDateInput = document.getElementById('endDateInput');
+
+                const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
+                const startDateStr = startDateInput ? startDateInput.value : '';
+                const endDateStr = endDateInput ? endDateInput.value : '';
+
+                let list = [...rawOrders];
+
+                // Lọc theo từ khóa (Mã đơn, Tên KH, SĐT KH)
+                if (keyword) {
+                    list = list.filter(o => {
+                        const code = (o.orderCode || '').toLowerCase();
+                        const custName = (o.customer && o.customer.fullName ? o.customer.fullName : 'khách vãng lai').toLowerCase();
+                        const custPhone = (o.customer && o.customer.phone ? o.customer.phone : '').toLowerCase();
+                        return code.includes(keyword) || custName.includes(keyword) || custPhone.includes(keyword);
+                    });
+                }
+
+                // Lọc theo khoảng ngày (dựa trên orderDate)
+                if (startDateStr) {
+                    const start = new Date(startDateStr);
+                    start.setHours(0, 0, 0, 0);
+                    list = list.filter(o => {
+                        if (!o.orderDate) return false;
+                        const d = new Date(o.orderDate);
+                        return d >= start;
+                    });
+                }
+
+                if (endDateStr) {
+                    const end = new Date(endDateStr);
+                    end.setHours(23, 59, 59, 999);
+                    list = list.filter(o => {
+                        if (!o.orderDate) return false;
+                        const d = new Date(o.orderDate);
+                        return d <= end;
+                    });
+                }
+
+                filteredOrders = list;
+                totalPages = Math.ceil(filteredOrders.length / pageSize) || 0;
+
+                // Cập nhật thống kê nhanh
+                updateStats(filteredOrders);
+
+                // Render bảng trang hiện tại
+                renderTable();
+            }
+
+            function updateStats(orders) {
+                const statOrders = document.getElementById('statTotalOrders');
+                const statRev = document.getElementById('statTotalRevenue');
+
+                if (statOrders) statOrders.textContent = orders.length;
+
+                let totalRev = 0;
+                orders.forEach(o => {
+                    totalRev += (Number(o.totalAmount) || 0);
+                });
+
+                if (statRev) statRev.textContent = formatVND(totalRev);
+            }
+
+            function handleSearch() {
+                currentPage = 0; // Reset về trang 0 theo yêu cầu
+                applyFiltersAndRender();
+            }
+
+            function resetFilters() {
+                const searchInput = document.getElementById('searchInput');
+                const startDateInput = document.getElementById('startDateInput');
+                const endDateInput = document.getElementById('endDateInput');
+
+                if (searchInput) searchInput.value = '';
+                if (startDateInput) startDateInput.value = '';
+                if (endDateInput) endDateInput.value = '';
+
+                currentPage = 0;
+                applyFiltersAndRender();
+            }
+
+            // ================= 3. RENDER BẢNG & PHÂN TRANG =================
+            function renderTable() {
+                const tbody = document.getElementById('orderTableBody');
+                const emptyState = document.getElementById('emptyState');
+                const paginationContainer = document.getElementById('paginationContainer');
+
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                if (filteredOrders.length === 0) {
+                    if (emptyState) emptyState.classList.remove('d-none');
+                    if (paginationContainer) paginationContainer.classList.add('d-none');
+                    return;
+                }
+
+                if (emptyState) emptyState.classList.add('d-none');
+                if (paginationContainer) paginationContainer.classList.remove('d-none');
+
+                // Cắt phân trang
+                const startIdx = currentPage * pageSize;
+                const endIdx = Math.min(startIdx + pageSize, filteredOrders.length);
+                const pageItems = filteredOrders.slice(startIdx, endIdx);
+
+                pageItems.forEach(o => {
+                    const tr = document.createElement('tr');
+                    const hasCustomer = !!(o.customer && o.customer.fullName);
+                    const custName = hasCustomer ? o.customer.fullName : 'Khách vãng lai';
+                    const initial = hasCustomer ? custName.trim().charAt(0).toUpperCase() : 'V';
+                    const safeCode = (o.orderCode || '').replace(/'/g, "\\'");
+
+                    tr.innerHTML = `
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-receipt text-danger"></i>
+                                <span class="fw-bold font-monospace text-dark">${o.orderCode || ''}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                     style="width: 30px; height: 30px; font-size: 0.78rem; font-weight: 700; background-color: ${hasCustomer ? 'var(--biz-primary-light)' : '#f1f5f9'}; color: ${hasCustomer ? 'var(--biz-primary)' : 'var(--biz-text-muted)'}; border: 1px solid rgba(225, 29, 72, ${hasCustomer ? '0.2' : '0.05'});">
+                                    ${initial}
+                                </div>
+                                <div>
+                                    <span class="fw-semibold text-dark d-block">${custName}</span>
+                                    ${o.customer && o.customer.phone ? `<span class="small text-muted"><i class="bi bi-telephone me-1"></i>${o.customer.phone}</span>` : ''}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="text-muted small">${formatDateTime(o.orderDate)}</span>
+                        </td>
+                        <td class="text-end">
+                            <strong class="text-dark">${formatVND(o.totalAmount)}</strong>
+                        </td>
+                        <td class="text-center pe-4">
+                            <div class="d-inline-flex gap-1">
+                                <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1 text-primary" 
+                                        title="Xem chi tiết" onclick="viewOrderDetail(${o.id})">
+                                    <i class="bi bi-eye-fill"></i>
+                                </button>
+                                <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1 text-danger" 
+                                        title="Xóa đơn hàng (Admin)" onclick="openDeleteModal(${o.id}, '${safeCode}')">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                renderPagination();
+            }
+
+            function renderPagination() {
+                const paginationUl = document.getElementById('paginationUl');
+                const infoEl = document.getElementById('paginationInfo');
+
+                if (!paginationUl || !infoEl) return;
+
+                const startItem = filteredOrders.length === 0 ? 0 : (currentPage * pageSize) + 1;
+                const endItem = Math.min((currentPage + 1) * pageSize, filteredOrders.length);
+                infoEl.textContent = `Hiển thị ${startItem} - ${endItem} trong tổng số ${filteredOrders.length} đơn hàng`;
+
+                paginationUl.innerHTML = '';
+                if (totalPages <= 1) return;
+
+                // Nút Trước
+                const prevLi = document.createElement('li');
+                prevLi.className = `page-item ${currentPage === 0 ? 'disabled' : ''}`;
+                prevLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage - 1})"><i class="bi bi-chevron-left"></i></button>`;
+                paginationUl.appendChild(prevLi);
+
+                // Các số trang
+                for (let i = 0; i < totalPages; i++) {
+                    const li = document.createElement('li');
+                    li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                    li.innerHTML = `<button class="page-link" onclick="goToPage(${i})">${i + 1}</button>`;
+                    paginationUl.appendChild(li);
+                }
+
+                // Nút Sau
+                const nextLi = document.createElement('li');
+                nextLi.className = `page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}`;
+                nextLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage + 1})"><i class="bi bi-chevron-right"></i></button>`;
+                paginationUl.appendChild(nextLi);
+            }
+
+            function goToPage(page) {
+                if (page < 0 || page >= totalPages || page === currentPage) return;
+                currentPage = page;
+                renderTable();
+            }
+
+            // ================= 4. XEM CHI TIẾT ĐƠN HÀNG (GET /api/orders/{id}) =================
+            async function viewOrderDetail(id) {
+                try {
+                    const response = await fetch(`/api/orders/${id}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) return;
+
+                    if (response.ok) {
+                        const o = await response.json();
+                        populateDetailModal(o);
+                        const modal = getDetailModal();
+                        if (modal) modal.show();
+                    } else if (response.status === 404) {
+                        showToast('Không tìm thấy (404)', 'Không tìm thấy dữ liệu đơn hàng!', false);
+                    } else {
+                        const err = await response.json();
+                        showToast('Lỗi', err.message || 'Không thể xem chi tiết đơn hàng!', false);
+                    }
+                } catch (err) {
+                    console.error('Lỗi xem chi tiết đơn hàng:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                }
+            }
+
+            function populateDetailModal(o) {
+                document.getElementById('detailOrderCode').textContent = o.orderCode || '—';
+                document.getElementById('detailOrderDate').textContent = formatDateTime(o.orderDate);
+
+                // Khách hàng
+                const hasCustomer = !!(o.customer && o.customer.fullName);
+                const custName = hasCustomer ? o.customer.fullName : 'Khách vãng lai';
+                document.getElementById('detailCustomerName').textContent = custName;
+                document.getElementById('detailCustomerAvatar').textContent = hasCustomer ? custName.trim().charAt(0).toUpperCase() : 'V';
+
+                const phoneEl = document.getElementById('detailCustomerPhone');
+                const emailEl = document.getElementById('detailCustomerEmail');
+                const addrEl = document.getElementById('detailCustomerAddress');
+
+                if (hasCustomer) {
+                    phoneEl.textContent = o.customer.phone || '—';
+                    emailEl.textContent = o.customer.email || '—';
+                    addrEl.textContent = o.customer.address || '—';
+                } else {
+                    phoneEl.textContent = '—';
+                    emailEl.textContent = '—';
+                    addrEl.textContent = '—';
+                }
+
+                // Ghi chú
+                const noteBlock = document.getElementById('detailNoteContainer');
+                const noteEl = document.getElementById('detailOrderNote');
+                if (o.note && o.note.trim()) {
+                    noteEl.textContent = o.note.trim();
+                    noteBlock.classList.remove('d-none');
+                } else {
+                    noteBlock.classList.add('d-none');
+                }
+
+                // Danh sách món hàng
+                const tbody = document.getElementById('detailItemsTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    const items = o.items || [];
+                    if (items.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Không có sản phẩm nào trong đơn hàng</td></tr>`;
+                    } else {
+                        items.forEach((it, idx) => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="ps-3 text-muted small">${idx + 1}</td>
+                                <td><strong class="text-dark">${it.productName || 'Sản phẩm'}</strong></td>
+                                <td class="text-center">${it.quantity}</td>
+                                <td class="text-end text-muted">${formatVND(it.unitPrice)}</td>
+                                <td class="text-end pe-3 fw-semibold text-danger">${formatVND(it.lineTotal)}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+                }
+
+                // Tổng tiền từ backend
+                document.getElementById('detailTotalAmount').textContent = formatVND(o.totalAmount);
+            }
+
+            // ================= 5. XÓA ĐƠN HÀNG (DELETE /api/orders/{id}) =================
+            function openDeleteModal(id, code) {
+                document.getElementById('deleteOrderId').value = id;
+                document.getElementById('deleteOrderCode').textContent = code;
+                const modal = getDeleteModal();
+                if (modal) modal.show();
+            }
+
+            async function executeDeleteOrder() {
+                const id = document.getElementById('deleteOrderId').value;
+                if (!id) return;
+
+                const btnConfirm = document.getElementById('btnConfirmDelete');
+                if (btnConfirm) {
+                    btnConfirm.disabled = true;
+                    btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                }
+
+                try {
+                    const response = await fetch(`/api/orders/${id}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        if (btnConfirm) { btnConfirm.disabled = false; btnConfirm.innerHTML = 'Xóa bỏ'; }
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Thành công', 'Đã xóa đơn hàng thành công!', true);
+                        loadOrders();
+                    } else {
+                        const err = await response.json();
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Lỗi xóa đơn hàng', err.message || 'Không thể xóa đơn hàng!', false);
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi xóa đơn hàng:', err);
+                    const modal = getDeleteModal();
+                    if (modal) modal.hide();
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnConfirm) {
+                        btnConfirm.disabled = false;
+                        btnConfirm.innerHTML = 'Xóa bỏ';
+                    }
+                }
+            }
+
+            // Gán vào window
+            window.handleSearch = handleSearch;
+            window.resetFilters = resetFilters;
+            window.viewOrderDetail = viewOrderDetail;
+            window.openDeleteModal = openDeleteModal;
+            window.executeDeleteOrder = executeDeleteOrder;
+            window.goToPage = goToPage;
+            window.hideToast = hideToast;
+
+            // Khởi chạy khi load trang
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadOrders);
+            } else {
+                loadOrders();
+            }
+        </script>
+
+    </div>
+
+</body>
+</html>
