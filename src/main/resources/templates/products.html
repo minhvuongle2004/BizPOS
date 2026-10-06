@@ -72,7 +72,7 @@
         <!-- 3. BẢNG DANH SÁCH SẢN PHẨM -->
         <div class="biz-card mb-4 overflow-hidden position-relative">
             <!-- Loading Overlay -->
-            <div id="tableLoading" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center bg-white bg-opacity-75" style="z-index: 10; display: none;">
+            <div id="tableLoading" class="position-absolute top-0 start-0 w-100 h-100 flex-column align-items-center justify-content-center bg-white bg-opacity-75 d-none" style="z-index: 10;">
                 <div class="spinner-border text-danger" role="status" style="width: 2.2rem; height: 2.2rem;">
                     <span class="visually-hidden">Đang tải...</span>
                 </div>
@@ -98,7 +98,7 @@
             </div>
 
             <!-- Empty State: Khi không có dữ liệu -->
-            <div id="emptyState" class="text-center py-5" style="display: none;">
+            <div id="emptyState" class="text-center py-5 d-none">
                 <i class="bi bi-box-seam display-4 text-muted d-block mb-3"></i>
                 <h6 class="fw-bold text-dark">Không tìm thấy sản phẩm nào</h6>
                 <p class="text-muted small mb-3">Thử thay đổi từ khóa tìm kiếm hoặc thêm sản phẩm mới vào hệ thống.</p>
@@ -346,7 +346,10 @@
                 const emptyState = document.getElementById('emptyState');
                 const paginationContainer = document.getElementById('paginationContainer');
 
-                if (loadingEl) loadingEl.style.display = 'flex';
+                if (loadingEl) {
+                    loadingEl.classList.remove('d-none');
+                    loadingEl.classList.add('d-flex');
+                }
 
                 const searchInput = document.getElementById('searchInput');
                 const categoryFilter = document.getElementById('categoryFilter');
@@ -366,7 +369,10 @@
                     });
 
                     if (checkAuthError(response.status)) {
-                        if (loadingEl) loadingEl.style.display = 'none';
+                        if (loadingEl) {
+                            loadingEl.classList.remove('d-flex');
+                            loadingEl.classList.add('d-none');
+                        }
                         return;
                     }
 
@@ -379,11 +385,19 @@
                         if (tbody) tbody.innerHTML = '';
 
                         if (items.length === 0) {
-                            if (emptyState) emptyState.style.display = 'block';
-                            if (paginationContainer) paginationContainer.style.display = 'none';
+                            if (emptyState) {
+                                emptyState.classList.remove('d-none');
+                            }
+                            if (paginationContainer) {
+                                paginationContainer.classList.add('d-none');
+                            }
                         } else {
-                            if (emptyState) emptyState.style.display = 'none';
-                            if (paginationContainer) paginationContainer.style.display = 'flex';
+                            if (emptyState) {
+                                emptyState.classList.add('d-none');
+                            }
+                            if (paginationContainer) {
+                                paginationContainer.classList.remove('d-none');
+                            }
 
                             items.forEach(p => {
                                 const tr = document.createElement('tr');
@@ -430,7 +444,10 @@
                     console.error('Fetch error:', err);
                     showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
                 } finally {
-                    if (loadingEl) loadingEl.style.display = 'none';
+                    if (loadingEl) {
+                        loadingEl.classList.remove('d-flex');
+                        loadingEl.classList.add('d-none');
+                    }
                 }
             }
 
