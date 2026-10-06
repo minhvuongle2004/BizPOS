@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: main-layout(
+          ~{::title},
+          'Quản lý Khách hàng',
+          'customers',
+          ~{::#customers-content}
+      )}">
+<head>
+    <title>Khách hàng — BizPOS</title>
+</head>
+<body>
+
+    <div id="customers-content">
+
+        <!-- THÔNG BÁO TOAST NỔI GÓC PHẢI -->
+        <div id="bizToast" class="biz-toast alert alert-dismissible fade show shadow-lg" role="alert" style="display: none; position: fixed; top: 24px; right: 24px; z-index: 1060; min-width: 320px;">
+            <div class="d-flex align-items-center">
+                <i id="bizToastIcon" class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                <div class="flex-grow-1">
+                    <strong id="bizToastTitle" class="d-block small fw-bold">Thông báo</strong>
+                    <span id="bizToastMessage" class="small text-secondary">Nội dung thông báo</span>
+                </div>
+                <button type="button" class="btn-close ms-2" onclick="hideToast()" aria-label="Close"></button>
+            </div>
+        </div>
+
+        <!-- 1. TOOLBAR: TIÊU ĐỀ + NÚT THÊM MỚI -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+            <div>
+                <h4 class="mb-1 fw-bold text-dark">Danh sách Khách hàng</h4>
+                <p class="text-muted small mb-0">Quản lý hồ sơ khách hàng, thông tin liên hệ và phục vụ bán hàng</p>
+            </div>
+            <button type="button" class="btn btn-biz-primary d-inline-flex align-items-center gap-2" onclick="openAddModal()">
+                <i class="bi bi-person-plus-fill"></i>
+                <span>Thêm khách hàng</span>
+            </button>
+        </div>
+
+        <!-- 2. KHỐI TÌM KIẾM (SEARCH TOOLBAR) -->
+        <div class="biz-card p-3 p-md-4 mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-9 col-sm-8">
+                    <div class="position-relative">
+                        <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                        <input type="text" id="searchInput" class="biz-input ps-5" placeholder="Tìm theo họ tên hoặc số điện thoại khách hàng..." onkeydown="if(event.key === 'Enter') handleSearch()">
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-4 d-flex gap-2">
+                    <button type="button" class="btn btn-biz-primary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1" onclick="handleSearch()">
+                        <i class="bi bi-search"></i>
+                        <span>Tìm</span>
+                    </button>
+                    <button type="button" class="btn btn-biz-outline" title="Đặt lại tìm kiếm" onclick="resetSearch()">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. BẢNG DANH SÁCH KHÁCH HÀNG -->
+        <div class="biz-card mb-4 overflow-hidden position-relative">
+            <!-- Loading Overlay -->
+            <div id="tableLoading" class="position-absolute top-0 start-0 w-100 h-100 flex-column align-items-center justify-content-center bg-white bg-opacity-75 d-none" style="z-index: 10;">
+                <div class="spinner-border text-danger" role="status" style="width: 2.2rem; height: 2.2rem;">
+                    <span class="visually-hidden">Đang tải...</span>
+                </div>
+                <span class="small text-muted mt-2 fw-medium">Đang tải danh sách khách hàng...</span>
+            </div>
+
+            <div class="biz-table-wrapper border-0 rounded-0">
+                <table class="biz-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 240px;">Họ và tên</th>
+                            <th style="width: 160px;">Số điện thoại</th>
+                            <th style="width: 200px;">Email</th>
+                            <th>Địa chỉ</th>
+                            <th class="text-center" style="width: 130px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customerTableBody">
+                        <!-- Render qua JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-5 d-none">
+                <i class="bi bi-people display-4 text-muted d-block mb-3"></i>
+                <h6 class="fw-bold text-dark">Không tìm thấy khách hàng nào</h6>
+                <p class="text-muted small mb-3">Thử thay đổi từ khóa tìm kiếm hoặc thêm khách hàng mới vào hệ thống.</p>
+                <button type="button" class="btn btn-biz-primary btn-sm" onclick="openAddModal()">
+                    <i class="bi bi-person-plus-fill me-1"></i> Thêm khách hàng mới
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. THANH PHÂN TRANG (PAGINATION) -->
+        <div id="paginationContainer" class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+            <span id="paginationInfo" class="small text-muted">Hiển thị 0 - 0 trong tổng số 0 khách hàng</span>
+            <ul id="paginationUl" class="pagination mb-0 gap-1">
+                <!-- Render qua JavaScript -->
+            </ul>
+        </div>
+
+        <!-- ================= MODAL: THÊM / SỬA KHÁCH HÀNG ================= -->
+        <div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header border-bottom py-3 px-4">
+                        <h5 class="modal-title fw-bold text-dark" id="customerModalLabel">
+                            <i class="bi bi-person-plus-fill text-danger me-2"></i>Thêm khách hàng mới
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <form id="customerForm" onsubmit="handleSaveCustomer(event)">
+                        <div class="modal-body p-4">
+                            <!-- ID ẩn cho Edit -->
+                            <input type="hidden" id="modalCustomerId">
+
+                            <!-- Họ và tên -->
+                            <div class="mb-3">
+                                <label class="biz-label" for="modalCustomerFullName">Họ và tên <span class="text-danger">*</span></label>
+                                <input type="text" id="modalCustomerFullName" class="biz-input" placeholder="Ví dụ: Nguyễn Văn A" required maxlength="150">
+                                <div id="fullNameError" class="small text-danger mt-1" style="display: none;"></div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <!-- Số điện thoại -->
+                                <div class="col-md-6">
+                                    <label class="biz-label" for="modalCustomerPhone">Số điện thoại</label>
+                                    <input type="tel" id="modalCustomerPhone" class="biz-input" placeholder="Ví dụ: 0987654321" maxlength="20">
+                                    <div id="phoneError" class="small text-danger mt-1" style="display: none;"></div>
+                                </div>
+
+                                <!-- Email -->
+                                <div class="col-md-6">
+                                    <label class="biz-label" for="modalCustomerEmail">Email</label>
+                                    <input type="email" id="modalCustomerEmail" class="biz-input" placeholder="Ví dụ: customer@example.com" maxlength="150">
+                                    <div id="emailError" class="small text-danger mt-1" style="display: none;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Địa chỉ -->
+                            <div class="mb-2">
+                                <label class="biz-label" for="modalCustomerAddress">Địa chỉ</label>
+                                <textarea id="modalCustomerAddress" class="biz-input" rows="2" placeholder="Ví dụ: 123 Cầu Giấy, Hà Nội" maxlength="255"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50">
+                            <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Hủy</button>
+                            <button type="submit" id="btnSaveCustomer" class="btn btn-biz-primary d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-check-lg"></i>
+                                <span>Lưu khách hàng</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: XÁC NHẬN XÓA KHÁCH HÀNG ================= -->
+        <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-body p-4 text-center">
+                        <div class="d-inline-flex p-3 rounded-circle bg-danger bg-opacity-10 text-danger mb-3">
+                            <i class="bi bi-exclamation-triangle-fill fs-2"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-2">Xác nhận xóa?</h5>
+                        <p class="small text-muted mb-3">
+                            Bạn có chắc chắn muốn xóa khách hàng <strong id="deleteCustomerName" class="text-dark">KH</strong>? Thao tác này không thể hoàn tác.
+                        </p>
+                        <input type="hidden" id="deleteCustomerId">
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="button" class="btn btn-biz-outline flex-grow-1" data-bs-dismiss="modal">Hủy</button>
+                            <button type="button" id="btnConfirmDelete" class="btn btn-biz-danger flex-grow-1" onclick="executeDeleteCustomer()">
+                                Xóa bỏ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JAVASCRIPT XỬ LÝ QUẢN LÝ KHÁCH HÀNG (NẰM TRONG FRAGMENT ĐỂ ĐƯỢC CHÈN VÀO LAYOUT) -->
+        <script>
+            // State
+            let currentPage = 0;
+            const pageSize = 10;
+            let totalPages = 0;
+            let totalElements = 0;
+
+            // Modals
+            let customerModalInstance = null;
+            let deleteModalInstance = null;
+
+            function getCustomerModal() {
+                if (!customerModalInstance) {
+                    const el = document.getElementById('customerModal');
+                    if (el && window.bootstrap) customerModalInstance = new bootstrap.Modal(el);
+                }
+                return customerModalInstance;
+            }
+
+            function getDeleteModal() {
+                if (!deleteModalInstance) {
+                    const el = document.getElementById('deleteConfirmModal');
+                    if (el && window.bootstrap) deleteModalInstance = new bootstrap.Modal(el);
+                }
+                return deleteModalInstance;
+            }
+
+            // ================= AUTH HEADERS & CHECK =================
+            function getAuthHeaders() {
+                const token = localStorage.getItem('bizpos_token');
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                return headers;
+            }
+
+            function checkAuthError(status) {
+                if (status === 401) {
+                    showToast('Lỗi xác thực', 'Phiên làm việc đã hết hạn. Đang chuyển về trang Đăng nhập...', false);
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    return true;
+                }
+                if (status === 403) {
+                    showToast('Từ chối quyền', 'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho ADMIN)!', false);
+                    return true;
+                }
+                return false;
+            }
+
+            // ================= TOAST =================
+            function showToast(title, message, isSuccess = true) {
+                const toast = document.getElementById('bizToast');
+                const icon = document.getElementById('bizToastIcon');
+                const titleEl = document.getElementById('bizToastTitle');
+                const msgEl = document.getElementById('bizToastMessage');
+
+                if (!toast) return;
+
+                toast.className = `biz-toast alert alert-dismissible fade show shadow-lg ${isSuccess ? 'alert-success border-success' : 'alert-danger border-danger'}`;
+                icon.className = `bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-octagon-fill text-danger'} me-2 fs-5`;
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+                toast.style.display = 'block';
+
+                setTimeout(() => { hideToast(); }, 3500);
+            }
+
+            function hideToast() {
+                const toast = document.getElementById('bizToast');
+                if (toast) toast.style.display = 'none';
+            }
+
+            // ================= 1. NẠP DANH SÁCH KHÁCH HÀNG (API BACKEND PAGINATION + SEARCH) =================
+            async function loadCustomers() {
+                const loadingEl = document.getElementById('tableLoading');
+                const tbody = document.getElementById('customerTableBody');
+                const emptyState = document.getElementById('emptyState');
+                const paginationContainer = document.getElementById('paginationContainer');
+
+                if (loadingEl) {
+                    loadingEl.classList.remove('d-none');
+                    loadingEl.classList.add('d-flex');
+                }
+
+                const searchInput = document.getElementById('searchInput');
+                const keyword = searchInput ? searchInput.value.trim() : '';
+
+                const params = new URLSearchParams();
+                params.append('page', currentPage);
+                params.append('size', pageSize);
+                if (keyword) params.append('keyword', keyword);
+
+                try {
+                    const response = await fetch(`/api/customers?${params.toString()}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (loadingEl) {
+                            loadingEl.classList.remove('d-flex');
+                            loadingEl.classList.add('d-none');
+                        }
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const items = data.content || [];
+                        totalPages = data.totalPages || 0;
+                        totalElements = data.totalElements || 0;
+
+                        if (tbody) tbody.innerHTML = '';
+
+                        if (items.length === 0) {
+                            if (emptyState) emptyState.classList.remove('d-none');
+                            if (paginationContainer) paginationContainer.classList.add('d-none');
+                        } else {
+                            if (emptyState) emptyState.classList.add('d-none');
+                            if (paginationContainer) paginationContainer.classList.remove('d-none');
+
+                            items.forEach(c => {
+                                const tr = document.createElement('tr');
+                                const safeName = (c.fullName || '').replace(/'/g, "\\'");
+                                const initial = (c.fullName || 'K').trim().charAt(0).toUpperCase();
+
+                                tr.innerHTML = `
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.82rem; font-weight: 700; background-color: var(--biz-primary-light); color: var(--biz-primary); border: 1px solid rgba(225, 29, 72, 0.2);">
+                                                ${initial}
+                                            </div>
+                                            <span class="fw-semibold text-dark">${c.fullName || ''}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-dark small">${c.phone ? '<i class=\"bi bi-telephone text-muted me-1\"></i>' + c.phone : '<span class=\"text-muted fst-italic\">—</span>'}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted small">${c.email ? '<i class=\"bi bi-envelope text-muted me-1\"></i>' + c.email : '<span class=\"text-muted fst-italic\">—</span>'}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted small">${c.address ? c.address : '<span class=\"text-muted fst-italic\">—</span>'}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Chỉnh sửa" onclick="openEditModal(${c.id})">
+                                                <i class="bi bi-pencil-square text-primary"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Xóa khách hàng" onclick="openDeleteModal(${c.id}, '${safeName}')">
+                                                <i class="bi bi-trash3 text-danger"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                `;
+                                if (tbody) tbody.appendChild(tr);
+                            });
+
+                            renderPagination(data);
+                        }
+                    } else {
+                        const err = await response.json();
+                        showToast('Lỗi', err.message || 'Không thể lấy dữ liệu khách hàng!', false);
+                    }
+                } catch (err) {
+                    console.error('Fetch error:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (loadingEl) {
+                        loadingEl.classList.remove('d-flex');
+                        loadingEl.classList.add('d-none');
+                    }
+                }
+            }
+
+            // ================= 2. PHÂN TRANG =================
+            function renderPagination(pageData) {
+                const paginationUl = document.getElementById('paginationUl');
+                const infoEl = document.getElementById('paginationInfo');
+
+                if (!paginationUl || !infoEl) return;
+
+                const startItem = pageData.totalElements === 0 ? 0 : (currentPage * pageSize) + 1;
+                const endItem = Math.min((currentPage + 1) * pageSize, pageData.totalElements);
+                infoEl.textContent = `Hiển thị ${startItem} - ${endItem} trong tổng số ${pageData.totalElements} khách hàng`;
+
+                paginationUl.innerHTML = '';
+                if (totalPages <= 1) return;
+
+                // Nút Trước
+                const prevLi = document.createElement('li');
+                prevLi.className = `page-item ${currentPage === 0 ? 'disabled' : ''}`;
+                prevLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage - 1})"><i class="bi bi-chevron-left"></i></button>`;
+                paginationUl.appendChild(prevLi);
+
+                // Các trang
+                for (let i = 0; i < totalPages; i++) {
+                    const li = document.createElement('li');
+                    li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                    li.innerHTML = `<button class="page-link" onclick="goToPage(${i})">${i + 1}</button>`;
+                    paginationUl.appendChild(li);
+                }
+
+                // Nút Sau
+                const nextLi = document.createElement('li');
+                nextLi.className = `page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}`;
+                nextLi.innerHTML = `<button class="page-link" onclick="goToPage(${currentPage + 1})"><i class="bi bi-chevron-right"></i></button>`;
+                paginationUl.appendChild(nextLi);
+            }
+
+            function goToPage(page) {
+                if (page < 0 || page >= totalPages || page === currentPage) return;
+                currentPage = page;
+                loadCustomers();
+            }
+
+            function handleSearch() {
+                currentPage = 0; // Reset về trang 0 theo yêu cầu
+                loadCustomers();
+            }
+
+            function resetSearch() {
+                const input = document.getElementById('searchInput');
+                if (input) input.value = '';
+                currentPage = 0;
+                loadCustomers();
+            }
+
+            // ================= 3. MODAL THÊM / SỬA =================
+            function clearModalErrors() {
+                const fne = document.getElementById('fullNameError');
+                const pe = document.getElementById('phoneError');
+                const ee = document.getElementById('emailError');
+                if (fne) fne.style.display = 'none';
+                if (pe) pe.style.display = 'none';
+                if (ee) ee.style.display = 'none';
+            }
+
+            function openAddModal() {
+                clearModalErrors();
+                const form = document.getElementById('customerForm');
+                if (form) form.reset();
+                document.getElementById('modalCustomerId').value = '';
+                document.getElementById('customerModalLabel').innerHTML = '<i class="bi bi-person-plus-fill text-danger me-2"></i>Thêm khách hàng mới';
+                document.getElementById('btnSaveCustomer').innerHTML = '<i class="bi bi-check-lg"></i><span>Thêm khách hàng</span>';
+
+                const modal = getCustomerModal();
+                if (modal) modal.show();
+            }
+
+            async function openEditModal(id) {
+                clearModalErrors();
+                try {
+                    const response = await fetch(`/api/customers/${id}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) return;
+
+                    if (response.ok) {
+                        const c = await response.json();
+                        document.getElementById('modalCustomerId').value = c.id;
+                        document.getElementById('modalCustomerFullName').value = c.fullName;
+                        document.getElementById('modalCustomerPhone').value = c.phone || '';
+                        document.getElementById('modalCustomerEmail').value = c.email || '';
+                        document.getElementById('modalCustomerAddress').value = c.address || '';
+
+                        document.getElementById('customerModalLabel').innerHTML = '<i class="bi bi-pencil-square text-danger me-2"></i>Chỉnh sửa khách hàng';
+                        document.getElementById('btnSaveCustomer').innerHTML = '<i class="bi bi-check-lg"></i><span>Lưu thay đổi</span>';
+
+                        const modal = getCustomerModal();
+                        if (modal) modal.show();
+                    } else {
+                        const err = await response.json();
+                        showToast('Lỗi', err.message || 'Không thể lấy thông tin khách hàng!', false);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối máy chủ!', false);
+                }
+            }
+
+            // ================= 4. LƯU KHÁCH HÀNG (POST / PUT) =================
+            async function handleSaveCustomer(event) {
+                event.preventDefault();
+                clearModalErrors();
+
+                const id = document.getElementById('modalCustomerId').value;
+                const fullName = document.getElementById('modalCustomerFullName').value.trim();
+                const phone = document.getElementById('modalCustomerPhone').value.trim();
+                const email = document.getElementById('modalCustomerEmail').value.trim();
+                const address = document.getElementById('modalCustomerAddress').value.trim();
+
+                // Validation cơ bản
+                let hasError = false;
+                if (!fullName) {
+                    const el = document.getElementById('fullNameError');
+                    if (el) { el.textContent = 'Vui lòng nhập họ và tên khách hàng!'; el.style.display = 'block'; }
+                    hasError = true;
+                }
+
+                if (email) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(email)) {
+                        const el = document.getElementById('emailError');
+                        if (el) { el.textContent = 'Email không đúng định dạng!'; el.style.display = 'block'; }
+                        hasError = true;
+                    }
+                }
+
+                if (hasError) return;
+
+                const payload = {
+                    fullName: fullName,
+                    phone: phone || null,
+                    email: email || null,
+                    address: address || null
+                };
+
+                const isEdit = !!id;
+                const url = isEdit ? `/api/customers/${id}` : '/api/customers';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                const btnSave = document.getElementById('btnSaveCustomer');
+                if (btnSave) {
+                    btnSave.disabled = true;
+                    btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
+                }
+
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (btnSave) btnSave.disabled = false;
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    // Xử lý 409 Conflict: Trùng SĐT hoặc Email
+                    if (response.status === 409) {
+                        showToast('Xung đột dữ liệu (409 Conflict)', data.message || 'Số điện thoại hoặc email đã tồn tại!', false);
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const modal = getCustomerModal();
+                        if (modal) modal.hide();
+                        showToast('Thành công', isEdit ? `Đã cập nhật khách hàng '${data.fullName}'!` : `Đã thêm khách hàng '${data.fullName}'!`, true);
+                        loadCustomers();
+                    } else {
+                        showToast('Thất bại', data.message || 'Không thể lưu khách hàng!', false);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnSave) {
+                        btnSave.disabled = false;
+                        btnSave.innerHTML = `<i class="bi bi-check-lg"></i><span>${isEdit ? 'Lưu thay đổi' : 'Thêm khách hàng'}</span>`;
+                    }
+                }
+            }
+
+            // ================= 5. XÓA KHÁCH HÀNG (XỬ LÝ 409 & 403 & 401) =================
+            function openDeleteModal(id, name) {
+                document.getElementById('deleteCustomerId').value = id;
+                document.getElementById('deleteCustomerName').textContent = `'${name}'`;
+                const modal = getDeleteModal();
+                if (modal) modal.show();
+            }
+
+            async function executeDeleteCustomer() {
+                const id = document.getElementById('deleteCustomerId').value;
+                if (!id) return;
+
+                const btnConfirm = document.getElementById('btnConfirmDelete');
+                if (btnConfirm) {
+                    btnConfirm.disabled = true;
+                    btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                }
+
+                try {
+                    const response = await fetch(`/api/customers/${id}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        if (btnConfirm) { btnConfirm.disabled = false; btnConfirm.innerHTML = 'Xóa bỏ'; }
+                        return;
+                    }
+
+                    // Xử lý mã lỗi 409 Conflict: Khách hàng đang có đơn hàng liên kết
+                    if (response.status === 409) {
+                        const err = await response.json();
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Không thể xóa (409 Conflict)', err.message || 'Khách hàng này đang có đơn hàng liên kết nên không thể xóa!', false);
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Thành công', 'Đã xóa khách hàng thành công!', true);
+                        if (currentPage > 0 && totalElements % pageSize === 1) {
+                            currentPage--;
+                        }
+                        loadCustomers();
+                    } else {
+                        const err = await response.json();
+                        const modal = getDeleteModal();
+                        if (modal) modal.hide();
+                        showToast('Lỗi xóa khách hàng', err.message || 'Không thể xóa khách hàng!', false);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    const modal = getDeleteModal();
+                    if (modal) modal.hide();
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnConfirm) {
+                        btnConfirm.disabled = false;
+                        btnConfirm.innerHTML = 'Xóa bỏ';
+                    }
+                }
+            }
+
+            // Gán window global
+            window.openAddModal = openAddModal;
+            window.openEditModal = openEditModal;
+            window.handleSearch = handleSearch;
+            window.resetSearch = resetSearch;
+            window.handleSaveCustomer = handleSaveCustomer;
+            window.openDeleteModal = openDeleteModal;
+            window.executeDeleteCustomer = executeDeleteCustomer;
+            window.goToPage = goToPage;
+            window.hideToast = hideToast;
+
+            // Khởi chạy
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => { loadCustomers(); });
+            } else {
+                loadCustomers();
+            }
+        </script>
+
+    </div>
+
+</body>
+</html>
