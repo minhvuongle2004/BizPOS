@@ -31,6 +31,7 @@ public class Customer extends BaseEntity {
     @Column(name = "address", length = 255)
     private String address;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Order> orders = new ArrayList<>();
