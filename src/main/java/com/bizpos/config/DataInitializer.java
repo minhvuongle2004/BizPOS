@@ -67,11 +67,20 @@ public class DataInitializer implements CommandLineRunner {
                     .name("Cà phê sữa đá")
                     .price(new BigDecimal("25000.00"))
                     .description("Cà phê pha phin truyền thống thơm ngon")
+                    .stockQuantity(100)
                     .category(sampleCategory)
                     .build();
             productRepository.save(sampleProduct);
-            log.info(">> [GHI DB THÀNH CÔNG] Đã tạo sản phẩm mẫu: {} (Mã: {})", sampleProduct.getName(), sampleProduct.getCode());
+            log.info(">> [GHI DB THÀNH CÔNG] Đã tạo sản phẩm mẫu: {} (Mã: {}, Tồn kho: 100)", sampleProduct.getName(), sampleProduct.getCode());
         }
+
+        // Cập nhật tồn kho mặc định cho các sản phẩm hiện có nếu chưa có số lượng tồn kho
+        productRepository.findAll().forEach(p -> {
+            if (p.getStockQuantity() == null || p.getStockQuantity() == 0) {
+                p.setStockQuantity(100);
+                productRepository.save(p);
+            }
+        });
 
         // 3. Kiểm tra bảng Khách hàng (Customer)
         if (customerRepository.count() == 0) {

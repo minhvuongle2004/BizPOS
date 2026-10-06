@@ -92,4 +92,16 @@ public class ProductController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
+
+    /**
+     * 7. Cập nhật số lượng tồn kho của sản phẩm
+     * PATCH /api/products/{id}/stock?quantity=50
+     */
+    @PatchMapping("/{id}/stock")
+    public ResponseEntity<ProductResponse> updateStock(
+            @PathVariable Long id,
+            @RequestParam Integer quantity) {
+        Product updatedProduct = productService.updateStock(id, quantity);
+        return ResponseEntity.ok(ProductResponse.fromEntity(updatedProduct));
+    }
 }

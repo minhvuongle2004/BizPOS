@@ -67,6 +67,19 @@ public class OrderServiceImpl implements OrderService {
             Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
 
+            // KIỂM TRA VÀ TRỪ TỒN KHO:
+            int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+            int requestedQty = itemReq.getQuantity();
+
+            if (requestedQty > currentStock) {
+                throw new com.bizpos.exception.InsufficientStockException(
+                        "Sản phẩm '" + product.getName() + "' (Mã: " + product.getCode() + 
+                        ") không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
+            }
+
+            product.setStockQuantity(currentStock - requestedQty);
+            productRepository.save(product);
+
             // 3. Lấy giá từ product.price; tuyệt đối không lấy giá từ request
             BigDecimal unitPrice = product.getPrice();
 
@@ -134,10 +147,22 @@ public class OrderServiceImpl implements OrderService {
         order.setCustomer(customer);
         order.setNote(request.getNote() != null ? request.getNote().trim() : null);
 
-        // 3. Xóa danh sách OrderItem cũ khỏi đơn (orphanRemoval = true sẽ xóa các dòng chi tiết cũ khỏi DB)
+        // 3. Hoàn trả lại số lượng tồn kho của các OrderItem cũ trước khi thay thế
+        if (order.getItems() != null) {
+            for (OrderItem oldItem : order.getItems()) {
+                if (oldItem.getProduct() != null) {
+                    Product oldProduct = oldItem.getProduct();
+                    int currentStock = oldProduct.getStockQuantity() != null ? oldProduct.getStockQuantity() : 0;
+                    oldProduct.setStockQuantity(currentStock + oldItem.getQuantity());
+                    productRepository.save(oldProduct);
+                }
+            }
+        }
+
+        // 4. Xóa danh sách OrderItem cũ khỏi đơn (orphanRemoval = true sẽ xóa các dòng chi tiết cũ khỏi DB)
         order.getItems().clear();
 
-        // 4. Tạo lại các OrderItem mới từ request, luôn lấy tên và giá hiện tại từ bảng products
+        // 5. Tạo lại các OrderItem mới từ request, luôn lấy tên và giá hiện tại từ bảng products
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (OrderItemRequest itemReq : request.getItems()) {
@@ -150,6 +175,19 @@ public class OrderServiceImpl implements OrderService {
 
             Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
+
+            // KIỂM TRA VÀ TRỪ TỒN KHO CHO ĐƠN CẬP NHẬT:
+            int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+            int requestedQty = itemReq.getQuantity();
+
+            if (requestedQty > currentStock) {
+                throw new com.bizpos.exception.InsufficientStockException(
+                        "Sản phẩm '" + product.getName() + "' (Mã: " + product.getCode() + 
+                        ") không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
+            }
+
+            product.setStockQuantity(currentStock - requestedQty);
+            productRepository.save(product);
 
             BigDecimal unitPrice = product.getPrice();
             int quantity = itemReq.getQuantity();
@@ -165,13 +203,13 @@ public class OrderServiceImpl implements OrderService {
 
             order.addItem(orderItem);
 
-            // 5. Tính lại totalAmount
+            // 6. Tính lại totalAmount
             totalAmount = totalAmount.add(lineTotal);
         }
 
         order.setTotalAmount(totalAmount);
 
-        // 6. Lưu trong @Transactional
+        // 7. Lưu trong @Transactional
         return orderRepository.save(order);
     }
 
@@ -179,6 +217,19 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public void deleteOrder(Long id) {
         Order order = getOrderById(id);
+
+        // Hoàn trả tồn kho cho tất cả các sản phẩm trong đơn khi đơn bị xóa
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                if (item.getProduct() != null) {
+                    Product product = item.getProduct();
+                    int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                    product.setStockQuantity(currentStock + item.getQuantity());
+                    productRepository.save(product);
+                }
+            }
+        }
+
         orderRepository.delete(order);
     }
 

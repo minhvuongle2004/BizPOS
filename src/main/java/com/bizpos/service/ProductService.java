@@ -48,4 +48,9 @@ public interface ProductService {
      * Lấy danh sách sản phẩm theo danh mục
      */
     List<Product> getProductsByCategory(Long categoryId);
+
+    /**
+     * Cập nhật số lượng tồn kho của sản phẩm
+     */
+    Product updateStock(Long id, Integer quantity);
 }

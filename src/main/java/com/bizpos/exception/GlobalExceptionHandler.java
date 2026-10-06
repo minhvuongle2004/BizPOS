@@ -83,6 +83,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Nhóm 3b: Không đủ số lượng tồn kho (Insufficient Stock) -> 400 Bad Request
+     */
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientStock(InsufficientStockException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
      * Xử lý trường hợp client gửi body JSON sai cú pháp hoặc kiểu dữ liệu
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)

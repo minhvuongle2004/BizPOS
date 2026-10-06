@@ -22,6 +22,7 @@ public class ProductResponse {
     private String name;
     private BigDecimal price;
     private String description;
+    private Integer stockQuantity;
     private CategoryResponse category;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -36,6 +37,7 @@ public class ProductResponse {
                 .name(product.getName())
                 .price(product.getPrice())
                 .description(product.getDescription())
+                .stockQuantity(product.getStockQuantity() != null ? product.getStockQuantity() : 0)
                 .category(CategoryResponse.fromEntity(product.getCategory()))
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())

@@ -74,6 +74,7 @@ public class ProductServiceImpl implements ProductService {
                 .name(request.getName().trim())
                 .price(request.getPrice())
                 .description(request.getDescription() != null ? request.getDescription().trim() : null)
+                .stockQuantity(request.getStockQuantity() != null ? request.getStockQuantity() : 0)
                 .category(category)
                 .build();
 
@@ -102,8 +103,22 @@ public class ProductServiceImpl implements ProductService {
         existingProduct.setName(request.getName().trim());
         existingProduct.setPrice(request.getPrice());
         existingProduct.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
+        if (request.getStockQuantity() != null) {
+            existingProduct.setStockQuantity(request.getStockQuantity());
+        }
         existingProduct.setCategory(category);
 
+        return productRepository.save(existingProduct);
+    }
+
+    @Override
+    @Transactional
+    public Product updateStock(Long id, Integer quantity) {
+        if (quantity == null || quantity < 0) {
+            throw new IllegalArgumentException("Số lượng tồn kho phải là số nguyên không âm (>= 0)!");
+        }
+        Product existingProduct = getProductById(id);
+        existingProduct.setStockQuantity(quantity);
         return productRepository.save(existingProduct);
     }
 
