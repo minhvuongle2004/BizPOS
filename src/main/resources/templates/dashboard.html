@@ -2,247 +2,595 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout :: main-layout(
           ~{::title},
-          'Tổng quan (Dashboard)',
+          'Tổng quan & Phân tích bán hàng',
           'dashboard',
           ~{::#dashboard-content}
       )}">
 <head>
-    <title>Dashboard — BizPOS</title>
+    <title>Dashboard & Phân tích bán hàng — BizPOS</title>
 </head>
 <body>
 
     <div id="dashboard-content">
 
-        <!-- 1. HÀNG THỐNG KÊ NHANH (KPI STAT CARDS) -->
+        <!-- THÔNG BÁO TOAST NỔI GÓC PHẢI -->
+        <div id="bizToast" class="biz-toast alert alert-dismissible fade show shadow-lg" role="alert" style="display: none; position: fixed; top: 24px; right: 24px; z-index: 1060; min-width: 320px;">
+            <div class="d-flex align-items-center">
+                <i id="bizToastIcon" class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                <div class="flex-grow-1">
+                    <strong id="bizToastTitle" class="d-block small fw-bold">Thông báo</strong>
+                    <span id="bizToastMessage" class="small text-secondary">Nội dung thông báo</span>
+                </div>
+                <button type="button" class="btn-close ms-2" onclick="hideToast()" aria-label="Close"></button>
+            </div>
+        </div>
+
+        <!-- 1. TOOLBAR: TIÊU ĐỀ & BỘ LỌC THỜI GIAN -->
+        <div class="biz-card p-3 p-md-4 mb-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div>
+                    <h4 class="mb-1 fw-bold text-dark">
+                        <i class="bi bi-speedometer2 text-danger me-2"></i>Tổng quan & Phân tích bán hàng
+                    </h4>
+                    <p class="text-muted small mb-0">Theo dõi doanh thu, hiệu suất đơn hàng và cảnh báo tồn kho dựa trên dữ liệu thật</p>
+                </div>
+
+                <!-- Các nút Preset bộ lọc thời gian -->
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <div class="d-inline-flex gap-1 bg-light p-1 rounded-3 border">
+                        <button type="button" class="biz-filter-btn" data-preset="today" onclick="setPresetFilter('today', this)">
+                            Hôm nay
+                        </button>
+                        <button type="button" class="biz-filter-btn active" data-preset="7days" onclick="setPresetFilter('7days', this)">
+                            7 ngày qua
+                        </button>
+                        <button type="button" class="biz-filter-btn" data-preset="30days" onclick="setPresetFilter('30days', this)">
+                            30 ngày qua
+                        </button>
+                        <button type="button" class="biz-filter-btn" data-preset="custom" onclick="toggleCustomFilter(this)">
+                            <i class="bi bi-calendar3 me-1"></i>Tùy chọn
+                        </button>
+                    </div>
+
+                    <button type="button" class="btn btn-biz-outline btn-sm px-3 py-2" title="Làm mới dữ liệu" onclick="loadAllDashboardData()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Khung chọn ngày tùy chỉnh (mặc định ẩn, bật khi bấm Tùy chọn) -->
+            <div id="customDateRangeBox" class="row g-2 align-items-center mt-3 pt-3 border-top d-none">
+                <div class="col-auto">
+                    <span class="small fw-semibold text-muted">Khoảng thời gian:</span>
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <input type="date" id="filterStartDate" class="biz-input py-1 px-2 small">
+                </div>
+                <div class="col-auto">
+                    <span class="text-muted small">&rarr;</span>
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <input type="date" id="filterEndDate" class="biz-input py-1 px-2 small">
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-biz-primary btn-sm py-1 px-3" onclick="applyCustomDateFilter()">
+                        <i class="bi bi-funnel-fill me-1"></i>Áp dụng
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. HÀNG THỐNG KÊ KPI CARDS -->
         <div class="row g-3 mb-4">
-            <!-- Thẻ 1: Tổng doanh thu -->
-            <div class="col-xl col-md-4 col-sm-6">
-                <div class="biz-card p-3 p-xl-4 h-100">
+            <!-- KPI 1: Tổng doanh thu -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="biz-card p-3 p-xl-4 h-100 position-relative overflow-hidden">
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Tổng doanh thu</span>
                         <div class="p-2 rounded-3" style="background-color: var(--biz-primary-light); color: var(--biz-primary);">
                             <i class="bi bi-cash-stack fs-5"></i>
                         </div>
                     </div>
-                    <div class="fs-4 fw-bold mb-1" style="color: var(--biz-primary);" th:text="${#numbers.formatDecimal(totalRevenue, 0, 'POINT', 0, 'COMMA')} + ' ₫'">
-                        0 ₫
+                    <div class="fs-4 fw-bold mb-1" id="kpiTotalRevenue" style="color: var(--biz-primary);">
+                        <span class="biz-skeleton biz-skeleton-text" style="width: 120px; height: 28px; display: inline-block;"></span>
                     </div>
-                    <div class="small text-muted d-flex align-items-center gap-1">
-                        <i class="bi bi-receipt text-secondary"></i>
-                        <span th:text="'Từ ' + ${totalOrders} + ' đơn hàng đã tạo'">Từ 0 đơn hàng</span>
+                    <div class="small text-muted d-flex align-items-center gap-1" id="kpiRevenueSub">
+                        <i class="bi bi-calendar-check text-secondary"></i>
+                        <span id="kpiRevenueDateText">Khoảng thời gian đã chọn</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Thẻ 2: Tổng đơn hàng -->
-            <div class="col-xl col-md-4 col-sm-6">
-                <div class="biz-card p-3 p-xl-4 h-100">
+            <!-- KPI 2: Tổng đơn hàng -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="biz-card p-3 p-xl-4 h-100 position-relative overflow-hidden">
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Tổng đơn hàng</span>
                         <div class="p-2 rounded-3" style="background-color: var(--biz-info-bg); color: var(--biz-info);">
                             <i class="bi bi-receipt-cutoff fs-5"></i>
                         </div>
                     </div>
-                    <div class="fs-4 fw-bold text-dark mb-1" th:text="${totalOrders}">
-                        0
+                    <div class="fs-4 fw-bold text-dark mb-1" id="kpiTotalOrders">
+                        <span class="biz-skeleton biz-skeleton-text" style="width: 60px; height: 28px; display: inline-block;"></span>
                     </div>
                     <div class="small text-muted d-flex align-items-center gap-1">
-                        <i class="bi bi-check-circle-fill text-success"></i>
-                        <span>Đơn đã hoàn tất</span>
+                        <i class="bi bi-check2-circle text-success"></i>
+                        <span>Đơn hàng đã hoàn tất</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Thẻ 3: Tổng sản phẩm -->
-            <div class="col-xl col-md-4 col-sm-6">
-                <div class="biz-card p-3 p-xl-4 h-100">
+            <!-- KPI 3: Giá trị đơn hàng trung bình (AOV) -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="biz-card p-3 p-xl-4 h-100 position-relative overflow-hidden">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Sản phẩm</span>
-                        <div class="p-2 rounded-3" style="background-color: var(--biz-warning-bg); color: var(--biz-warning);">
-                            <i class="bi bi-box-seam fs-5"></i>
-                        </div>
-                    </div>
-                    <div class="fs-4 fw-bold text-dark mb-1" th:text="${totalProducts}">
-                        0
-                    </div>
-                    <div class="small text-muted d-flex align-items-center gap-1">
-                        <i class="bi bi-tags text-secondary"></i>
-                        <span th:text="'Thuộc ' + ${totalCategories} + ' danh mục'">Thuộc 0 danh mục</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Thẻ 4: Tổng danh mục -->
-            <div class="col-xl col-md-4 col-sm-6">
-                <div class="biz-card p-3 p-xl-4 h-100">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Danh mục</span>
-                        <div class="p-2 rounded-3" style="background-color: #f1f5f9; color: var(--biz-text-heading);">
-                            <i class="bi bi-tags-fill fs-5"></i>
-                        </div>
-                    </div>
-                    <div class="fs-4 fw-bold text-dark mb-1" th:text="${totalCategories}">
-                        0
-                    </div>
-                    <div class="small text-muted d-flex align-items-center gap-1">
-                        <i class="bi bi-collection text-secondary"></i>
-                        <span>Phân loại mặt hàng</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Thẻ 5: Tổng khách hàng -->
-            <div class="col-xl col-md-4 col-sm-6">
-                <div class="biz-card p-3 p-xl-4 h-100">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Khách hàng</span>
+                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Đơn trung bình (AOV)</span>
                         <div class="p-2 rounded-3" style="background-color: var(--biz-success-bg); color: var(--biz-success);">
-                            <i class="bi bi-people fs-5"></i>
+                            <i class="bi bi-pie-chart-fill fs-5"></i>
                         </div>
                     </div>
-                    <div class="fs-4 fw-bold text-dark mb-1" th:text="${totalCustomers}">
-                        0
+                    <div class="fs-4 fw-bold text-dark mb-1" id="kpiAverageOrderValue">
+                        <span class="biz-skeleton biz-skeleton-text" style="width: 100px; height: 28px; display: inline-block;"></span>
                     </div>
                     <div class="small text-muted d-flex align-items-center gap-1">
-                        <i class="bi bi-person-check-fill text-success"></i>
-                        <span>Đã lưu hồ sơ</span>
+                        <i class="bi bi-calculator text-secondary"></i>
+                        <span>Doanh thu / số đơn hàng</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI 4: Sản phẩm sắp hết hàng -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="biz-card p-3 p-xl-4 h-100 position-relative overflow-hidden">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Cảnh báo tồn kho</span>
+                        <div class="p-2 rounded-3" style="background-color: var(--biz-warning-bg); color: var(--biz-warning);">
+                            <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                        </div>
+                    </div>
+                    <div class="fs-4 fw-bold text-danger mb-1" id="kpiLowStockCount">
+                        <span class="biz-skeleton biz-skeleton-text" style="width: 50px; height: 28px; display: inline-block;"></span>
+                    </div>
+                    <div class="small text-muted d-flex align-items-center justify-content-between">
+                        <span>Tồn kho &le; 5 sản phẩm</span>
+                        <a href="#lowStockSection" class="text-decoration-none small text-danger fw-semibold">Xem chi tiết &darr;</a>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 2. BIỂU ĐỒ DOANH THU 7 NGÀY GẦN NHẤT -->
-        <div class="biz-card p-4 mb-4">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                <div>
-                    <h5 class="mb-1 fw-bold text-dark">
-                        <i class="bi bi-graph-up text-danger me-2"></i>Doanh thu 7 ngày gần nhất
-                    </h5>
-                    <p class="text-muted small mb-0">Xu hướng doanh thu theo các ngày gần đây dựa trên dữ liệu đơn hàng thực tế</p>
+        <!-- 3. KHỐI TRUNG TÂM: BIỂU ĐỒ DOANH THU & TOP SẢN PHẨM BÁN CHẠY -->
+        <div class="row g-4 mb-4">
+
+            <!-- CỘT TRÁI (8 / 12): BIỂU ĐỒ DOANH THU THEO NGÀY -->
+            <div class="col-lg-7 col-xl-8">
+                <div class="biz-card p-4 h-100 position-relative">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <div>
+                            <h5 class="mb-1 fw-bold text-dark">
+                                <i class="bi bi-graph-up text-danger me-2"></i>Doanh thu theo ngày
+                            </h5>
+                            <p class="text-muted small mb-0" id="chartSubtitle">Biểu đồ doanh thu thực tế theo từng ngày trong khoảng thời gian đã chọn</p>
+                        </div>
+                        <span class="biz-badge biz-badge-primary" id="chartRangeBadge">
+                            <i class="bi bi-calendar-event me-1"></i>Đang tải...
+                        </span>
+                    </div>
+
+                    <!-- Vùng chứa canvas biểu đồ -->
+                    <div class="position-relative" style="height: 320px; width: 100%;">
+                        <canvas id="revenueChart"></canvas>
+                        
+                        <!-- Empty state khi không có doanh thu -->
+                        <div id="chartEmptyState" class="position-absolute top-50 start-50 translate-middle text-center w-100 d-none">
+                            <i class="bi bi-bar-chart text-muted display-4 d-block mb-2"></i>
+                            <h6 class="fw-bold text-muted mb-1">Chưa có phát sinh doanh thu</h6>
+                            <p class="small text-secondary mb-0">Không có đơn hàng nào được ghi nhận trong khoảng thời gian này.</p>
+                        </div>
+                    </div>
                 </div>
-                <span class="biz-badge biz-badge-primary">
-                    <i class="bi bi-calendar-event me-1"></i> 7 ngày qua
-                </span>
             </div>
 
-            <div style="position: relative; height: 260px; width: 100%;">
-                <canvas id="revenueChart"></canvas>
+            <!-- CỘT PHẢI (4 / 12): TOP 5 SẢN PHẨM BÁN CHẠY -->
+            <div class="col-lg-5 col-xl-4">
+                <div class="biz-card p-4 h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <div>
+                                <h5 class="mb-1 fw-bold text-dark">
+                                    <i class="bi bi-trophy text-warning me-2"></i>Top 5 bán chạy
+                                </h5>
+                                <p class="text-muted small mb-0">Theo tổng số lượng đã bán</p>
+                            </div>
+                            <span class="biz-badge biz-badge-info">Top 5</span>
+                        </div>
+
+                        <!-- Danh sách Top sản phẩm -->
+                        <div id="topProductsList" class="d-flex flex-column gap-2">
+                            <!-- Nạp động qua JS hoặc Skeleton -->
+                        </div>
+
+                        <!-- Empty state khi chưa có sản phẩm bán được -->
+                        <div id="topProductsEmptyState" class="text-center py-4 d-none">
+                            <i class="bi bi-inbox text-muted fs-1 d-block mb-2"></i>
+                            <h6 class="small fw-bold text-dark mb-1">Chưa có sản phẩm bán ra</h6>
+                            <p class="small text-muted mb-0">Chưa ghi nhận món hàng nào bán được trong giai đoạn này.</p>
+                        </div>
+                    </div>
+
+                    <div class="border-top pt-3 mt-3 text-center">
+                        <a href="/pos" class="btn btn-sm btn-biz-outline w-100 d-inline-flex align-items-center justify-content-center gap-1">
+                            <i class="bi bi-cart-plus me-1"></i>Bán hàng ngay qua POS
+                        </a>
+                    </div>
+                </div>
             </div>
+
         </div>
 
-        <!-- 3. DANH SÁCH ĐƠN HÀNG GẦN ĐÂY -->
-        <div class="biz-card p-4">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                <div>
-                    <h5 class="mb-1 fw-bold text-dark">
-                        <i class="bi bi-receipt-cutoff text-danger me-2"></i>Đơn hàng gần đây
-                    </h5>
-                    <p class="text-muted small mb-0">Các đơn hàng mới nhất được tạo trong hệ thống</p>
+        <!-- 4. KHỐI DƯỚI CÙNG: CẢNH BÁO TỒN KHO THẤP & ĐƠN HÀNG GẦN ĐÂY -->
+        <div class="row g-4 mb-4" id="lowStockSection">
+
+            <!-- CỘT TRÁI (6 / 12): DANH SÁCH SẢN PHẨM SẮP HẾT HÀNG (LOW STOCK) -->
+            <div class="col-lg-6">
+                <div class="biz-card p-4 h-100">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <div>
+                            <h5 class="mb-1 fw-bold text-dark">
+                                <i class="bi bi-exclamation-octagon text-danger me-2"></i>Sản phẩm sắp hết hàng
+                            </h5>
+                            <p class="text-muted small mb-0">Mặt hàng có tồn kho &le; 5 cần lưu ý nhập thêm</p>
+                        </div>
+                        <a href="/products" class="btn btn-biz-outline btn-sm px-2 py-1 small">
+                            Quản lý tồn kho &rarr;
+                        </a>
+                    </div>
+
+                    <div class="biz-table-wrapper border-0 rounded-0" style="max-height: 300px; overflow-y: auto;">
+                        <table class="biz-table table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 100px;">Mã SP</th>
+                                    <th>Tên sản phẩm</th>
+                                    <th class="text-center" style="width: 90px;">Tồn kho</th>
+                                    <th class="text-center" style="width: 110px;">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lowStockTableBody">
+                                <!-- Nạp động qua JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty state khi kho an toàn -->
+                    <div id="lowStockEmptyState" class="text-center py-4 d-none">
+                        <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
+                        <h6 class="fw-bold text-dark mb-1">Tất cả sản phẩm đều đủ tồn kho</h6>
+                        <p class="small text-muted mb-0">Không có sản phẩm nào chạm ngưỡng cảnh báo (&le; 5 món).</p>
+                    </div>
                 </div>
-                <span class="biz-badge biz-badge-info">
-                    <i class="bi bi-clock-history me-1"></i> Mới nhất
-                </span>
             </div>
 
-            <!-- Trường hợp có đơn hàng -->
-            <div th:if="${#lists.size(recentOrders) > 0}" class="biz-table-wrapper">
-                <table class="biz-table">
-                    <thead>
-                        <tr>
-                            <th>Mã đơn</th>
-                            <th>Khách hàng</th>
-                            <th>Thời gian</th>
-                            <th class="text-end">Tổng tiền</th>
-                            <th class="text-center">Trạng thái</th>
-                            <th>Ghi chú</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="order : ${recentOrders}">
-                            <!-- Mã đơn -->
-                            <td>
-                                <span class="fw-semibold text-dark" th:text="${order.orderCode}">HD-001</span>
-                            </td>
+            <!-- CỘT PHẢI (6 / 12): ĐƠN HÀNG GẦN ĐÂY -->
+            <div class="col-lg-6">
+                <div class="biz-card p-4 h-100">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                        <div>
+                            <h5 class="mb-1 fw-bold text-dark">
+                                <i class="bi bi-clock-history text-danger me-2"></i>Đơn hàng gần đây
+                            </h5>
+                            <p class="text-muted small mb-0">Giao dịch mua bán mới nhất từ hệ thống</p>
+                        </div>
+                        <a href="/orders" class="btn btn-biz-outline btn-sm px-2 py-1 small">
+                            Xem tất cả &rarr;
+                        </a>
+                    </div>
 
-                            <!-- Khách hàng -->
-                            <td>
-                                <div th:if="${order.customer != null}" class="d-flex align-items-center gap-2">
-                                    <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; font-size: 0.75rem; font-weight: 600; color: var(--biz-text-heading);">
-                                        <span th:text="${#strings.substring(order.customer.fullName, 0, 1)}">K</span>
-                                    </div>
-                                    <div>
-                                        <div class="fw-medium text-dark small" th:text="${order.customer.fullName}">Khách hàng</div>
-                                        <div class="text-muted" style="font-size: 0.75rem;" th:if="${order.customer.phone}" th:text="${order.customer.phone}">0987654321</div>
-                                    </div>
-                                </div>
-                                <div th:unless="${order.customer != null}" class="text-muted small fst-italic">
-                                    Khách vãng lai
-                                </div>
-                            </td>
+                    <div th:if="${#lists.size(recentOrders) > 0}" class="biz-table-wrapper border-0 rounded-0" style="max-height: 300px; overflow-y: auto;">
+                        <table class="biz-table table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 130px;">Mã đơn</th>
+                                    <th>Khách hàng</th>
+                                    <th style="width: 130px;">Thời gian</th>
+                                    <th class="text-end" style="width: 110px;">Tổng tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="order : ${recentOrders}">
+                                    <td>
+                                        <span class="fw-semibold text-dark font-monospace small" th:text="${order.orderCode}">HD-001</span>
+                                    </td>
+                                    <td>
+                                        <span class="small fw-medium text-dark" th:text="${order.customer != null ? order.customer.fullName : 'Khách vãng lai'}">Khách</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted small" th:text="${#temporals.format(order.orderDate, 'dd/MM HH:mm')}">01/01 12:00</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="fw-bold small" style="color: var(--biz-primary);" th:text="${#numbers.formatDecimal(order.totalAmount, 0, 'POINT', 0, 'COMMA')} + ' ₫'">0 ₫</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-                            <!-- Thời gian -->
-                            <td>
-                                <span class="text-muted small" th:text="${#temporals.format(order.orderDate, 'dd/MM/yyyy HH:mm')}">
-                                    01/01/2026 12:00
-                                </span>
-                            </td>
-
-                            <!-- Tổng tiền -->
-                            <td class="text-end">
-                                <span class="fw-bold" style="color: var(--biz-primary);" th:text="${#numbers.formatDecimal(order.totalAmount, 0, 'POINT', 0, 'COMMA')} + ' ₫'">
-                                    0 ₫
-                                </span>
-                            </td>
-
-                            <!-- Trạng thái -->
-                            <td class="text-center">
-                                <span class="biz-badge biz-badge-success">
-                                    <i class="bi bi-check2-circle"></i> Hoàn thành
-                                </span>
-                            </td>
-
-                            <!-- Ghi chú -->
-                            <td>
-                                <span class="text-muted small" th:text="${order.note != null && !#strings.isEmpty(order.note) ? order.note : '—'}">—</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <div th:unless="${#lists.size(recentOrders) > 0}" class="text-center py-4">
+                        <i class="bi bi-inbox text-muted fs-1 d-block mb-2"></i>
+                        <h6 class="fw-bold text-dark mb-1">Chưa có đơn hàng nào</h6>
+                        <p class="small text-muted mb-0">Đơn hàng mới tạo tại POS sẽ xuất hiện ngay tại đây.</p>
+                    </div>
+                </div>
             </div>
 
-            <!-- Trường hợp chưa có đơn hàng nào -->
-            <div th:unless="${#lists.size(recentOrders) > 0}" class="text-center py-5">
-                <i class="bi bi-inbox text-muted display-4 d-block mb-3"></i>
-                <h6 class="fw-bold text-dark">Chưa có đơn hàng nào trong hệ thống</h6>
-                <p class="text-muted small mb-0">Các đơn hàng mới phát sinh từ quầy POS sẽ tự động hiển thị tại đây.</p>
-            </div>
         </div>
 
-        <!-- Script tích hợp Chart.js cho biểu đồ doanh thu -->
+        <!-- ================= SCRIPT XỬ LÝ DASHBOARD & SALES ANALYTICS ================= -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script th:inline="javascript">
-            /* Lấy dữ liệu 7 ngày từ Spring Boot Controller */
-            const chartLabels = /*[[${chartLabels}]]*/ ['24/10', '25/10', '26/10', '27/10', '28/10', '29/10', '30/10'];
-            const chartData = /*[[${chartData}]]*/ [0, 0, 0, 0, 0, 0, 0];
+        <script>
+            // --- STATE BỘ LỌC THỜI GIAN ---
+            let currentFilterPreset = '7days';
+            let activeStartDate = '';
+            let activeEndDate = '';
+            let revenueChartInstance = null;
 
-            document.addEventListener('DOMContentLoaded', function () {
+            // ================= 1. AUTH HEADERS =================
+            function getAuthHeaders() {
+                const token = localStorage.getItem('bizpos_token');
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                return headers;
+            }
+
+            function checkAuthError(status) {
+                if (status === 401) {
+                    showToast('Lỗi xác thực', 'Phiên làm việc đã hết hạn. Đang chuyển về trang Đăng nhập...', false);
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    return true;
+                }
+                if (status === 403) {
+                    showToast('Từ chối quyền', 'Bạn không có quyền thực hiện thao tác này!', false);
+                    return true;
+                }
+                return false;
+            }
+
+            // ================= 2. TOAST =================
+            function showToast(title, message, isSuccess = true) {
+                const toast = document.getElementById('bizToast');
+                const icon = document.getElementById('bizToastIcon');
+                const titleEl = document.getElementById('bizToastTitle');
+                const msgEl = document.getElementById('bizToastMessage');
+                if (!toast) return;
+
+                toast.className = `biz-toast alert alert-dismissible fade show shadow-lg ${isSuccess ? 'alert-success border-success' : 'alert-danger border-danger'}`;
+                icon.className = `bi ${isSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-octagon-fill text-danger'} me-2 fs-5`;
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+                toast.style.display = 'block';
+
+                setTimeout(() => { hideToast(); }, 3500);
+            }
+
+            function hideToast() {
+                const toast = document.getElementById('bizToast');
+                if (toast) toast.style.display = 'none';
+            }
+
+            function formatVND(amount) {
+                if (amount === null || amount === undefined || isNaN(amount)) return '0 ₫';
+                return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
+            }
+
+            // Helper format ngày YYYY-MM-DD
+            function formatDateISO(d) {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            function formatDateDisplay(isoStr) {
+                if (!isoStr) return '';
+                const parts = isoStr.split('-');
+                if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                return isoStr;
+            }
+
+            // ================= 3. QUẢN LÝ BỘ LỌC THỜI GIAN =================
+            function calculateDatesForPreset(preset) {
+                const today = new Date();
+                let start = new Date();
+                let end = new Date();
+
+                if (preset === 'today') {
+                    start = today;
+                    end = today;
+                } else if (preset === '7days') {
+                    start.setDate(today.getDate() - 6);
+                    end = today;
+                } else if (preset === '30days') {
+                    start.setDate(today.getDate() - 29);
+                    end = today;
+                }
+
+                return {
+                    startStr: formatDateISO(start),
+                    endStr: formatDateISO(end)
+                };
+            }
+
+            function setPresetFilter(preset, btnElement) {
+                currentFilterPreset = preset;
+
+                // Cập nhật giao diện active button
+                const allBtns = document.querySelectorAll('.biz-filter-btn');
+                allBtns.forEach(b => b.classList.remove('active'));
+                if (btnElement) btnElement.classList.add('active');
+
+                // Ẩn box tùy chọn nếu không phải custom
+                const customBox = document.getElementById('customDateRangeBox');
+                if (customBox) customBox.classList.add('d-none');
+
+                const dates = calculateDatesForPreset(preset);
+                activeStartDate = dates.startStr;
+                activeEndDate = dates.endStr;
+
+                const startInput = document.getElementById('filterStartDate');
+                const endInput = document.getElementById('filterEndDate');
+                if (startInput) startInput.value = activeStartDate;
+                if (endInput) endInput.value = activeEndDate;
+
+                loadAllDashboardData();
+            }
+
+            function toggleCustomFilter(btnElement) {
+                const customBox = document.getElementById('customDateRangeBox');
+                if (!customBox) return;
+
+                const allBtns = document.querySelectorAll('.biz-filter-btn');
+                allBtns.forEach(b => b.classList.remove('active'));
+                if (btnElement) btnElement.classList.add('active');
+
+                customBox.classList.toggle('d-none');
+
+                const startInput = document.getElementById('filterStartDate');
+                const endInput = document.getElementById('filterEndDate');
+                if (startInput && !startInput.value) startInput.value = activeStartDate;
+                if (endInput && !endInput.value) endInput.value = activeEndDate;
+            }
+
+            function applyCustomDateFilter() {
+                const startInput = document.getElementById('filterStartDate');
+                const endInput = document.getElementById('filterEndDate');
+                const s = startInput ? startInput.value : '';
+                const e = endInput ? endInput.value : '';
+
+                if (!s || !e) {
+                    showToast('Cảnh báo', 'Vui lòng chọn đầy đủ ngày bắt đầu và kết thúc!', false);
+                    return;
+                }
+
+                if (s > e) {
+                    showToast('Cảnh báo', 'Ngày bắt đầu không được lớn hơn ngày kết thúc!', false);
+                    return;
+                }
+
+                activeStartDate = s;
+                activeEndDate = e;
+                currentFilterPreset = 'custom';
+
+                loadAllDashboardData();
+            }
+
+            // ================= 4. NẠP DỮ LIỆU KPI CARDS (/api/dashboard/summary) =================
+            async function loadSummaryKPIs() {
+                const revEl = document.getElementById('kpiTotalRevenue');
+                const ordersEl = document.getElementById('kpiTotalOrders');
+                const aovEl = document.getElementById('kpiAverageOrderValue');
+                const lowStockEl = document.getElementById('kpiLowStockCount');
+                const dateTextEl = document.getElementById('kpiRevenueDateText');
+
+                if (dateTextEl) {
+                    if (currentFilterPreset === 'today') dateTextEl.textContent = 'Doanh thu hôm nay';
+                    else if (currentFilterPreset === '7days') dateTextEl.textContent = '7 ngày qua';
+                    else if (currentFilterPreset === '30days') dateTextEl.textContent = '30 ngày qua';
+                    else dateTextEl.textContent = `${formatDateDisplay(activeStartDate)} - ${formatDateDisplay(activeEndDate)}`;
+                }
+
+                try {
+                    const params = new URLSearchParams();
+                    if (activeStartDate) params.append('startDate', activeStartDate);
+                    if (activeEndDate) params.append('endDate', activeEndDate);
+
+                    const res = await fetch(`/api/dashboard/summary?${params.toString()}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(res.status)) return;
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (revEl) revEl.textContent = formatVND(data.totalRevenue);
+                        if (ordersEl) ordersEl.textContent = Number(data.totalOrders).toLocaleString('vi-VN');
+                        if (aovEl) aovEl.textContent = formatVND(data.averageOrderValue);
+                        if (lowStockEl) lowStockEl.textContent = Number(data.lowStockCount).toLocaleString('vi-VN');
+                    } else {
+                        const err = await res.json();
+                        showToast('Lỗi thống kê', err.message || 'Không thể lấy số liệu tổng quan!', false);
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi nạp summary:', err);
+                }
+            }
+
+            // ================= 5. NẠP BIỂU ĐỒ DOANH THU (/api/dashboard/revenue) =================
+            async function loadRevenueChart() {
+                const emptyEl = document.getElementById('chartEmptyState');
+                const rangeBadge = document.getElementById('chartRangeBadge');
+
+                if (rangeBadge) {
+                    if (currentFilterPreset === 'today') rangeBadge.textContent = 'Hôm nay';
+                    else if (currentFilterPreset === '7days') rangeBadge.textContent = '7 ngày qua';
+                    else if (currentFilterPreset === '30days') rangeBadge.textContent = '30 ngày qua';
+                    else rangeBadge.textContent = `${formatDateDisplay(activeStartDate)} - ${formatDateDisplay(activeEndDate)}`;
+                }
+
+                try {
+                    const params = new URLSearchParams();
+                    if (activeStartDate) params.append('startDate', activeStartDate);
+                    if (activeEndDate) params.append('endDate', activeEndDate);
+
+                    const res = await fetch(`/api/dashboard/revenue?${params.toString()}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(res.status)) return;
+
+                    if (res.ok) {
+                        const chartData = await res.json();
+                        const labels = chartData.labels || [];
+                        const data = chartData.data || [];
+                        const total = chartData.totalRevenue || 0;
+
+                        if (total === 0 && data.every(v => v === 0)) {
+                            if (emptyEl) emptyEl.classList.remove('d-none');
+                        } else {
+                            if (emptyEl) emptyEl.classList.add('d-none');
+                        }
+
+                        renderOrUpdateChart(labels, data);
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi nạp biểu đồ:', err);
+                }
+            }
+
+            function renderOrUpdateChart(labels, data) {
                 const ctx = document.getElementById('revenueChart');
                 if (!ctx) return;
 
                 const chartContext = ctx.getContext('2d');
 
-                // Tạo gradient mềm mại Crimson Ruby
-                const gradient = chartContext.createLinearGradient(0, 0, 0, 240);
+                // Tạo gradient nền Crimson Ruby (#e11d48)
+                const gradient = chartContext.createLinearGradient(0, 0, 0, 260);
                 gradient.addColorStop(0, 'rgba(225, 29, 72, 0.22)');
                 gradient.addColorStop(1, 'rgba(225, 29, 72, 0.00)');
 
-                new Chart(chartContext, {
+                if (revenueChartInstance) {
+                    revenueChartInstance.data.labels = labels;
+                    revenueChartInstance.data.datasets[0].data = data;
+                    revenueChartInstance.update();
+                    return;
+                }
+
+                revenueChartInstance = new Chart(chartContext, {
                     type: 'line',
                     data: {
-                        labels: chartLabels,
+                        labels: labels,
                         datasets: [{
                             label: 'Doanh thu (₫)',
-                            data: chartData,
+                            data: data,
                             borderColor: '#e11d48',
                             backgroundColor: gradient,
                             borderWidth: 2.5,
@@ -259,9 +607,7 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: {
-                                display: false
-                            },
+                            legend: { display: false },
                             tooltip: {
                                 backgroundColor: '#0f172a',
                                 titleFont: { family: 'Inter', size: 12, weight: '600' },
@@ -279,19 +625,12 @@
                         },
                         scales: {
                             x: {
-                                grid: {
-                                    display: false
-                                },
-                                ticks: {
-                                    font: { family: 'Inter', size: 12 },
-                                    color: '#64748b'
-                                }
+                                grid: { display: false },
+                                ticks: { font: { family: 'Inter', size: 11 }, color: '#64748b' }
                             },
                             y: {
                                 beginAtZero: true,
-                                grid: {
-                                    color: '#f1f5f9'
-                                },
+                                grid: { color: '#f1f5f9' },
                                 ticks: {
                                     font: { family: 'Inter', size: 11 },
                                     color: '#64748b',
@@ -305,6 +644,179 @@
                         }
                     }
                 });
+            }
+
+            // ================= 6. NẠP TOP 5 SẢN PHẨM BÁN CHẠY (/api/dashboard/top-products) =================
+            async function loadTopProducts() {
+                const listEl = document.getElementById('topProductsList');
+                const emptyEl = document.getElementById('topProductsEmptyState');
+                if (!listEl) return;
+
+                // Skeleton loading
+                listEl.innerHTML = Array(5).fill(0).map(() => `
+                    <div class="d-flex align-items-center justify-content-between p-2 rounded-2 border border-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="biz-skeleton" style="width: 26px; height: 26px; border-radius: 50%;"></span>
+                            <div>
+                                <span class="biz-skeleton biz-skeleton-text" style="width: 120px;"></span>
+                                <span class="biz-skeleton biz-skeleton-text" style="width: 70px;"></span>
+                            </div>
+                        </div>
+                        <span class="biz-skeleton biz-skeleton-text" style="width: 60px;"></span>
+                    </div>
+                `).join('');
+
+                try {
+                    const params = new URLSearchParams();
+                    if (activeStartDate) params.append('startDate', activeStartDate);
+                    if (activeEndDate) params.append('endDate', activeEndDate);
+                    params.append('limit', 5);
+
+                    const res = await fetch(`/api/dashboard/top-products?${params.toString()}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(res.status)) return;
+
+                    if (res.ok) {
+                        const items = await res.json();
+                        listEl.innerHTML = '';
+
+                        if (!items || items.length === 0) {
+                            if (emptyEl) emptyEl.classList.remove('d-none');
+                            return;
+                        }
+
+                        if (emptyEl) emptyEl.classList.add('d-none');
+
+                        items.forEach((item, index) => {
+                            const rank = index + 1;
+                            let rankClass = 'biz-rank-other';
+                            if (rank === 1) rankClass = 'biz-rank-1';
+                            else if (rank === 2) rankClass = 'biz-rank-2';
+                            else if (rank === 3) rankClass = 'biz-rank-3';
+
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'd-flex align-items-center justify-content-between p-2 rounded-3 border bg-white shadow-sm';
+                            itemDiv.innerHTML = `
+                                <div class="d-flex align-items-center gap-2 pe-2 text-truncate">
+                                    <span class="biz-rank-badge ${rankClass}">${rank}</span>
+                                    <div class="text-truncate">
+                                        <div class="fw-semibold text-dark small text-truncate" title="${item.productName}">
+                                            ${item.productName}
+                                        </div>
+                                        <span class="text-muted small font-monospace" style="font-size: 0.72rem;">
+                                            ${item.productCode || ''} &bull; Đã bán: <strong class="text-dark">${item.totalQuantity}</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="text-end ps-2 flex-shrink-0">
+                                    <span class="fw-bold small text-danger">${formatVND(item.totalRevenue)}</span>
+                                </div>
+                            `;
+                            listEl.appendChild(itemDiv);
+                        });
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi nạp top products:', err);
+                }
+            }
+
+            // ================= 7. NẠP SẢN PHẨM SẮP HẾT HÀNG (/api/dashboard/low-stock) =================
+            async function loadLowStockProducts() {
+                const tbody = document.getElementById('lowStockTableBody');
+                const emptyEl = document.getElementById('lowStockEmptyState');
+                if (!tbody) return;
+
+                // Skeleton
+                tbody.innerHTML = Array(3).fill(0).map(() => `
+                    <tr>
+                        <td><span class="biz-skeleton biz-skeleton-badge" style="width: 70px;"></span></td>
+                        <td><span class="biz-skeleton biz-skeleton-text" style="width: 130px;"></span></td>
+                        <td class="text-center"><span class="biz-skeleton biz-skeleton-text" style="width: 30px;"></span></td>
+                        <td class="text-center"><span class="biz-skeleton biz-skeleton-badge" style="width: 80px;"></span></td>
+                    </tr>
+                `).join('');
+
+                try {
+                    const res = await fetch('/api/dashboard/low-stock?threshold=5', {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(res.status)) return;
+
+                    if (res.ok) {
+                        const items = await res.json();
+                        tbody.innerHTML = '';
+
+                        if (!items || items.length === 0) {
+                            if (emptyEl) emptyEl.classList.remove('d-none');
+                            return;
+                        }
+
+                        if (emptyEl) emptyEl.classList.add('d-none');
+
+                        items.forEach(p => {
+                            const tr = document.createElement('tr');
+                            const isZero = p.stockQuantity <= 0;
+                            const badgeHtml = isZero
+                                ? `<span class="biz-badge biz-badge-danger"><i class="bi bi-x-circle-fill me-1"></i>Hết hàng</span>`
+                                : `<span class="biz-badge biz-badge-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i>Sắp hết</span>`;
+
+                            tr.innerHTML = `
+                                <td>
+                                    <span class="badge bg-light text-dark border font-monospace small">${p.code || ''}</span>
+                                </td>
+                                <td>
+                                    <div class="fw-medium text-dark small text-truncate" style="max-width: 170px;" title="${p.name}">
+                                        ${p.name}
+                                    </div>
+                                    <span class="text-muted" style="font-size: 0.72rem;">${p.categoryName || ''}</span>
+                                </td>
+                                <td class="text-center">
+                                    <strong class="${isZero ? 'text-danger' : 'text-warning'}">${p.stockQuantity}</strong>
+                                </td>
+                                <td class="text-center">
+                                    ${badgeHtml}
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi nạp low stock:', err);
+                }
+            }
+
+            // ================= 8. TỔNG HỢP NẠP TẤT CẢ DỮ LIỆU =================
+            async function loadAllDashboardData() {
+                await Promise.all([
+                    loadSummaryKPIs(),
+                    loadRevenueChart(),
+                    loadTopProducts(),
+                    loadLowStockProducts()
+                ]);
+            }
+
+            // Gán các hàm vào window
+            window.setPresetFilter = setPresetFilter;
+            window.toggleCustomFilter = toggleCustomFilter;
+            window.applyCustomDateFilter = applyCustomDateFilter;
+            window.loadAllDashboardData = loadAllDashboardData;
+            window.hideToast = hideToast;
+
+            // Khởi tạo khi mở trang
+            document.addEventListener('DOMContentLoaded', () => {
+                const dates = calculateDatesForPreset('7days');
+                activeStartDate = dates.startStr;
+                activeEndDate = dates.endStr;
+
+                const startInput = document.getElementById('filterStartDate');
+                const endInput = document.getElementById('filterEndDate');
+                if (startInput) startInput.value = activeStartDate;
+                if (endInput) endInput.value = activeEndDate;
+
+                loadAllDashboardData();
             });
         </script>
 

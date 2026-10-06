@@ -815,3 +815,69 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: space-between;
 }
 
+/* ==============================================================
+ * DASHBOARD & SALES ANALYTICS SPECIFIC STYLES
+ * ============================================================== */
+
+.biz-filter-btn {
+    padding: 7px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--biz-border);
+    background-color: var(--biz-surface);
+    color: var(--biz-text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+
+.biz-filter-btn:hover {
+    border-color: var(--biz-primary);
+    color: var(--biz-primary);
+    background-color: var(--biz-primary-light);
+}
+
+.biz-filter-btn.active {
+    background-color: var(--biz-primary);
+    border-color: var(--biz-primary);
+    color: #ffffff;
+    box-shadow: 0 2px 8px var(--biz-primary-ring);
+}
+
+.biz-rank-badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.biz-rank-1 {
+    background-color: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.biz-rank-2 {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.biz-rank-3 {
+    background-color: #ffedd5;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+}
+
+.biz-rank-other {
+    background-color: #f8fafc;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
