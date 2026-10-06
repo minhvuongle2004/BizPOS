@@ -3,12 +3,16 @@ package com.bizpos.config;
 import com.bizpos.entity.Category;
 import com.bizpos.entity.Customer;
 import com.bizpos.entity.Product;
+import com.bizpos.entity.Role;
+import com.bizpos.entity.User;
 import com.bizpos.repository.CategoryRepository;
 import com.bizpos.repository.CustomerRepository;
 import com.bizpos.repository.ProductRepository;
+import com.bizpos.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -21,10 +25,31 @@ public class DataInitializer implements CommandLineRunner {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {
         log.info("========== BIZPOS: BẮT ĐẦU KIỂM TRA ĐỌC/GHI DATABASE QUA REPOSITORY ==========");
+
+        // 0. Khởi tạo tài khoản mẫu ADMIN và STAFF
+        if (userRepository.count() == 0) {
+            User admin = User.builder()
+                    .username("admin")
+                    .password(passwordEncoder.encode("admin123"))
+                    .role(Role.ADMIN)
+                    .build();
+            userRepository.save(admin);
+            log.info(">> [GHI DB THÀNH CÔNG] Đã tạo tài khoản mẫu: admin (Role: ADMIN, Mật khẩu: admin123)");
+
+            User staff = User.builder()
+                    .username("staff")
+                    .password(passwordEncoder.encode("staff123"))
+                    .role(Role.STAFF)
+                    .build();
+            userRepository.save(staff);
+            log.info(">> [GHI DB THÀNH CÔNG] Đã tạo tài khoản mẫu: staff (Role: STAFF, Mật khẩu: staff123)");
+        }
 
         // 1. Kiểm tra bảng Danh mục (Category)
         if (categoryRepository.count() == 0) {

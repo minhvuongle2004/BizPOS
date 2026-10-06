@@ -27,6 +27,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Nhóm 1b: Sai thông tin đăng nhập (Bad Credentials) -> 401 Unauthorized
+     */
+    @org.springframework.web.bind.annotation.ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(org.springframework.security.authentication.BadCredentialsException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .message("Tên đăng nhập hoặc mật khẩu không chính xác!")
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    /**
      * Nhóm 2: Dữ liệu trùng lặp (Tên category, mã product, phone/email customer) -> 409 Conflict
      */
     @ExceptionHandler(DuplicateResourceException.class)
