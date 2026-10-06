@@ -1,0 +1,138 @@
+package com.bizpos.service.impl;
+
+import com.bizpos.dto.CreateOrderRequest;
+import com.bizpos.dto.OrderItemRequest;
+import com.bizpos.entity.Customer;
+import com.bizpos.entity.Order;
+import com.bizpos.entity.OrderItem;
+import com.bizpos.entity.Product;
+import com.bizpos.exception.ResourceNotFoundException;
+import com.bizpos.repository.CustomerRepository;
+import com.bizpos.repository.OrderRepository;
+import com.bizpos.repository.ProductRepository;
+import com.bizpos.service.OrderService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class OrderServiceImpl implements OrderService {
+
+    private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
+    private final CustomerRepository customerRepository;
+
+    /**
+     * Tạo đơn hàng mới kết hợp Customer, Product, Order và OrderItem
+     * Toàn bộ phương thức chạy trong Transaction để đảm bảo tính toàn vẹn (ACID).
+     */
+    @Override
+    @Transactional
+    public Order createOrder(CreateOrderRequest request) {
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("Đơn hàng phải chứa ít nhất 1 sản phẩm!");
+        }
+
+        // 1. Nếu có customerId, kiểm tra khách hàng có tồn tại
+        Customer customer = null;
+        if (request.getCustomerId() != null) {
+            customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + request.getCustomerId()));
+        }
+
+        Order order = new Order();
+        order.setCustomer(customer);
+        order.setOrderDate(LocalDateTime.now());
+        order.setNote(request.getNote() != null ? request.getNote().trim() : null);
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (OrderItemRequest itemReq : request.getItems()) {
+            if (itemReq.getProductId() == null) {
+                throw new IllegalArgumentException("Vui lòng cung cấp productId cho từng mục hàng!");
+            }
+            if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
+                throw new IllegalArgumentException("Số lượng mua cho từng sản phẩm phải lớn hơn 0!");
+            }
+
+            // 2. Lấy từng Product theo productId (ném ngoại lệ nếu không tìm thấy)
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
+
+            // 3. Lấy giá từ product.price; tuyệt đối không lấy giá từ request
+            BigDecimal unitPrice = product.getPrice();
+
+            // 4. Tạo từng OrderItem gồm tên sản phẩm, đơn giá, số lượng và thành tiền
+            int quantity = itemReq.getQuantity();
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+            OrderItem orderItem = OrderItem.builder()
+                    .product(product)
+                    .productName(product.getName())
+                    .unitPrice(unitPrice)
+                    .quantity(quantity)
+                    .lineTotal(lineTotal)
+                    .build();
+
+            // Thêm item vào order (thiết lập quan hệ hai chiều)
+            order.addItem(orderItem);
+
+            // 5. Tính tổng tiền của toàn bộ đơn
+            totalAmount = totalAmount.add(lineTotal);
+        }
+
+        order.setTotalAmount(totalAmount);
+
+        // 6. Tạo orderCode duy nhất
+        order.setOrderCode(generateUniqueOrderCode());
+
+        // 7. Lưu Order cùng các OrderItem (CascadeType.ALL sẽ tự động lưu các OrderItem)
+        return orderRepository.save(order);
+    }
+
+    @Override
+    public List<Order> getAllOrders() {
+        return orderRepository.findAllByOrderByOrderDateDesc();
+    }
+
+    @Override
+    public Order getOrderById(Long id) {
+        return orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
+    }
+
+    @Override
+    public Order getOrderByCode(String orderCode) {
+        return orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+    }
+
+    @Override
+    @Transactional
+    public void deleteOrder(Long id) {
+        Order order = getOrderById(id);
+        orderRepository.delete(order);
+    }
+
+    /**
+     * Sinh mã đơn hàng duy nhất có định dạng: ORD-yyyyMMddHHmmss-XXX
+     */
+    private String generateUniqueOrderCode() {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+        String orderCode;
+        do {
+            String randomSuffix = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+            orderCode = "ORD-" + timestamp + "-" + randomSuffix;
+        } while (orderRepository.existsByOrderCode(orderCode));
+
+        return orderCode;
+    }
+}

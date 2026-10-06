@@ -24,6 +24,7 @@ public class Order extends BaseEntity {
     @Column(name = "order_code", length = 50, nullable = false, unique = true)
     private String orderCode;
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id")
     private Customer customer;
