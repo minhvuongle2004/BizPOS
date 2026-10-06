@@ -28,6 +28,11 @@ public interface OrderService {
     Order getOrderByCode(String orderCode);
 
     /**
+     * Cập nhật đơn hàng theo ID (cập nhật khách hàng, ghi chú, và thay thế danh sách sản phẩm)
+     */
+    Order updateOrder(Long id, CreateOrderRequest request);
+
+    /**
      * Xóa đơn hàng theo ID
      */
     void deleteOrder(Long id);

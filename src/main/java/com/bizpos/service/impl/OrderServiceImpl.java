@@ -117,6 +117,66 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public Order updateOrder(Long id, CreateOrderRequest request) {
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("Đơn hàng phải chứa ít nhất 1 sản phẩm!");
+        }
+
+        // 1. Tìm đơn theo id; không có thì báo lỗi
+        Order order = getOrderById(id);
+
+        // 2. Cập nhật khách hàng và ghi chú
+        Customer customer = null;
+        if (request.getCustomerId() != null) {
+            customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + request.getCustomerId()));
+        }
+        order.setCustomer(customer);
+        order.setNote(request.getNote() != null ? request.getNote().trim() : null);
+
+        // 3. Xóa danh sách OrderItem cũ khỏi đơn (orphanRemoval = true sẽ xóa các dòng chi tiết cũ khỏi DB)
+        order.getItems().clear();
+
+        // 4. Tạo lại các OrderItem mới từ request, luôn lấy tên và giá hiện tại từ bảng products
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (OrderItemRequest itemReq : request.getItems()) {
+            if (itemReq.getProductId() == null) {
+                throw new IllegalArgumentException("Vui lòng cung cấp productId cho từng mục hàng!");
+            }
+            if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
+                throw new IllegalArgumentException("Số lượng mua cho từng sản phẩm phải lớn hơn 0!");
+            }
+
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
+
+            BigDecimal unitPrice = product.getPrice();
+            int quantity = itemReq.getQuantity();
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+            OrderItem orderItem = OrderItem.builder()
+                    .product(product)
+                    .productName(product.getName())
+                    .unitPrice(unitPrice)
+                    .quantity(quantity)
+                    .lineTotal(lineTotal)
+                    .build();
+
+            order.addItem(orderItem);
+
+            // 5. Tính lại totalAmount
+            totalAmount = totalAmount.add(lineTotal);
+        }
+
+        order.setTotalAmount(totalAmount);
+
+        // 6. Lưu trong @Transactional
+        return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
     public void deleteOrder(Long id) {
         Order order = getOrderById(id);
         orderRepository.delete(order);

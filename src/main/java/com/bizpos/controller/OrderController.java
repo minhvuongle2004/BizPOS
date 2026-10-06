@@ -46,4 +46,28 @@ public class OrderController {
         Order order = orderService.getOrderById(id);
         return ResponseEntity.ok(order);
     }
+
+    /**
+     * 4. Cập nhật đơn hàng theo ID
+     * PUT /api/orders/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<Order> updateOrder(
+            @PathVariable Long id,
+            @RequestBody CreateOrderRequest request) {
+        Order updatedOrder = orderService.updateOrder(id, request);
+        return ResponseEntity.ok(updatedOrder);
+    }
+
+    /**
+     * 5. Xóa đơn hàng theo ID
+     * DELETE /api/orders/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<java.util.Map<String, String>> deleteOrder(@PathVariable Long id) {
+        orderService.deleteOrder(id);
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("message", "Xóa đơn hàng thành công với ID: " + id);
+        return ResponseEntity.ok(response);
+    }
 }
