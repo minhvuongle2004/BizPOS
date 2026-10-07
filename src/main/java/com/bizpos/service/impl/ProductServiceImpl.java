@@ -100,6 +100,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @com.bizpos.aspect.Auditable(action = "UPDATE_PRODUCT", entity = "Product")
     public Product updateProduct(Long id, ProductRequest request) {
         Product existingProduct = getProductById(id);
         validateProductRequest(request);
@@ -167,6 +168,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @com.bizpos.aspect.Auditable(action = "DELETE_PRODUCT", entity = "Product")
     public void deleteProduct(Long id) {
         Product product = getProductById(id);
 

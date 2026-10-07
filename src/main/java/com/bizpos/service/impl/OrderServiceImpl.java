@@ -150,6 +150,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @com.bizpos.aspect.Auditable(action = "UPDATE_ORDER", entity = "Order")
     public Order updateOrder(Long id, CreateOrderRequest request) {
         if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
             throw new IllegalArgumentException("Đơn hàng phải chứa ít nhất 1 sản phẩm!");
@@ -263,6 +264,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @com.bizpos.aspect.Auditable(action = "DELETE_ORDER", entity = "Order")
     public void deleteOrder(Long id) {
         Order order = getOrderById(id);
 

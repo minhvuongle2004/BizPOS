@@ -112,7 +112,18 @@
   * `GET /api/stock-movements/product/{productId}/paged`: Phân trang thẻ kho theo sản phẩm.
   * `GET /api/stock-movements`: Tra cứu & lọc đa tiêu chí toàn hệ thống (`productId`, `type`, khoảng thời gian `from/to`).
 
-### 6. Quản lý Dữ liệu Danh mục & Khách hàng
+### 6. Nhật ký kiểm toán hệ thống (Audit Trail via Spring AOP)
+* **Tự động bắt vết qua Aspect-Oriented Programming (AOP)**: Sử dụng custom annotation `@Auditable` và `AuditAspect` (`@Around`) để can thiệp trong suốt, không làm ô nhiễm (decouple) logic nghiệp vụ cốt lõi.
+* **Giám sát chặt chẽ các can thiệp dữ liệu nhạy cảm**:
+  * `UPDATE_PRICE` (Sửa giá bán): Tự động phát hiện khi giá sản phẩm bị thay đổi, lưu vết giá cũ vs giá mới (`oldValue` &rarr; `newValue`).
+  * `UPDATE_PRODUCT` (Sửa sản phẩm): Lưu vết thông tin tên, mã hàng, tồn kho trước/sau khi sửa.
+  * `DELETE_PRODUCT` (Xóa sản phẩm): Chụp lại toàn bộ snapshot thông tin sản phẩm trước khi bị xóa khỏi hệ thống.
+  * `UPDATE_ORDER` (Sửa hóa đơn): Lưu vết mã đơn, tổng tiền cũ vs tổng tiền mới, số lượng món hàng bị thay đổi.
+  * `DELETE_ORDER` (Hủy / Xóa hóa đơn): Lưu vết mã đơn, tổng tiền của đơn bị hủy nhằm chống thất thoát doanh thu.
+* **Audit Metadata toàn diện**: Bảng `audit_logs` lưu trữ `performed_by` (trích xuất từ JWT token người thao tác), `ip_address` (địa chỉ IP máy trạm), `details` (mô tả ngữ cảnh tiếng Việt) và `created_at`.
+* **Bảo vệ an toàn thông tin**: Toàn bộ API tra cứu `/api/audit-logs/**` và giao diện Audit Log Modal được bảo vệ nghiêm ngặt — **chỉ tài khoản quản trị `ADMIN` mới có quyền truy cập** (nhân viên `STAFF` bị chặn 403 Forbidden).
+
+### 7. Quản lý Dữ liệu Danh mục & Khách hàng
 * **Danh mục (Categories)**: Thêm, sửa, xóa, tra cứu. Ngăn chặn việc xóa danh mục nếu đang có sản phẩm liên kết (trả về HTTP 409 Conflict).
 * **Khách hàng (Customers)**: Quản lý hồ sơ khách hàng, tra cứu nhanh theo Tên / Số điện thoại, ràng buộc không trùng SĐT và Email.
 * **Đơn hàng (Orders)**: Xem danh sách đơn, phân trang, lọc theo khoảng thời gian và xem chi tiết danh sách món hàng trong từng đơn.
@@ -131,6 +142,7 @@ Hệ thống BizPOS tuân thủ chặt chẽ tiêu chuẩn kiểm soát gian l�
 | **Xem Sổ nhật ký kho / Thẻ kho** (`GET /api/stock-movements/**`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Xem Dashboard Analytics & Báo cáo** | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Cập nhật tồn kho kiểm đếm** (`PATCH /stock`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
+| **Xem Nhật ký kiểm toán** (`GET /api/audit-logs/**`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
 | **Sửa giá / Sửa sản phẩm** (`PUT /api/products/{id}`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
 | **Sửa hóa đơn đã tạo** (`PUT /api/orders/{id}`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
 | **Xóa bất kỳ dữ liệu nào** (`DELETE /api/**`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
@@ -138,7 +150,7 @@ Hệ thống BizPOS tuân thủ chặt chẽ tiêu chuẩn kiểm soát gian l�
 | **Nhập hàng loạt bằng Excel** (`POST /import`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
 
 > [!IMPORTANT]
-> **Chống gian lận thu ngân:** Nhân viên (`STAFF`) tuyệt đối không thể tự ý sửa giá bán sản phẩm trên hệ thống hoặc sửa giảm bớt món trong hóa đơn sau khi khách đã thanh toán. Mọi hành vi xóa hoặc trích xuất dữ liệu quy mô lớn đều yêu cầu quyền `ADMIN`.
+> **Chống gian lận thu ngân & Traceability:** Nhân viên (`STAFF`) tuyệt đối không thể tự ý sửa giá bán sản phẩm trên hệ thống hoặc sửa giảm bớt món trong hóa đơn sau khi khách đã thanh toán. Mọi hành vi sửa giá, xóa đơn của `ADMIN` đều bị Spring AOP ghi nhận vĩnh viễn vào `audit_logs` để truy vết trách nhiệm.
 
 ---
 
@@ -188,6 +200,20 @@ erDiagram
         datetime created_at
     }
 
+    AUDIT_LOGS {
+        bigint id PK
+        varchar entity_name
+        varchar entity_id
+        varchar action
+        varchar action_description
+        text old_value
+        text new_value
+        varchar details
+        varchar performed_by
+        varchar ip_address
+        datetime created_at
+    }
+
     CUSTOMERS {
         bigint id PK
         varchar full_name
@@ -228,18 +254,19 @@ erDiagram
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (156 Automated Tests)
+## 🧪 Hệ thống Kiểm thử Tự động (164 Automated Tests)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 156, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 164, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
-### 1. Unit Tests (JUnit 5 + Mockito) — 97 tests
-* **`StockMovementServiceTest` (6 tests mới)**: Ghi nhận biến động kho, kiểm tra tính toàn vẹn tham số (product null, quantity $\le 0$), truy vấn lịch sử thẻ kho theo sản phẩm, phân trang thẻ kho.
+### 1. Unit Tests (JUnit 5 + Mockito) — 101 tests
+* **`AuditLogServiceTest` (4 tests mới)**: Ghi nhận nhật ký kiểm toán, fallback giá trị SYSTEM & IP máy trạm, phân trang lịch sử kiểm toán, truy vấn theo đối tượng tác động.
+* **`StockMovementServiceTest` (6 tests)**: Ghi nhận biến động kho, kiểm tra tính toàn vẹn tham số (product null, quantity $\le 0$), truy vấn lịch sử thẻ kho theo sản phẩm, phân trang thẻ kho.
 * **`OrderServiceTest` (24 tests)**: Tạo đơn 1 món / nhiều món, snapshot giá từ DB, tính tổng tiền, chiết khấu %, chiết khấu tiền mặt, trừ tồn kho, ghi nhận thẻ kho SALE, rollback khi thiếu tồn kho, cập nhật đơn hàng & hoàn trả tồn kho cũ, xóa đơn hàng.
 * **`ProductServiceTest` (17 tests)**: CRUD sản phẩm, trùng mã SKU, giá âm, tồn âm, category không tồn tại, cập nhật tồn kho thủ công & ghi nhận thẻ kho ADJUSTMENT.
 * **`CategoryServiceTest` (11 tests)**: CRUD danh mục, tên trùng lặp, chặn xóa danh mục khi có sản phẩm liên kết (409 Conflict).
@@ -249,8 +276,13 @@ BUILD SUCCESS
 * **`CustomUserDetailsServiceTest` (3 tests)**: Nạp thông tin người dùng với quyền `ROLE_ADMIN`, `ROLE_STAFF`, xử lý khi user không tồn tại.
 * **`JwtAuthenticationFilterTest` (6 tests)**: Kiểm thử bộ lọc JWT, xử lý khi thiếu header, header không phải Bearer, Bearer hợp lệ, token sai, token lỗi.
 
-### 2. Integration Tests (Spring Boot + MockMvc + MySQL thật) — 59 tests
-* **`StockMovementIntegrationTest` (4 tests mới)**:
+### 2. Integration Tests (Spring Boot + MockMvc + MySQL thật) — 63 tests
+* **`AuditLogIntegrationTest` (4 tests mới)**:
+  * Sửa giá sản phẩm (`PUT /api/products/{id}`) tự động kích hoạt Spring AOP `@Around` ghi nhận `UPDATE_PRICE` kèm giá cũ, giá mới và tài khoản thực hiện.
+  * Hủy đơn hàng (`DELETE /api/orders/{id}`) tự động ghi nhận `DELETE_ORDER`.
+  * Chặn nhân viên (`STAFF`) 403 Forbidden khi cố gắng truy cập `/api/audit-logs`.
+  * Cho phép quản trị viên (`ADMIN`) truy xuất danh sách nhật ký kiểm toán.
+* **`StockMovementIntegrationTest` (4 tests)**:
   * Bán hàng qua OrderService $\rightarrow$ trừ kho $\rightarrow$ tự động tạo bản ghi `MovementType.SALE` trong `stock_movements` với `previousStock`, `currentStock` và `referenceCode` khớp mã đơn.
   * Điều chỉnh tồn kho thủ công qua `ProductService.updateStock` $\rightarrow$ ghi nhận `MovementType.ADJUSTMENT`.
   * Hủy đơn hàng $\rightarrow$ hoàn trả kho $\rightarrow$ ghi nhận `MovementType.RETURN`.
