@@ -30,6 +30,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final OrderItemRepository orderItemRepository;
+    private final com.bizpos.service.StockMovementService stockMovementService;
 
     @Override
     public PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId) {
@@ -78,7 +79,23 @@ public class ProductServiceImpl implements ProductService {
                 .category(category)
                 .build();
 
-        return productRepository.save(product);
+        Product saved = productRepository.save(product);
+
+        // Ghi nhận nhập kho ban đầu nếu stockQuantity > 0
+        if (saved.getStockQuantity() != null && saved.getStockQuantity() > 0) {
+            stockMovementService.recordMovement(
+                    saved,
+                    com.bizpos.entity.MovementType.IMPORT,
+                    saved.getStockQuantity(),
+                    0,
+                    saved.getStockQuantity(),
+                    "INIT-STOCK",
+                    "Khởi tạo số lượng tồn kho ban đầu",
+                    getCurrentUsername()
+            );
+        }
+
+        return saved;
     }
 
     @Override
@@ -118,8 +135,34 @@ public class ProductServiceImpl implements ProductService {
             throw new IllegalArgumentException("Số lượng tồn kho phải là số nguyên không âm (>= 0)!");
         }
         Product existingProduct = getProductById(id);
+        int prevStock = existingProduct.getStockQuantity() != null ? existingProduct.getStockQuantity() : 0;
+        int delta = Math.abs(quantity - prevStock);
         existingProduct.setStockQuantity(quantity);
-        return productRepository.save(existingProduct);
+        Product updated = productRepository.save(existingProduct);
+
+        if (quantity != prevStock) {
+            stockMovementService.recordMovement(
+                    updated,
+                    com.bizpos.entity.MovementType.ADJUSTMENT,
+                    delta,
+                    prevStock,
+                    quantity,
+                    "ADJUST-" + id,
+                    "Điều chỉnh tồn kho thủ công (" + (quantity > prevStock ? "+" : "-") + delta + ")",
+                    getCurrentUsername()
+            );
+        }
+
+        return updated;
+    }
+
+    private String getCurrentUsername() {
+        org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            return auth.getName();
+        }
+        return "SYSTEM";
     }
 
     @Override

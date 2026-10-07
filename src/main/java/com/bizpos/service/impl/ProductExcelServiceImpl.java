@@ -29,6 +29,7 @@ public class ProductExcelServiceImpl implements ProductExcelService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final com.bizpos.service.StockMovementService stockMovementService;
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -298,7 +299,21 @@ public class ProductExcelServiceImpl implements ProductExcelService {
 
             // Lưu toàn bộ các sản phẩm hợp lệ vào database
             if (!productsToSave.isEmpty()) {
-                productRepository.saveAll(productsToSave);
+                List<Product> savedProducts = productRepository.saveAll(productsToSave);
+                for (Product sp : savedProducts) {
+                    if (sp.getStockQuantity() != null && sp.getStockQuantity() > 0) {
+                        stockMovementService.recordMovement(
+                                sp,
+                                com.bizpos.entity.MovementType.IMPORT,
+                                sp.getStockQuantity(),
+                                0,
+                                sp.getStockQuantity(),
+                                "EXCEL-IMPORT",
+                                "Nhập hàng từ file Excel: " + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "danh_sach.xlsx"),
+                                getCurrentUsername()
+                        );
+                    }
+                }
                 log.info("Import thành công {} sản phẩm từ Excel", productsToSave.size());
             }
 
@@ -313,6 +328,15 @@ public class ProductExcelServiceImpl implements ProductExcelService {
                 .errorCount(errors.size())
                 .errors(errors)
                 .build();
+    }
+
+    private String getCurrentUsername() {
+        org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            return auth.getName();
+        }
+        return "SYSTEM";
     }
 
     private void setBorders(CellStyle style) {

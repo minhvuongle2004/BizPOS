@@ -99,7 +99,20 @@
   * Kiểm tra và validate chi tiết từng dòng (mã trùng DB, rỗng tên, danh mục không tồn tại, giá âm, tồn âm).
   * Báo cáo kết quả import chi tiết (Tổng số dòng, số dòng thành công, số dòng lỗi và lý do cụ thể từng dòng) mà không làm crash request.
 
-### 5. Quản lý Dữ liệu Danh mục & Khách hàng
+### 5. Sổ nhật ký kho / Thẻ kho (Stock Movement Ledger)
+* **Append-Only Immutable Ledger**: Thay vì chỉ ghi đè số lượng tồn kho `stockQuantity`, hệ thống ghi nhận mỗi biến động vào bảng `stock_movements` tạo thành thẻ kho bất biến (audit log).
+* **Bao phủ toàn diện các loại biến động (`MovementType`)**:
+  * `SALE` (Xuất bán hàng): Tự động ghi nhận khi đặt hàng, liên kết với mã đơn hàng `referenceCode` (ví dụ: `ORD-20261007-XXXX`).
+  * `IMPORT` (Nhập kho): Ghi nhận khi khởi tạo tồn kho sản phẩm mới hoặc khi nhập hàng loạt từ file Excel (`EXCEL-IMPORT`).
+  * `RETURN` (Hoàn trả kho): Ghi nhận khi hủy đơn hàng hoặc cập nhật thay thế món hàng trong đơn.
+  * `ADJUSTMENT` (Điều chỉnh tồn kho): Ghi nhận khi nhân viên/quản lý cập nhật kiểm kê số lượng thực tế.
+* **Audit Trail minh bạch**: Lưu vết chi tiết `previous_stock` (tồn trước), `current_stock` (tồn sau), `quantity` (số lượng biến động), `reference_code` (mã tham chiếu), `reason` (lý do nghiệp vụ), `created_by` (người thực hiện từ JWT SecurityContext) và `created_at`.
+* **REST APIs Thẻ kho**:
+  * `GET /api/stock-movements/product/{productId}`: Xem toàn bộ lịch sử thẻ kho của sản phẩm.
+  * `GET /api/stock-movements/product/{productId}/paged`: Phân trang thẻ kho theo sản phẩm.
+  * `GET /api/stock-movements`: Tra cứu & lọc đa tiêu chí toàn hệ thống (`productId`, `type`, khoảng thời gian `from/to`).
+
+### 6. Quản lý Dữ liệu Danh mục & Khách hàng
 * **Danh mục (Categories)**: Thêm, sửa, xóa, tra cứu. Ngăn chặn việc xóa danh mục nếu đang có sản phẩm liên kết (trả về HTTP 409 Conflict).
 * **Khách hàng (Customers)**: Quản lý hồ sơ khách hàng, tra cứu nhanh theo Tên / Số điện thoại, ràng buộc không trùng SĐT và Email.
 * **Đơn hàng (Orders)**: Xem danh sách đơn, phân trang, lọc theo khoảng thời gian và xem chi tiết danh sách món hàng trong từng đơn.
@@ -115,6 +128,7 @@ Hệ thống BizPOS tuân thủ chặt chẽ tiêu chuẩn kiểm soát gian l�
 | **Đăng ký & Đăng nhập** (`/api/auth/**`, `/login`) | ✅ Cho phép | ✅ Cho phép | ✅ Cho phép |
 | **Bán hàng POS & Tạo đơn hàng** (`POST /api/orders`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Xem danh sách Sản phẩm, Danh mục, Đơn hàng** | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
+| **Xem Sổ nhật ký kho / Thẻ kho** (`GET /api/stock-movements/**`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Xem Dashboard Analytics & Báo cáo** | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Cập nhật tồn kho kiểm đếm** (`PATCH /stock`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Sửa giá / Sửa sản phẩm** (`PUT /api/products/{id}`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
@@ -161,6 +175,19 @@ erDiagram
         datetime updated_at
     }
 
+    STOCK_MOVEMENTS {
+        bigint id PK
+        bigint product_id FK
+        varchar movement_type
+        int quantity
+        int previous_stock
+        int current_stock
+        varchar reference_code
+        varchar reason
+        varchar created_by
+        datetime created_at
+    }
+
     CUSTOMERS {
         bigint id PK
         varchar full_name
@@ -193,6 +220,7 @@ erDiagram
     }
 
     CATEGORIES ||--o{ PRODUCTS : "contains"
+    PRODUCTS ||--o{ STOCK_MOVEMENTS : "tracks"
     CUSTOMERS ||--o{ ORDERS : "places"
     ORDERS ||--|{ ORDER_ITEMS : "has"
     PRODUCTS ||--o{ ORDER_ITEMS : "referenced_in"
@@ -200,19 +228,20 @@ erDiagram
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (146 Automated Tests)
+## 🧪 Hệ thống Kiểm thử Tự động (156 Automated Tests)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 146, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 156, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
-### 1. Unit Tests (JUnit 5 + Mockito) — 91 tests
-* **`OrderServiceTest` (24 tests)**: Tạo đơn 1 món / nhiều món, snapshot giá từ DB, tính tổng tiền, chiết khấu %, chiết khấu tiền mặt, trừ tồn kho, rollback khi thiếu tồn kho, cập nhật đơn hàng & hoàn trả tồn kho cũ, xóa đơn hàng.
-* **`ProductServiceTest` (17 tests)**: CRUD sản phẩm, trùng mã SKU, giá âm, tồn âm, category không tồn tại, cập nhật tồn kho thủ công.
+### 1. Unit Tests (JUnit 5 + Mockito) — 97 tests
+* **`StockMovementServiceTest` (6 tests mới)**: Ghi nhận biến động kho, kiểm tra tính toàn vẹn tham số (product null, quantity $\le 0$), truy vấn lịch sử thẻ kho theo sản phẩm, phân trang thẻ kho.
+* **`OrderServiceTest` (24 tests)**: Tạo đơn 1 món / nhiều món, snapshot giá từ DB, tính tổng tiền, chiết khấu %, chiết khấu tiền mặt, trừ tồn kho, ghi nhận thẻ kho SALE, rollback khi thiếu tồn kho, cập nhật đơn hàng & hoàn trả tồn kho cũ, xóa đơn hàng.
+* **`ProductServiceTest` (17 tests)**: CRUD sản phẩm, trùng mã SKU, giá âm, tồn âm, category không tồn tại, cập nhật tồn kho thủ công & ghi nhận thẻ kho ADJUSTMENT.
 * **`CategoryServiceTest` (11 tests)**: CRUD danh mục, tên trùng lặp, chặn xóa danh mục khi có sản phẩm liên kết (409 Conflict).
 * **`CustomerServiceTest` (14 tests)**: CRUD khách hàng, trùng SĐT, trùng Email, format dữ liệu.
 * **`DashboardServiceTest` (16 tests)**: Tính toán KPI tổng quan, chia AOV (tránh chia cho 0), chuẩn hóa khoảng ngày (Today, 7 ngày, 30 ngày, custom `from/to`), zero-fill biểu đồ doanh thu, Top 5 sản phẩm, lọc tồn kho thấp threshold $\le 5$.
@@ -220,7 +249,12 @@ BUILD SUCCESS
 * **`CustomUserDetailsServiceTest` (3 tests)**: Nạp thông tin người dùng với quyền `ROLE_ADMIN`, `ROLE_STAFF`, xử lý khi user không tồn tại.
 * **`JwtAuthenticationFilterTest` (6 tests)**: Kiểm thử bộ lọc JWT, xử lý khi thiếu header, header không phải Bearer, Bearer hợp lệ, token sai, token lỗi.
 
-### 2. Integration Tests (Spring Boot + MockMvc + MySQL thật) — 55 tests
+### 2. Integration Tests (Spring Boot + MockMvc + MySQL thật) — 59 tests
+* **`StockMovementIntegrationTest` (4 tests mới)**:
+  * Bán hàng qua OrderService $\rightarrow$ trừ kho $\rightarrow$ tự động tạo bản ghi `MovementType.SALE` trong `stock_movements` với `previousStock`, `currentStock` và `referenceCode` khớp mã đơn.
+  * Điều chỉnh tồn kho thủ công qua `ProductService.updateStock` $\rightarrow$ ghi nhận `MovementType.ADJUSTMENT`.
+  * Hủy đơn hàng $\rightarrow$ hoàn trả kho $\rightarrow$ ghi nhận `MovementType.RETURN`.
+  * Gọi API `GET /api/stock-movements/product/{id}` trả về danh sách lịch sử thẻ kho chuẩn xác.
 * **`OrderConcurrencyIntegrationTest` (2 tests)**:
   * **Đua lệnh đơn sản phẩm:** 20 threads đồng thời tranh mua sản phẩm tồn kho = 10 $\rightarrow$ đúng 10 đơn thành công, 10 đơn bị chặn do hết hàng, tồn kho cuối cùng trong MySQL về đúng 0 (không âm, không lost update).
   * **Chống Deadlock đa sản phẩm:** Chạy song song các luồng đặt hàng mua sản phẩm theo thứ tự ngược chiều nhau (A rồi B vs B rồi A) $\rightarrow$ cơ chế sắp xếp `productId` tăng dần trước khi lock triệt tiêu 100% Deadlock, toàn bộ đơn hoàn tất thành công.

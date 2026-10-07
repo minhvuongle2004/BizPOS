@@ -29,6 +29,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
+    private final com.bizpos.service.StockMovementService stockMovementService;
 
     /**
      * Tạo đơn hàng mới kết hợp Customer, Product, Order và OrderItem
@@ -52,6 +53,10 @@ public class OrderServiceImpl implements OrderService {
         order.setCustomer(customer);
         order.setOrderDate(LocalDateTime.now());
         order.setNote(request.getNote() != null ? request.getNote().trim() : null);
+
+        // Sinh mã đơn hàng trước để dùng làm referenceCode cho StockMovement
+        String orderCode = generateUniqueOrderCode();
+        order.setOrderCode(orderCode);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -82,8 +87,21 @@ public class OrderServiceImpl implements OrderService {
                         ") không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
             }
 
-            product.setStockQuantity(currentStock - requestedQty);
+            int newStock = currentStock - requestedQty;
+            product.setStockQuantity(newStock);
             productRepository.save(product);
+
+            // Ghi nhật ký kho (Stock Movement Ledger)
+            stockMovementService.recordMovement(
+                    product,
+                    com.bizpos.entity.MovementType.SALE,
+                    requestedQty,
+                    currentStock,
+                    newStock,
+                    orderCode,
+                    "Xuất kho bán hàng theo đơn " + orderCode,
+                    getCurrentUsername()
+            );
 
             // 3. Lấy giá từ product.price; tuyệt đối không lấy giá từ request
             BigDecimal unitPrice = product.getPrice();
@@ -109,10 +127,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setTotalAmount(totalAmount);
 
-        // 6. Tạo orderCode duy nhất
-        order.setOrderCode(generateUniqueOrderCode());
-
-        // 7. Lưu Order cùng các OrderItem (CascadeType.ALL sẽ tự động lưu các OrderItem)
+        // Lưu Order cùng các OrderItem (CascadeType.ALL sẽ tự động lưu các OrderItem)
         return orderRepository.save(order);
     }
 
@@ -158,8 +173,20 @@ public class OrderServiceImpl implements OrderService {
                 if (oldItem.getProduct() != null) {
                     Product oldProduct = oldItem.getProduct();
                     int currentStock = oldProduct.getStockQuantity() != null ? oldProduct.getStockQuantity() : 0;
-                    oldProduct.setStockQuantity(currentStock + oldItem.getQuantity());
+                    int newStock = currentStock + oldItem.getQuantity();
+                    oldProduct.setStockQuantity(newStock);
                     productRepository.save(oldProduct);
+
+                    stockMovementService.recordMovement(
+                            oldProduct,
+                            com.bizpos.entity.MovementType.RETURN,
+                            oldItem.getQuantity(),
+                            currentStock,
+                            newStock,
+                            order.getOrderCode(),
+                            "Hoàn kho do cập nhật đơn hàng " + order.getOrderCode(),
+                            getCurrentUsername()
+                    );
                 }
             }
         }
@@ -195,8 +222,20 @@ public class OrderServiceImpl implements OrderService {
                         ") không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
             }
 
-            product.setStockQuantity(currentStock - requestedQty);
+            int newStock = currentStock - requestedQty;
+            product.setStockQuantity(newStock);
             productRepository.save(product);
+
+            stockMovementService.recordMovement(
+                    product,
+                    com.bizpos.entity.MovementType.SALE,
+                    requestedQty,
+                    currentStock,
+                    newStock,
+                    order.getOrderCode(),
+                    "Xuất kho bán hàng (cập nhật đơn hàng) " + order.getOrderCode(),
+                    getCurrentUsername()
+            );
 
             BigDecimal unitPrice = product.getPrice();
             int quantity = itemReq.getQuantity();
@@ -233,13 +272,34 @@ public class OrderServiceImpl implements OrderService {
                 if (item.getProduct() != null) {
                     Product product = item.getProduct();
                     int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
-                    product.setStockQuantity(currentStock + item.getQuantity());
+                    int newStock = currentStock + item.getQuantity();
+                    product.setStockQuantity(newStock);
                     productRepository.save(product);
+
+                    stockMovementService.recordMovement(
+                            product,
+                            com.bizpos.entity.MovementType.RETURN,
+                            item.getQuantity(),
+                            currentStock,
+                            newStock,
+                            order.getOrderCode(),
+                            "Hoàn kho do hủy đơn hàng " + order.getOrderCode(),
+                            getCurrentUsername()
+                    );
                 }
             }
         }
 
         orderRepository.delete(order);
+    }
+
+    private String getCurrentUsername() {
+        org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            return auth.getName();
+        }
+        return "SYSTEM";
     }
 
     /**
