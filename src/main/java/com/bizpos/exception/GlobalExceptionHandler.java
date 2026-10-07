@@ -40,6 +40,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Nhóm 1c: Không có quyền truy cập (Access Denied / @PreAuthorize) -> 403 Forbidden
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.FORBIDDEN.value())
+                .message("Bạn không có quyền thực hiện thao tác này (yêu cầu quyền ADMIN)!")
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    /**
      * Nhóm 2: Dữ liệu trùng lặp (Tên category, mã product, phone/email customer) -> 409 Conflict
      */
     @ExceptionHandler(DuplicateResourceException.class)
