@@ -1,58 +1,275 @@
-# BizPOS — Hệ thống quản lý bán hàng cơ bản
+# 🛒 BizPOS — Hệ Thống Quản Lý Bán Hàng & Điểm Bán Lẻ (Retail Point of Sale)
 
-Ứng dụng web POS hỗ trợ cửa hàng quản lý sản phẩm, khách hàng và đơn hàng.
+> **BizPOS** là giải pháp phần mềm quản lý bán hàng toàn diện, hiện đại dành cho cửa hàng bán lẻ và chuỗi F&B / Mini Mart. Hệ thống cung cấp đầy đủ các quy trình: Bán hàng tại quầy (POS), Quản lý kho hàng thời gian thực, Xuất/Nhập Excel, Báo cáo doanh thu & Dashboard Analytics, cùng cơ chế Bảo mật và Phân quyền nghiêm ngặt theo chuẩn thị trường.
+
+---
+
+## 📑 Mục lục
+- [🚀 Công nghệ sử dụng](#-công-nghệ-sử-dụng)
+- [✨ Tính năng nổi bật](#-tính-năng-nổi-bật)
+  - [1. Quầy bán hàng thời gian thực (POS)](#1-quầy-bán-hàng-thời-gian-thực-pos)
+  - [2. Quản lý kho hàng & Tồn kho tự động (Inventory Management)](#2-quản-lý-kho-hàng--tồn-kho-tự-động-inventory-management)
+  - [3. Báo cáo & Phân tích kinh doanh (Sales & Analytics Dashboard)](#3-báo-cáo--phân-tích-kinh-doanh-sales--analytics-dashboard)
+  - [4. Xuất / Nhập Excel (Product & Inventory Excel Engine)](#4-xuất--nhập-excel-product--inventory-excel-engine)
+  - [5. Quản lý Dữ liệu Danh mục & Khách hàng](#5-quản-lý-dữ-liệu-danh-mục--khách-hàng)
+- [🔒 Bảo mật & Ma trận Phân quyền (Security & RBAC)](#-bảo-mật--ma-trận-phân-quyền-security--rbac)
+- [🗄️ Cấu trúc Cơ sở dữ liệu (Database Schema)](#️-cấu-trúc-cơ-sở-dữ-liệu-database-schema)
+- [🧪 Hệ thống Kiểm thử Tự động (144 Automated Tests)](#-hệ-thống-kiểm-thử-tự-động-144-automated-tests)
+- [⚙️ Cài đặt & Khởi chạy](#️-cài-đặt--khởi-chạy)
+- [👤 Tài khoản Mặc định](#-tài-khoản-mặc-định)
 
 ---
 
 ## 🚀 Công nghệ sử dụng
 
-- **Backend**: Java 17, Spring Boot 3.3.4, Spring Web
-- **Cơ sở dữ liệu**: MySQL
-- **ORM / Persistence**: Spring Data JPA, Hibernate
-- **Giao diện**: HTML5, CSS3, JavaScript, Bootstrap 5
-- **Template Engine**: Thymeleaf
-- **Build Tool**: Maven
+### Backend
+* **Ngôn ngữ & Framework**: Java 17, Spring Boot 3.3.4 (Spring Web, Spring Data JPA, Spring Security 6, Spring Validation).
+* **Cơ sở dữ liệu & ORM**: MySQL 8.x, Hibernate ORM, HikariCP Connection Pool.
+* **Xác thực & Bảo mật**: Stateless JWT Authentication (`io.jsonwebtoken:jjwt:0.12.6`), BCrypt Password Encoder, Method Security (`@PreAuthorize`).
+* **Xử lý File Excel**: Apache POI 5.2.5 (`poi-ooxml`).
+* **Kiểm thử**: JUnit 5, Mockito, Spring Boot Test, Spring Security Test, MockMvc.
+
+### Frontend
+* **Template Engine**: Thymeleaf (Modular Layouts & Fragments).
+* **Styling & UI Components**: Bootstrap 5.3, Bootstrap Icons, Custom CSS3 Design System.
+* **Giao diện & UX**:
+  * Hiệu ứng thanh điều hướng trượt (Sliding indicator transition).
+  * Màn hình chờ Skeleton loading (chống layout shift).
+  * Hệ thống thông báo Toast Notifications chuẩn REST error handling (400, 401, 403, 404, 409, 500).
+* **Biểu đồ**: Chart.js 4.4 (Doanh thu bán hàng theo thời gian thực).
 
 ---
 
-## 📋 Chức năng chính
+## ✨ Tính năng nổi bật
 
-1. **Quản lý danh mục**: Thêm, sửa, xóa, xem danh sách.
-2. **Quản lý sản phẩm**: CRUD, tìm kiếm sản phẩm theo tên / mã.
-3. **Quản lý khách hàng**: CRUD, tìm kiếm theo tên / số điện thoại.
-4. **Tạo đơn hàng (POS)**: Chọn khách hàng, thêm nhiều sản phẩm vào đơn, tự động tính tổng tiền.
-5. **Quản lý đơn hàng**: Xem danh sách đơn, chi tiết đơn, sửa / xóa đơn.
-6. **Đăng nhập cơ bản**: Xác thực người dùng truy cập hệ thống.
+### 1. Quầy bán hàng thời gian thực (POS)
+* Tìm kiếm sản phẩm thông minh qua tên hoặc mã SKU.
+* Lọc sản phẩm nhanh theo từng danh mục.
+* Thẻ sản phẩm hiển thị giá bán và số lượng tồn kho thực tế.
+* **Kiểm soát giỏ hàng thông minh**:
+  * Chặn thêm vào giỏ nếu sản phẩm đã hết hàng.
+  * Chặn tăng số lượng vượt quá mức tồn kho hiện tại trong kho.
+* Chọn thông tin khách hàng từ hệ thống hoặc bán cho khách lẻ.
+* Áp dụng chiết khấu linh hoạt (% phần trăm hoặc số tiền VND cố định).
+* **Tạo đơn hàng trong Transaction**:
+  * Tự động trừ số lượng tồn kho sản phẩm ngay khi chốt đơn.
+  * Tự động lưu snapshot tên sản phẩm và đơn giá tại thời điểm bán (đảm bảo lịch sử giá không bị thay đổi trong tương lai).
+  * Hỗ trợ modal xem trước và in hóa đơn thanh toán chuyên nghiệp cho khách.
+
+### 2. Quản lý kho hàng & Tồn kho tự động (Inventory Management)
+* Quản lý trường số lượng tồn kho `stockQuantity` cho từng sản phẩm.
+* Cơ chế trừ kho nguyên tử (Atomic Deduction) trong cùng `@Transactional`: rollback toàn bộ nếu có lỗi hoặc hết hàng (`InsufficientStockException`).
+* Phân loại trực quan trạng thái tồn kho bằng badge:
+  * 🟢 **Còn hàng**: Số lượng tồn $> 5$.
+  * 🟡 **Sắp hết**: $0 < \text{Số lượng tồn} \le 5$ (ngưỡng cảnh báo).
+  * 🔴 **Hết hàng**: $\text{Số lượng tồn} = 0$.
+* Hỗ trợ cập nhật số lượng tồn kho thủ công (`PATCH /api/products/{id}/stock`).
+* Hoàn lại số lượng tồn kho cũ khi hủy hoặc điều chỉnh đơn hàng.
+
+### 3. Báo cáo & Phân tích kinh doanh (Sales & Analytics Dashboard)
+* **KPI Tổng quan**:
+  * Tổng doanh thu bán hàng thực tế.
+  * Tổng số đơn hàng thành công.
+  * Giá trị trung bình trên mỗi đơn hàng (AOV - Average Order Value).
+  * Số lượng mặt hàng đang rơi vào ngưỡng cảnh báo tồn kho thấp.
+* **Bộ lọc thời gian linh hoạt**:
+  * Hôm nay (Today).
+  * 7 ngày gần nhất (Last 7 Days).
+  * 30 ngày gần nhất (Last 30 Days).
+  * Tùy chọn khoảng ngày (`from` $\rightarrow$ `to`) với logic chuẩn hóa thời gian tự động.
+* **Biểu đồ Doanh thu (Revenue Trend Line Chart)**:
+  * Trực quan hóa doanh thu theo ngày với Chart.js.
+  * Thuật toán **Zero-Fill** tự động điền giá trị 0đ cho những ngày không phát sinh giao dịch.
+* **Bảng xếp hạng Top 5 Sản phẩm bán chạy**:
+  * Thống kê theo số lượng bán ra và doanh thu mang lại.
+* **Danh sách cảnh báo tồn kho**:
+  * Lọc tự động các sản phẩm có tồn kho $\le 5$ để chủ cửa hàng kịp thời nhập hàng.
+
+### 4. Xuất / Nhập Excel (Product & Inventory Excel Engine)
+* **Export Sản phẩm (`GET /api/products/export`)**:
+  * Xuất toàn bộ danh sách sản phẩm ra định dạng `.xlsx`.
+  * Đầy đủ các cột: *Mã sản phẩm, Tên sản phẩm, Danh mục, Giá bán, Tồn kho, Ngày tạo*.
+  * Tự động căn chỉnh độ rộng cột, định dạng số tiền VND và header chuyên nghiệp.
+* **Import Sản phẩm (`POST /api/products/import`)**:
+  * Đọc file `.xlsx` và tạo sản phẩm hàng loạt.
+  * Kiểm tra và validate chi tiết từng dòng (mã trùng DB, rỗng tên, danh mục không tồn tại, giá âm, tồn âm).
+  * Báo cáo kết quả import chi tiết (Tổng số dòng, số dòng thành công, số dòng lỗi và lý do cụ thể từng dòng) mà không làm crash request.
+
+### 5. Quản lý Dữ liệu Danh mục & Khách hàng
+* **Danh mục (Categories)**: Thêm, sửa, xóa, tra cứu. Ngăn chặn việc xóa danh mục nếu đang có sản phẩm liên kết (trả về HTTP 409 Conflict).
+* **Khách hàng (Customers)**: Quản lý hồ sơ khách hàng, tra cứu nhanh theo Tên / Số điện thoại, ràng buộc không trùng SĐT và Email.
+* **Đơn hàng (Orders)**: Xem danh sách đơn, phân trang, lọc theo khoảng thời gian và xem chi tiết danh sách món hàng trong từng đơn.
 
 ---
 
-## 🗄️ Cấu trúc cơ sở dữ liệu
+## 🔒 Bảo mật & Ma trận Phân quyền (Security & RBAC)
 
-- `categories`: Danh mục sản phẩm
-- `products`: Sản phẩm (mã, tên, giá, mô tả, danh mục)
-- `customers`: Khách hàng (họ tên, SĐT, email, địa chỉ)
-- `orders`: Đơn hàng (mã đơn, khách hàng, ngày tạo, tổng tiền, ghi chú)
-- `order_items`: Chi tiết đơn hàng (lưu snapshot sản phẩm, đơn giá, số lượng, thành tiền)
+Hệ thống BizPOS tuân thủ chặt chẽ tiêu chuẩn kiểm soát gian lận và thất thoát thu ngân trong ngành bán lẻ:
+
+| Chức năng / API Endpoint | Khách (Chưa đăng nhập) | Nhân viên (STAFF) | Quản trị viên (ADMIN) |
+| :--- | :---: | :---: | :---: |
+| **Đăng ký & Đăng nhập** (`/api/auth/**`, `/login`) | ✅ Cho phép | ✅ Cho phép | ✅ Cho phép |
+| **Bán hàng POS & Tạo đơn hàng** (`POST /api/orders`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
+| **Xem danh sách Sản phẩm, Danh mục, Đơn hàng** | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
+| **Xem Dashboard Analytics & Báo cáo** | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
+| **Cập nhật tồn kho kiểm đếm** (`PATCH /stock`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
+| **Sửa giá / Sửa sản phẩm** (`PUT /api/products/{id}`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
+| **Sửa hóa đơn đã tạo** (`PUT /api/orders/{id}`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
+| **Xóa bất kỳ dữ liệu nào** (`DELETE /api/**`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
+| **Xuất danh sách ra file Excel** (`GET /export`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
+| **Nhập hàng loạt bằng Excel** (`POST /import`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
+
+> [!IMPORTANT]
+> **Chống gian lận thu ngân:** Nhân viên (`STAFF`) tuyệt đối không thể tự ý sửa giá bán sản phẩm trên hệ thống hoặc sửa giảm bớt món trong hóa đơn sau khi khách đã thanh toán. Mọi hành vi xóa hoặc trích xuất dữ liệu quy mô lớn đều yêu cầu quyền `ADMIN`.
+
+---
+
+## 🗄️ Cấu trúc Cơ sở dữ liệu (Database Schema)
+
+```mermaid
+erDiagram
+    USERS {
+        bigint id PK
+        varchar username UK
+        varchar password
+        varchar role
+        datetime created_at
+        datetime updated_at
+    }
+
+    CATEGORIES {
+        bigint id PK
+        varchar name UK
+        varchar description
+        datetime created_at
+        datetime updated_at
+    }
+
+    PRODUCTS {
+        bigint id PK
+        varchar code UK
+        varchar name
+        decimal price
+        int stock_quantity
+        varchar description
+        bigint category_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    CUSTOMERS {
+        bigint id PK
+        varchar full_name
+        varchar phone UK
+        varchar email UK
+        varchar address
+        datetime created_at
+        datetime updated_at
+    }
+
+    ORDERS {
+        bigint id PK
+        varchar order_code UK
+        datetime order_date
+        decimal total_amount
+        varchar note
+        bigint customer_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    ORDER_ITEMS {
+        bigint id PK
+        bigint order_id FK
+        bigint product_id FK
+        varchar product_name
+        decimal unit_price
+        int quantity
+        decimal subtotal
+    }
+
+    CATEGORIES ||--o{ PRODUCTS : "contains"
+    CUSTOMERS ||--o{ ORDERS : "places"
+    ORDERS ||--|{ ORDER_ITEMS : "has"
+    PRODUCTS ||--o{ ORDER_ITEMS : "referenced_in"
+```
+
+---
+
+## 🧪 Hệ thống Kiểm thử Tự động (144 Automated Tests)
+
+BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
+
+```text
+Results :
+Tests run: 144, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+### 1. Unit Tests (JUnit 5 + Mockito) — 91 tests
+* **`OrderServiceTest` (24 tests)**: Tạo đơn 1 món / nhiều món, snapshot giá từ DB, tính tổng tiền, chiết khấu %, chiết khấu tiền mặt, trừ tồn kho, rollback khi thiếu tồn kho, cập nhật đơn hàng & hoàn trả tồn kho cũ, xóa đơn hàng.
+* **`ProductServiceTest` (17 tests)**: CRUD sản phẩm, trùng mã SKU, giá âm, tồn âm, category không tồn tại, cập nhật tồn kho thủ công.
+* **`CategoryServiceTest` (11 tests)**: CRUD danh mục, tên trùng lặp, chặn xóa danh mục khi có sản phẩm liên kết (409 Conflict).
+* **`CustomerServiceTest` (14 tests)**: CRUD khách hàng, trùng SĐT, trùng Email, format dữ liệu.
+* **`DashboardServiceTest` (16 tests)**: Tính toán KPI tổng quan, chia AOV (tránh chia cho 0), chuẩn hóa khoảng ngày (Today, 7 ngày, 30 ngày, custom `from/to`), zero-fill biểu đồ doanh thu, Top 5 sản phẩm, lọc tồn kho thấp threshold $\le 5$.
+* **`JwtTokenProviderTest` (9 tests)**: Tạo token hợp lệ, parse username & role, validate token, từ chối token hết hạn, token sai định dạng, token bị can thiệp chữ ký.
+* **`CustomUserDetailsServiceTest` (3 tests)**: Nạp thông tin người dùng với quyền `ROLE_ADMIN`, `ROLE_STAFF`, xử lý khi user không tồn tại.
+* **`JwtAuthenticationFilterTest` (6 tests)**: Kiểm thử bộ lọc JWT, xử lý khi thiếu header, header không phải Bearer, Bearer hợp lệ, token sai, token lỗi.
+
+### 2. Integration Tests (Spring Boot + MockMvc + MySQL thật) — 53 tests
+* **`SecurityIntegrationTest` (21 tests)**: Đăng nhập đúng/sai mật khẩu/sai user, đăng ký mới, bảo vệ JWT, phân quyền ADMIN vs STAFF (chặn STAFF khi DELETE, chặn STAFF khi sửa giá sản phẩm, chặn STAFF khi sửa hóa đơn, chặn STAFF khi xuất/nhập Excel).
+* **`MasterDataIntegrationTest` (10 tests)**: Kiểm thử HTTP API và quan hệ dữ liệu thật cho Danh mục, Sản phẩm, Khách hàng.
+* **`DashboardIntegrationTest` (7 tests)**: Kiểm thử các API `/api/dashboard/summary`, `/revenue`, `/top-products`, `/low-stock` với dữ liệu thực tế từ MySQL.
+* **`ProductExcelIntegrationTest` (3 tests)**: Kiểm thử tải file Excel thực tế, nhập file Excel với dữ liệu hợp lệ và kiểm tra báo cáo lỗi chi tiết.
+* **`OrderInventoryIntegrationTest` (3 tests)**: Kiểm thử luồng toàn vẹn từ Controller $\rightarrow$ Service $\rightarrow$ DB: Tạo đơn $\rightarrow$ trừ kho $\rightarrow$ rollback khi hết hàng.
 
 ---
 
 ## ⚙️ Cài đặt & Khởi chạy
 
-1. **Khởi tạo cơ sở dữ liệu**:
-   Chạy script [schema.sql](src/main/resources/schema.sql) trên MySQL (hoặc để Spring Boot tự tạo qua `createDatabaseIfNotExist=true`).
+### 1. Yêu cầu môi trường
+* **Java Development Kit (JDK)**: Phiên bản 17 trở lên.
+* **Apache Maven**: Phiên bản 3.8+ (hoặc dùng Maven Wrapper đi kèm).
+* **MySQL Database**: Phiên bản 8.0 trở lên.
 
-2. **Cấu hình thông tin kết nối**:
-   Mở file `src/main/resources/application.properties` và điều chỉnh:
-   ```properties
-   spring.datasource.url=jdbc:mysql://localhost:3306/bizpos_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-   spring.datasource.username=root
-   spring.datasource.password=your_password
-   ```
+### 2. Cấu hình cơ sở dữ liệu
+Mở file `src/main/resources/application.properties` và chỉnh sửa thông tin kết nối MySQL của bạn:
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/bizpos_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=root
+spring.datasource.password=your_mysql_password
+```
 
-3. **Khởi chạy ứng dụng**:
-   ```bash
-   mvn spring-boot:run
-   ```
+### 3. Chạy toàn bộ Test Suite
+Để kiểm tra tính toàn vẹn của toàn bộ hệ thống:
+```bash
+mvn test
+```
 
-4. **Truy cập ứng dụng**:
-   Mở trình duyệt tại: `http://localhost:8080/`
+### 4. Khởi chạy ứng dụng
+```bash
+mvn spring-boot:run
+```
+
+Sau khi khởi chạy thành công, truy cập hệ thống tại:
+👉 **`http://localhost:8080/`** (Trang chủ / Thông tin kết nối)  
+👉 **`http://localhost:8080/login`** (Trang Đăng nhập & Đăng ký)  
+👉 **`http://localhost:8080/pos`** (Màn hình Quầy Bán Hàng POS)  
+👉 **`http://localhost:8080/products`** (Quản lý Sản phẩm & Tồn kho & Excel)  
+👉 **`http://localhost:8080/orders`** (Quản lý Đơn hàng)  
+👉 **`http://localhost:8080/dashboard`** (Báo cáo & Sales Analytics)
+
+---
+
+## 👤 Tài khoản Mặc định
+
+Hệ thống tự động khởi tạo 2 tài khoản mẫu phục vụ kiểm thử và trải nghiệm:
+
+| Tên đăng nhập | Mật khẩu | Quyền hạn (Role) | Chức năng chính |
+| :--- | :--- | :---: | :--- |
+| **`admin`** | `admin123` | **ADMIN** | Toàn quyền quản trị, sửa giá, sửa đơn, xóa dữ liệu, Xuất / Nhập Excel |
+| **`staff`** | `staff123` | **STAFF** | Bán hàng POS, xem báo cáo, tra cứu; bị chặn sửa giá, sửa đơn, xóa và Excel |
+
+---
+
+*Phát triển bởi đội ngũ BizPOS — Giải pháp bán lẻ hiệu quả & bảo mật.*
