@@ -27,6 +27,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Nhóm 1a: Không tìm thấy tài nguyên tĩnh hoặc route không tồn tại trong Spring Boot 3.2+ -> 404 Not Found
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message("Không tìm thấy tài nguyên: " + ex.getResourcePath())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+
+    /**
      * Nhóm 1b: Sai thông tin đăng nhập (Bad Credentials) -> 401 Unauthorized
      */
     @org.springframework.web.bind.annotation.ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
