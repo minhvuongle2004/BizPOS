@@ -106,7 +106,7 @@ public class OrderServiceTest {
                 .build();
 
         when(customerRepository.findById(1L)).thenReturn(Optional.of(sampleCustomer));
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -153,8 +153,8 @@ public class OrderServiceTest {
                 .build();
 
         when(customerRepository.findById(1L)).thenReturn(Optional.of(sampleCustomer));
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
-        when(productRepository.findById(102L)).thenReturn(Optional.of(productB));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(102L)).thenReturn(Optional.of(productB));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -181,7 +181,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(4).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -203,7 +203,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(1).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -240,8 +240,8 @@ public class OrderServiceTest {
                 ))
                 .build();
 
-        when(productRepository.findById(201L)).thenReturn(Optional.of(productOdd1));
-        when(productRepository.findById(202L)).thenReturn(Optional.of(productOdd2));
+        when(productRepository.findByIdWithLock(201L)).thenReturn(Optional.of(productOdd1));
+        when(productRepository.findByIdWithLock(202L)).thenReturn(Optional.of(productOdd2));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -261,7 +261,7 @@ public class OrderServiceTest {
                 .build();
 
         when(customerRepository.findById(1L)).thenReturn(Optional.of(sampleCustomer));
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -281,7 +281,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(1).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -303,7 +303,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(5).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -321,7 +321,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(7).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -340,7 +340,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(4).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
 
         InsufficientStockException ex = assertThrows(
                 InsufficientStockException.class,
@@ -360,7 +360,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(10).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
 
         assertThrows(InsufficientStockException.class, () -> orderService.createOrder(request));
 
@@ -376,7 +376,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(101L).quantity(1).build()))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
 
         assertThrows(InsufficientStockException.class, () -> orderService.createOrder(request));
 
@@ -397,8 +397,8 @@ public class OrderServiceTest {
                 ))
                 .build();
 
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
-        when(productRepository.findById(102L)).thenReturn(Optional.of(productB));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(102L)).thenReturn(Optional.of(productB));
 
         assertThrows(InsufficientStockException.class, () -> orderService.createOrder(request));
 
@@ -439,7 +439,7 @@ public class OrderServiceTest {
 
         when(orderRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(existingOrder));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(sampleCustomer));
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -482,7 +482,7 @@ public class OrderServiceTest {
                 .build();
 
         when(orderRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(existingOrder));
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -519,7 +519,7 @@ public class OrderServiceTest {
                 .build();
 
         when(orderRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(existingOrder));
-        when(productRepository.findById(102L)).thenReturn(Optional.of(productB));
+        when(productRepository.findByIdWithLock(102L)).thenReturn(Optional.of(productB));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -561,7 +561,7 @@ public class OrderServiceTest {
                 .build();
 
         when(orderRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(existingOrder));
-        when(productRepository.findById(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
 
         // Act & Assert
         assertThrows(InsufficientStockException.class, () -> orderService.updateOrder(10L, updateReq));
@@ -661,7 +661,7 @@ public class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(999L).quantity(1).build()))
                 .build();
 
-        when(productRepository.findById(999L)).thenReturn(Optional.empty());
+        when(productRepository.findByIdWithLock(999L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> orderService.createOrder(request));
     }

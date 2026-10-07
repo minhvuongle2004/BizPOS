@@ -55,7 +55,12 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal totalAmount = BigDecimal.ZERO;
 
-        for (OrderItemRequest itemReq : request.getItems()) {
+        // Sắp xếp items theo productId tăng dần để phòng chống triệt để nguy cơ DEADLOCK giữa các transaction đồng thời
+        List<OrderItemRequest> sortedItems = request.getItems().stream()
+                .sorted(java.util.Comparator.comparing(OrderItemRequest::getProductId))
+                .toList();
+
+        for (OrderItemRequest itemReq : sortedItems) {
             if (itemReq.getProductId() == null) {
                 throw new IllegalArgumentException("Vui lòng cung cấp productId cho từng mục hàng!");
             }
@@ -63,8 +68,8 @@ public class OrderServiceImpl implements OrderService {
                 throw new IllegalArgumentException("Số lượng mua cho từng sản phẩm phải lớn hơn 0!");
             }
 
-            // 2. Lấy từng Product theo productId (ném ngoại lệ nếu không tìm thấy)
-            Product product = productRepository.findById(itemReq.getProductId())
+            // 2. Lấy từng Product theo productId với Pessimistic Lock (SELECT ... FOR UPDATE)
+            Product product = productRepository.findByIdWithLock(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
 
             // KIỂM TRA VÀ TRỪ TỒN KHO:
@@ -162,10 +167,14 @@ public class OrderServiceImpl implements OrderService {
         // 4. Xóa danh sách OrderItem cũ khỏi đơn (orphanRemoval = true sẽ xóa các dòng chi tiết cũ khỏi DB)
         order.getItems().clear();
 
-        // 5. Tạo lại các OrderItem mới từ request, luôn lấy tên và giá hiện tại từ bảng products
+        // 5. Tạo lại các OrderItem mới từ request (sắp xếp items theo productId tăng dần để chống Deadlock)
+        List<OrderItemRequest> sortedItems = request.getItems().stream()
+                .sorted(java.util.Comparator.comparing(OrderItemRequest::getProductId))
+                .toList();
+
         BigDecimal totalAmount = BigDecimal.ZERO;
 
-        for (OrderItemRequest itemReq : request.getItems()) {
+        for (OrderItemRequest itemReq : sortedItems) {
             if (itemReq.getProductId() == null) {
                 throw new IllegalArgumentException("Vui lòng cung cấp productId cho từng mục hàng!");
             }
@@ -173,7 +182,7 @@ public class OrderServiceImpl implements OrderService {
                 throw new IllegalArgumentException("Số lượng mua cho từng sản phẩm phải lớn hơn 0!");
             }
 
-            Product product = productRepository.findById(itemReq.getProductId())
+            Product product = productRepository.findByIdWithLock(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
 
             // KIỂM TRA VÀ TRỪ TỒN KHO CHO ĐƠN CẬP NHẬT:

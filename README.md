@@ -59,6 +59,10 @@
 ### 2. Quản lý kho hàng & Tồn kho tự động (Inventory Management)
 * Quản lý trường số lượng tồn kho `stockQuantity` cho từng sản phẩm.
 * Cơ chế trừ kho nguyên tử (Atomic Deduction) trong cùng `@Transactional`: rollback toàn bộ nếu có lỗi hoặc hết hàng (`InsufficientStockException`).
+* **Xử lý đồng thời (Concurrency Control) & Khóa bi quan (Pessimistic Locking)**:
+  * Sử dụng cơ chế khóa dòng độc quyền `SELECT ... FOR UPDATE` (`@Lock(LockModeType.PESSIMISTIC_WRITE)`).
+  * Ngăn chặn triệt để hiện tượng **Bán âm kho (Overselling)** và **Ghi đè mất dữ liệu (Lost Update)** khi hàng chục khách hàng/thu ngân cùng tranh mua sản phẩm cuối cùng.
+  * **Cơ chế chống Deadlock**: Tự động sắp xếp các mục hàng trong đơn theo thứ tự `productId` tăng dần trước khi khóa dòng trong database, triệt tiêu hoàn toàn nguy cơ Deadlock khi nhiều đơn hàng chứa các sản phẩm chéo nhau.
 * Phân loại trực quan trạng thái tồn kho bằng badge:
   * 🟢 **Còn hàng**: Số lượng tồn $> 5$.
   * 🟡 **Sắp hết**: $0 < \text{Số lượng tồn} \le 5$ (ngưỡng cảnh báo).
@@ -196,13 +200,13 @@ erDiagram
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (144 Automated Tests)
+## 🧪 Hệ thống Kiểm thử Tự động (146 Automated Tests)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 144, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 146, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -216,7 +220,10 @@ BUILD SUCCESS
 * **`CustomUserDetailsServiceTest` (3 tests)**: Nạp thông tin người dùng với quyền `ROLE_ADMIN`, `ROLE_STAFF`, xử lý khi user không tồn tại.
 * **`JwtAuthenticationFilterTest` (6 tests)**: Kiểm thử bộ lọc JWT, xử lý khi thiếu header, header không phải Bearer, Bearer hợp lệ, token sai, token lỗi.
 
-### 2. Integration Tests (Spring Boot + MockMvc + MySQL thật) — 53 tests
+### 2. Integration Tests (Spring Boot + MockMvc + MySQL thật) — 55 tests
+* **`OrderConcurrencyIntegrationTest` (2 tests)**:
+  * **Đua lệnh đơn sản phẩm:** 20 threads đồng thời tranh mua sản phẩm tồn kho = 10 $\rightarrow$ đúng 10 đơn thành công, 10 đơn bị chặn do hết hàng, tồn kho cuối cùng trong MySQL về đúng 0 (không âm, không lost update).
+  * **Chống Deadlock đa sản phẩm:** Chạy song song các luồng đặt hàng mua sản phẩm theo thứ tự ngược chiều nhau (A rồi B vs B rồi A) $\rightarrow$ cơ chế sắp xếp `productId` tăng dần trước khi lock triệt tiêu 100% Deadlock, toàn bộ đơn hoàn tất thành công.
 * **`SecurityIntegrationTest` (21 tests)**: Đăng nhập đúng/sai mật khẩu/sai user, đăng ký mới, bảo vệ JWT, phân quyền ADMIN vs STAFF (chặn STAFF khi DELETE, chặn STAFF khi sửa giá sản phẩm, chặn STAFF khi sửa hóa đơn, chặn STAFF khi xuất/nhập Excel).
 * **`MasterDataIntegrationTest` (10 tests)**: Kiểm thử HTTP API và quan hệ dữ liệu thật cho Danh mục, Sản phẩm, Khách hàng.
 * **`DashboardIntegrationTest` (7 tests)**: Kiểm thử các API `/api/dashboard/summary`, `/revenue`, `/top-products`, `/low-stock` với dữ liệu thực tế từ MySQL.
