@@ -7,6 +7,7 @@ import com.bizpos.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -54,9 +55,10 @@ public class OrderController {
     }
 
     /**
-     * 4. Cập nhật đơn hàng theo ID
+     * 4. Cập nhật đơn hàng theo ID (sửa thông tin hóa đơn) - Chỉ ADMIN được phép
      * PUT /api/orders/{id}
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<OrderResponse> updateOrder(
             @PathVariable Long id,

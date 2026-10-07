@@ -66,9 +66,10 @@ public class ProductController {
     }
 
     /**
-     * 4. Cập nhật thông tin sản phẩm theo ID
+     * 4. Cập nhật thông tin sản phẩm theo ID (sửa tên, giá, danh mục...) - Chỉ ADMIN được phép
      * PUT /api/products/{id}
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long id,

@@ -1,11 +1,18 @@
 package com.bizpos;
 
+import com.bizpos.dto.CreateOrderRequest;
 import com.bizpos.dto.LoginRequest;
+import com.bizpos.dto.OrderItemRequest;
+import com.bizpos.dto.ProductRequest;
 import com.bizpos.dto.RegisterRequest;
 import com.bizpos.entity.Category;
+import com.bizpos.entity.Order;
+import com.bizpos.entity.Product;
 import com.bizpos.entity.Role;
 import com.bizpos.entity.User;
 import com.bizpos.repository.CategoryRepository;
+import com.bizpos.repository.OrderRepository;
+import com.bizpos.repository.ProductRepository;
 import com.bizpos.repository.UserRepository;
 import com.bizpos.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import java.math.BigDecimal;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +58,12 @@ public class SecurityIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -351,5 +366,109 @@ public class SecurityIntegrationTest {
         mockMvc.perform(multipart("/api/products/import")
                         .file(dummyFile))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Product Update: STAFF bị từ chối sửa sản phẩm/đổi giá trả về HTTP 403 Forbidden")
+    void staff_cannotUpdateProduct_returns403() throws Exception {
+        Category cat = categoryRepository.findAll().stream().findFirst().orElseGet(() ->
+                categoryRepository.save(Category.builder().name("Cat Update Test " + System.currentTimeMillis()).build()));
+        Product p = productRepository.save(Product.builder()
+                .code("PRD_STF_" + System.currentTimeMillis())
+                .name("Sản phẩm gốc")
+                .price(new BigDecimal("50000"))
+                .stockQuantity(10)
+                .category(cat)
+                .build());
+
+        ProductRequest updateReq = ProductRequest.builder()
+                .code(p.getCode())
+                .name("Sản phẩm đổi tên")
+                .price(new BigDecimal("10000")) // Hạ giá
+                .stockQuantity(10)
+                .categoryId(cat.getId())
+                .build();
+
+        MvcResult result = mockMvc.perform(put("/api/products/" + p.getId())
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden())
+                .andReturn();
+
+        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        assertEquals(403, json.get("status").asInt());
+    }
+
+    @Test
+    @DisplayName("Product Update: ADMIN được phép sửa sản phẩm/đổi giá trả về HTTP 200 OK")
+    void admin_canUpdateProduct_returns200() throws Exception {
+        Category cat = categoryRepository.findAll().stream().findFirst().orElseGet(() ->
+                categoryRepository.save(Category.builder().name("Cat Update Test " + System.currentTimeMillis()).build()));
+        Product p = productRepository.save(Product.builder()
+                .code("PRD_ADM_" + System.currentTimeMillis())
+                .name("Sản phẩm gốc")
+                .price(new BigDecimal("50000"))
+                .stockQuantity(10)
+                .category(cat)
+                .build());
+
+        ProductRequest updateReq = ProductRequest.builder()
+                .code(p.getCode())
+                .name("Sản phẩm Admin đổi giá")
+                .price(new BigDecimal("60000"))
+                .stockQuantity(15)
+                .categoryId(cat.getId())
+                .build();
+
+        mockMvc.perform(put("/api/products/" + p.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Order Update: STAFF bị từ chối sửa thông tin hóa đơn trả về HTTP 403 Forbidden")
+    void staff_cannotUpdateOrder_returns403() throws Exception {
+        Order order = orderRepository.findAll().stream().findFirst().orElse(null);
+        if (order != null && !order.getItems().isEmpty()) {
+            CreateOrderRequest req = CreateOrderRequest.builder()
+                    .items(List.of(OrderItemRequest.builder()
+                            .productId(order.getItems().get(0).getProduct().getId())
+                            .quantity(1)
+                            .build()))
+                    .build();
+
+            MvcResult result = mockMvc.perform(put("/api/orders/" + order.getId())
+                            .header("Authorization", "Bearer " + staffToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isForbidden())
+                    .andReturn();
+
+            JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+            assertEquals(403, json.get("status").asInt());
+        }
+    }
+
+    @Test
+    @DisplayName("Order Update: ADMIN được phép sửa thông tin hóa đơn trả về HTTP 200 OK")
+    void admin_canUpdateOrder_returns200() throws Exception {
+        Order order = orderRepository.findAll().stream().findFirst().orElse(null);
+        if (order != null && !order.getItems().isEmpty()) {
+            CreateOrderRequest req = CreateOrderRequest.builder()
+                    .items(List.of(OrderItemRequest.builder()
+                            .productId(order.getItems().get(0).getProduct().getId())
+                            .quantity(1)
+                            .build()))
+                    .build();
+
+            mockMvc.perform(put("/api/orders/" + order.getId())
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isOk());
+        }
     }
 }
