@@ -62,7 +62,8 @@
                             </select>
                         </div>
                         <div class="col-md-2 col-5">
-                            <button type="button" class="btn btn-outline-danger w-100 d-inline-flex align-items-center justify-content-center gap-1 text-nowrap fw-bold" onclick="openReturnModal()" title="Xử lý đổi hoặc trả hàng theo hóa đơn">
+                            <button type="button" class="btn btn-outline-danger w-100 d-inline-flex align-items-center justify-content-center gap-1 text-nowrap fw-bold" 
+                                    onclick="openReturnModal()" data-bs-toggle="modal" data-bs-target="#returnModal" title="Xử lý đổi hoặc trả hàng theo hóa đơn">
                                 <i class="bi bi-arrow-return-left"></i>
                                 <span>Đổi / Trả</span>
                             </button>
@@ -265,6 +266,8 @@
                             <i class="bi bi-plus-lg me-1"></i>Tạo đơn mới
                         </button>
                     </div>
+                </div>
+            </div>
         </div>
 
         <!-- ================= MODAL: ĐỔI - TRẢ HÀNG THỜI TRANG (RETURN & EXCHANGE) ================= -->
@@ -591,17 +594,19 @@
             }
 
             function getReturnModal() {
-                if (!returnModalInstance) {
-                    const el = document.getElementById('returnModal');
-                    if (el && window.bootstrap) returnModalInstance = new bootstrap.Modal(el);
+                const el = document.getElementById('returnModal');
+                if (!el) return null;
+                if (!returnModalInstance && window.bootstrap) {
+                    returnModalInstance = (bootstrap.Modal.getOrCreateInstance) ? bootstrap.Modal.getOrCreateInstance(el) : new bootstrap.Modal(el);
                 }
                 return returnModalInstance;
             }
 
             function getReturnSuccessModal() {
-                if (!returnSuccessModalInstance) {
-                    const el = document.getElementById('returnSuccessModal');
-                    if (el && window.bootstrap) returnSuccessModalInstance = new bootstrap.Modal(el);
+                const el = document.getElementById('returnSuccessModal');
+                if (!el) return null;
+                if (!returnSuccessModalInstance && window.bootstrap) {
+                    returnSuccessModalInstance = (bootstrap.Modal.getOrCreateInstance) ? bootstrap.Modal.getOrCreateInstance(el) : new bootstrap.Modal(el);
                 }
                 return returnSuccessModalInstance;
             }
@@ -1274,8 +1279,12 @@
 
                 populateExchangeProductSelect();
 
-                const modal = getReturnModal();
-                if (modal) modal.show();
+                try {
+                    const modal = getReturnModal();
+                    if (modal) modal.show();
+                } catch (e) {
+                    console.error('Lỗi hiển thị modal đổi trả:', e);
+                }
                 if (input) setTimeout(() => input.focus(), 300);
             }
 
