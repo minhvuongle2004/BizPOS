@@ -31,10 +31,10 @@
             <!-- CỘT TRÁI: DANH MỤC, TÌM KIẾM & CATALOGUE SẢN PHẨM (8 / 12) -->
             <div class="col-lg-7 col-xl-8">
 
-                <!-- 1. THANH TÌM KIẾM & LỌC DANH MỤC -->
+                <!-- 1. THANH TÌM KIẾM, LỌC SIZE & ĐỔI TRẢ HÀNG -->
                 <div class="biz-card p-3 mb-3">
                     <div class="row g-2 align-items-center mb-3">
-                        <div class="col-12">
+                        <div class="col-md-7 col-12">
                             <div class="position-relative">
                                 <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
                                 <input type="text" id="posSearchInput" class="biz-input ps-5" 
@@ -45,6 +45,27 @@
                                     <i class="bi bi-x-circle-fill"></i>
                                 </button>
                             </div>
+                        </div>
+                        <div class="col-md-3 col-7">
+                            <select id="posSizeSelect" class="biz-input" onchange="handleSizeFilter(this.value)">
+                                <option value="">Tất cả kích cỡ (Size)</option>
+                                <option value="S">Size S</option>
+                                <option value="M">Size M</option>
+                                <option value="L">Size L</option>
+                                <option value="XL">Size XL</option>
+                                <option value="30">Size 30</option>
+                                <option value="31">Size 31</option>
+                                <option value="40">Size 40</option>
+                                <option value="41">Size 41</option>
+                                <option value="42">Size 42</option>
+                                <option value="Freesize">Freesize</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 col-5">
+                            <button type="button" class="btn btn-outline-danger w-100 d-inline-flex align-items-center justify-content-center gap-1 text-nowrap fw-bold" onclick="openReturnModal()" title="Xử lý đổi hoặc trả hàng theo hóa đơn">
+                                <i class="bi bi-arrow-return-left"></i>
+                                <span>Đổi / Trả</span>
+                            </button>
                         </div>
                     </div>
 
@@ -244,6 +265,287 @@
                             <i class="bi bi-plus-lg me-1"></i>Tạo đơn mới
                         </button>
                     </div>
+        </div>
+
+        <!-- ================= MODAL: ĐỔI - TRẢ HÀNG THỜI TRANG (RETURN & EXCHANGE) ================= -->
+        <div class="modal fade" id="returnModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="returnModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-danger bg-opacity-10 border-bottom border-danger-subtle py-3 px-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-return-left text-danger fs-4"></i>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark mb-0" id="returnModalLabel">Nghiệp vụ Đổi - Trả hàng Thời trang</h5>
+                                <span class="small text-muted">Hỗ trợ trả hàng hoàn tiền hoặc đổi size, đổi mẫu sản phẩm (Chính sách 7 ngày)</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <!-- BƯỚC 1: TRA CỨU HÓA ĐƠN -->
+                        <div class="biz-card p-3 mb-4 bg-light bg-opacity-50 border">
+                            <h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2">
+                                <span class="badge bg-danger text-white rounded-pill px-2">1</span>
+                                <span>Tra cứu hóa đơn gốc</span>
+                            </h6>
+                            <div class="row g-2 align-items-center">
+                                <div class="col-md-9 col-12">
+                                    <div class="position-relative">
+                                        <i class="bi bi-receipt position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                                        <input type="text" id="returnOrderCodeInput" class="biz-input ps-5" 
+                                               placeholder="Nhập mã đơn hàng cần đổi trả (Ví dụ: HD-FASHION-01, ORD-...)" 
+                                               onkeydown="if(event.key === 'Enter') lookupReturnOrder()">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-12">
+                                    <button type="button" class="btn btn-biz-primary w-100 d-inline-flex align-items-center justify-content-center gap-2" id="btnLookupOrder" onclick="lookupReturnOrder()">
+                                        <i class="bi bi-search"></i>
+                                        <span>Tra cứu đơn</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Thông tin hóa đơn sau khi tra cứu -->
+                            <div id="returnOrderSummaryBox" class="mt-3 pt-3 border-top d-none">
+                                <div class="row g-3">
+                                    <div class="col-md-3 col-6">
+                                        <span class="text-muted small d-block">Mã hóa đơn:</span>
+                                        <strong class="text-dark font-monospace" id="roOrderCode">HD-FASHION-01</strong>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <span class="text-muted small d-block">Khách hàng:</span>
+                                        <strong class="text-dark" id="roCustomerName">Khách lẻ</strong>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <span class="text-muted small d-block">Ngày mua hàng:</span>
+                                        <strong class="text-dark" id="roOrderDate">08/10/2026</strong>
+                                    </div>
+                                    <div class="col-md-3 col-6">
+                                        <span class="text-muted small d-block">Trạng thái đổi trả:</span>
+                                        <span id="roEligibilityBadge" class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1">Trong hạn đổi trả</span>
+                                    </div>
+                                </div>
+                                <div id="roMessageAlert" class="mt-2 small text-muted"></div>
+                            </div>
+                        </div>
+
+                        <!-- BƯỚC 2: CHỌN MÓN KHÁCH TRẢ LẠI -->
+                        <div id="returnItemsSection" class="mb-4 d-none">
+                            <h6 class="fw-bold text-dark mb-2 d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-danger text-white rounded-pill px-2">2</span>
+                                    <span>Chọn sản phẩm khách muốn trả lại</span>
+                                </div>
+                                <span class="small text-muted fw-normal">Tích chọn sản phẩm và nhập số lượng trả</span>
+                            </h6>
+                            <div class="table-responsive border rounded-3 overflow-hidden">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light small">
+                                        <tr>
+                                            <th style="width: 40px;" class="text-center">Chọn</th>
+                                            <th>Sản phẩm</th>
+                                            <th class="text-center" style="width: 70px;">Size</th>
+                                            <th class="text-center" style="width: 80px;">Màu</th>
+                                            <th class="text-end" style="width: 100px;">Giá mua</th>
+                                            <th class="text-center" style="width: 80px;">Đã mua</th>
+                                            <th class="text-center" style="width: 80px;">Được trả</th>
+                                            <th style="width: 100px;">SL trả</th>
+                                            <th style="width: 180px;">Lý do trả</th>
+                                            <th class="text-end" style="width: 110px;">Tiền hoàn</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="returnItemsTableBody">
+                                        <!-- Render động qua JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- BƯỚC 3: CHỌN MÓN ĐỔI LẤY MỚI (EXCHANGE) -->
+                        <div id="exchangeItemsSection" class="mb-4 d-none">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                                    <span class="badge bg-primary text-white rounded-pill px-2">3</span>
+                                    <span>Khách đổi lấy sản phẩm mới (Tùy chọn)</span>
+                                </h6>
+                                <span class="badge bg-info bg-opacity-10 text-info border border-info-subtle px-2 py-1 small">
+                                    Đổi size / Đổi mẫu
+                                </span>
+                            </div>
+
+                            <div class="biz-card p-3 mb-2 bg-light bg-opacity-25 border">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-7 col-12">
+                                        <label class="form-label small text-muted mb-1">Chọn sản phẩm đổi mới từ kho:</label>
+                                        <select id="exchangeProductSelect" class="biz-input py-2">
+                                            <option value="">-- Chọn sản phẩm thời trang trong kho --</option>
+                                            <!-- Load từ allProducts -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 col-6">
+                                        <label class="form-label small text-muted mb-1">Số lượng:</label>
+                                        <input type="number" id="exchangeProductQty" class="biz-input py-2 text-center" min="1" value="1">
+                                    </div>
+                                    <div class="col-md-3 col-6 d-flex align-items-end">
+                                        <button type="button" class="btn btn-biz-outline w-100 py-2 d-inline-flex align-items-center justify-content-center gap-1" onclick="addExchangeItem()">
+                                            <i class="bi bi-plus-circle text-primary"></i>
+                                            <span>Thêm món đổi</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bảng các món đổi mới -->
+                            <div class="table-responsive border rounded-3 overflow-hidden">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light small">
+                                        <tr>
+                                            <th>Sản phẩm đổi mới</th>
+                                            <th class="text-center" style="width: 70px;">Size</th>
+                                            <th class="text-center" style="width: 80px;">Màu</th>
+                                            <th class="text-end" style="width: 100px;">Đơn giá</th>
+                                            <th class="text-center" style="width: 80px;">Số lượng</th>
+                                            <th class="text-end" style="width: 110px;">Thành tiền</th>
+                                            <th class="text-center" style="width: 50px;">Xóa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="exchangeItemsTableBody">
+                                        <tr id="exchangeEmptyRow">
+                                            <td colspan="7" class="text-center text-muted small py-3">
+                                                Chưa chọn món đổi mới nào (Khách chỉ trả hàng hoàn tiền)
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- BƯỚC 4: TÓM TẮT TÀI CHÍNH BÙ TRỪ & GHI CHÚ -->
+                        <div id="financialSummarySection" class="biz-card p-3 bg-light border d-none">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-7 col-12">
+                                    <div class="row g-2">
+                                        <div class="col-12">
+                                            <label class="form-label small fw-semibold text-dark mb-1">Lý do chính của phiếu đổi trả <span class="text-danger">*</span></label>
+                                            <select id="returnMainReason" class="biz-input py-2">
+                                                <option value="WRONG_SIZE">Mặc chật / Rộng kích cỡ (Size không vừa)</option>
+                                                <option value="DEFECTIVE">Lỗi sản phẩm / Vải lỗi / Đường may hỏng</option>
+                                                <option value="COLOR_MISMATCH">Không ưng màu sắc thực tế</option>
+                                                <option value="CUSTOMER_CHANGE_MIND">Khách đổi ý / Không còn nhu cầu</option>
+                                                <option value="OTHER">Lý do khác</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small fw-semibold text-dark mb-1">Ghi chú phiếu đổi trả (tùy chọn)</label>
+                                            <input type="text" id="returnNote" class="biz-input py-2" placeholder="Nhập ghi chú thêm cho thu ngân / sổ kho...">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-5 col-12">
+                                    <div class="p-3 bg-white rounded-3 border shadow-sm">
+                                        <div class="d-flex justify-content-between align-items-center mb-1 small text-muted">
+                                            <span>Tổng tiền trả lại:</span>
+                                            <strong class="text-dark" id="calcTotalRefund">0 đ</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mb-2 small text-muted">
+                                            <span>Tổng tiền đổi mới:</span>
+                                            <strong class="text-dark" id="calcTotalExchange">0 đ</strong>
+                                        </div>
+                                        <hr class="my-2">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold text-dark">Chênh lệch:</span>
+                                            <span class="fs-5 fw-bold" id="calcNetAmountBadge">0 đ</span>
+                                        </div>
+                                        <div class="small mt-1 text-end" id="calcNetActionDesc">Đổi ngang (0 đ)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50 justify-content-between">
+                        <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Hủy bỏ</button>
+                        <button type="button" class="btn btn-biz-primary d-inline-flex align-items-center gap-2 px-4" id="btnSubmitReturn" onclick="handleExecuteReturn()" disabled>
+                            <i class="bi bi-check-lg"></i>
+                            <span id="btnSubmitReturnText">Xác nhận Đổi - Trả hàng</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: BIÊN NHẬN ĐỔI TRẢ THÀNH CÔNG ================= -->
+        <div class="modal fade" id="returnSuccessModal" tabindex="-1" data-bs-backdrop="static" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-success bg-opacity-10 border-bottom border-success-subtle py-3 px-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark mb-0">Phiếu Đổi - Trả hoàn tất!</h5>
+                                <span class="small text-muted" id="retSuccessTimestamp">08/10/2026 14:45</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded-3">
+                            <div>
+                                <span class="text-muted small d-block">Mã phiếu đổi trả:</span>
+                                <strong class="fs-6 text-dark font-monospace" id="retSuccessCode">RET-20261008...</strong>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-muted small d-block">Loại giao dịch:</span>
+                                <span class="badge bg-primary px-2 py-1" id="retSuccessType">ĐỔI HÀNG</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 p-3 bg-light rounded-3 border">
+                            <div class="d-flex justify-content-between align-items-center mb-1 small text-muted">
+                                <span>Hóa đơn gốc:</span>
+                                <strong class="text-dark font-monospace" id="retSuccessOrderCode">HD-FASHION-01</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1 small text-muted">
+                                <span>Khách hàng:</span>
+                                <strong class="text-dark" id="retSuccessCustomer">Khách lẻ</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1 small text-muted">
+                                <span>Thu ngân xử lý:</span>
+                                <strong class="text-dark" id="retSuccessUser">admin</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center small text-muted">
+                                <span>Lý do:</span>
+                                <strong class="text-dark" id="retSuccessReason">Mặc chật / Rộng kích cỡ</strong>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-white rounded-3 border shadow-sm mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1 small text-muted">
+                                <span>Tổng tiền trả lại:</span>
+                                <strong class="text-dark" id="retSuccessRefund">0 đ</strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2 small text-muted">
+                                <span>Tổng tiền đổi mới:</span>
+                                <strong class="text-dark" id="retSuccessExchange">0 đ</strong>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold text-dark">Thanh toán chênh lệch:</span>
+                                <span class="fs-5 fw-bold" id="retSuccessNetAmount">0 đ</span>
+                            </div>
+                            <div class="small text-end mt-1 text-muted" id="retSuccessActionDesc"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50 justify-content-between">
+                        <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">
+                            <i class="bi bi-x-lg me-1"></i>Đóng
+                        </button>
+                        <button type="button" class="btn btn-biz-primary" onclick="window.print()">
+                            <i class="bi bi-printer me-1"></i>In biên lai
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -254,15 +556,23 @@
             let allCategories = [];
             let allProducts = [];
             let selectedCategoryId = null;
+            let selectedSize = '';
             let searchKeyword = '';
             let searchDebounceTimer = null;
 
             // Giỏ hàng: [{ product: {...}, quantity: 1 }]
             let cart = [];
 
+            // State nghiệp vụ Đổi - Trả hàng
+            let returnOrderData = null;
+            let selectedReturnItems = {}; // { [productId]: { quantity, reason, note } }
+            let selectedExchangeItems = []; // [ { product, quantity } ]
+
             // Modal instances
             let clearCartModalInstance = null;
             let orderSuccessModalInstance = null;
+            let returnModalInstance = null;
+            let returnSuccessModalInstance = null;
 
             function getClearCartModal() {
                 if (!clearCartModalInstance) {
@@ -278,6 +588,22 @@
                     if (el && window.bootstrap) orderSuccessModalInstance = new bootstrap.Modal(el);
                 }
                 return orderSuccessModalInstance;
+            }
+
+            function getReturnModal() {
+                if (!returnModalInstance) {
+                    const el = document.getElementById('returnModal');
+                    if (el && window.bootstrap) returnModalInstance = new bootstrap.Modal(el);
+                }
+                return returnModalInstance;
+            }
+
+            function getReturnSuccessModal() {
+                if (!returnSuccessModalInstance) {
+                    const el = document.getElementById('returnSuccessModal');
+                    if (el && window.bootstrap) returnSuccessModalInstance = new bootstrap.Modal(el);
+                }
+                return returnSuccessModalInstance;
             }
 
             // ================= 1. AUTH HEADERS & CHECK =================
@@ -418,6 +744,7 @@
                 params.append('size', 100); // Lấy danh sách đủ lớn cho quầy POS
                 if (searchKeyword) params.append('keyword', searchKeyword);
                 if (selectedCategoryId) params.append('categoryId', selectedCategoryId);
+                if (selectedSize) params.append('productSize', selectedSize);
 
                 try {
                     const response = await fetch(`/api/products?${params.toString()}`, {
@@ -494,6 +821,10 @@
                                <i class="bi bi-plus-lg"></i>
                            </button>`;
 
+                    const sizeBadgeHtml = p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-1 py-0" style="font-size: 0.7rem; font-weight: 600;">Size: ${p.size}</span>` : '';
+                    const colorBadgeHtml = p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border px-1 py-0" style="font-size: 0.7rem;">${p.color}</span>` : '';
+                    const materialHtml = p.material ? `<span class="text-muted small" style="font-size: 0.68rem;">(${p.material})</span>` : '';
+
                     col.innerHTML = `
                         <div class="${cardClass}" onclick="addToCart(${p.id})">
                             <div>
@@ -506,11 +837,16 @@
                                         <span class="pos-product-code font-monospace">${p.code || ''}</span>
                                     </div>
                                 </div>
-                                <h6 class="pos-product-title mb-2 text-dark" title="${p.name}">
+                                <h6 class="pos-product-title mb-1 text-dark" title="${p.name}">
                                     ${p.name}
                                 </h6>
+                                <div class="d-flex align-items-center gap-1 flex-wrap mb-2">
+                                    ${sizeBadgeHtml}
+                                    ${colorBadgeHtml}
+                                    ${materialHtml}
+                                </div>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-light">
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-light">
                                 <span class="pos-product-price">${priceFormatted}</span>
                                 ${actionButtonHtml}
                             </div>
@@ -733,6 +1069,10 @@
                                     <h6 class="fw-semibold text-dark mb-1 small text-truncate" style="max-width: 190px;" title="${p.name}">
                                         ${p.name}
                                     </h6>
+                                    <div class="d-flex align-items-center gap-1 mb-1 flex-wrap">
+                                        ${p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger px-1 py-0" style="font-size: 0.68rem; font-weight: 600;">Size: ${p.size}</span>` : ''}
+                                        ${p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary px-1 py-0" style="font-size: 0.68rem;">${p.color}</span>` : ''}
+                                    </div>
                                     <div class="d-flex align-items-center gap-1">
                                         <span class="text-muted small">${formatVND(p.price)}</span>
                                         <span class="text-muted small">&bull;</span>
@@ -906,7 +1246,570 @@
                 await loadProducts();
             }
 
-            // ================= 9. CẢNH BÁO RỜI KHỎI TRANG KHI GIỎ HÀNG CÒN HÀNG =================
+            // ================= 9. NGHIỆP VỤ ĐỔI - TRẢ HÀNG THỜI TRANG (RETURN & EXCHANGE) =================
+            function handleSizeFilter(val) {
+                selectedSize = val || '';
+                loadProducts();
+            }
+
+            function openReturnModal() {
+                const input = document.getElementById('returnOrderCodeInput');
+                if (input) input.value = '';
+
+                const summaryBox = document.getElementById('returnOrderSummaryBox');
+                if (summaryBox) summaryBox.classList.add('d-none');
+
+                const retSection = document.getElementById('returnItemsSection');
+                if (retSection) retSection.classList.add('d-none');
+
+                const exchSection = document.getElementById('exchangeItemsSection');
+                if (exchSection) exchSection.classList.add('d-none');
+
+                const finSection = document.getElementById('financialSummarySection');
+                if (finSection) finSection.classList.add('d-none');
+
+                returnOrderData = null;
+                selectedReturnItems = {};
+                selectedExchangeItems = [];
+
+                populateExchangeProductSelect();
+
+                const modal = getReturnModal();
+                if (modal) modal.show();
+                if (input) setTimeout(() => input.focus(), 300);
+            }
+
+            function populateExchangeProductSelect() {
+                const sel = document.getElementById('exchangeProductSelect');
+                if (!sel) return;
+                sel.innerHTML = '<option value="">-- Chọn sản phẩm thời trang trong kho --</option>';
+
+                const sorted = [...allProducts].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                sorted.forEach(p => {
+                    const stock = p.stockQuantity || 0;
+                    const sizeStr = p.size ? `Size: ${p.size}` : '';
+                    const colorStr = p.color ? `Màu: ${p.color}` : '';
+                    const metaStr = [sizeStr, colorStr].filter(Boolean).join(' | ');
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.disabled = stock <= 0;
+                    opt.textContent = `${p.name} ${metaStr ? `(${metaStr})` : ''} - ${formatVND(p.price)} [Kho: ${stock}]`;
+                    sel.appendChild(opt);
+                });
+            }
+
+            async function lookupReturnOrder() {
+                const input = document.getElementById('returnOrderCodeInput');
+                const orderCode = input ? input.value.trim() : '';
+                if (!orderCode) {
+                    showToast('Cảnh báo', 'Vui lòng nhập mã hóa đơn cần tra cứu!', false);
+                    return;
+                }
+
+                const btnLookup = document.getElementById('btnLookupOrder');
+                if (btnLookup) {
+                    btnLookup.disabled = true;
+                    btnLookup.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang tìm...';
+                }
+
+                try {
+                    const response = await fetch(`/api/returns/eligible/${encodeURIComponent(orderCode)}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(response.status)) return;
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        showToast('Không tìm thấy', data.message || `Không tìm thấy thông tin hóa đơn ${orderCode}!`, false);
+                        return;
+                    }
+
+                    returnOrderData = data;
+                    selectedReturnItems = {};
+                    selectedExchangeItems = [];
+
+                    const summaryBox = document.getElementById('returnOrderSummaryBox');
+                    const roOrderCode = document.getElementById('roOrderCode');
+                    const roCust = document.getElementById('roCustomerName');
+                    const roDate = document.getElementById('roOrderDate');
+                    const roBadge = document.getElementById('roEligibilityBadge');
+                    const roMsg = document.getElementById('roMessageAlert');
+
+                    if (summaryBox) summaryBox.classList.remove('d-none');
+                    if (roOrderCode) roOrderCode.textContent = data.orderCode;
+                    if (roCust) roCust.textContent = data.customerName ? `${data.customerName}${data.customerPhone ? ` (${data.customerPhone})` : ''}` : 'Khách lẻ';
+                    if (roDate) {
+                        const d = data.orderDate ? new Date(data.orderDate) : new Date();
+                        roDate.textContent = d.toLocaleDateString('vi-VN');
+                    }
+
+                    if (roBadge) {
+                        if (data.eligible) {
+                            roBadge.className = 'badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1';
+                            roBadge.textContent = 'Đủ điều kiện đổi trả';
+                        } else {
+                            roBadge.className = 'badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-2 py-1';
+                            roBadge.textContent = 'Không đủ điều kiện';
+                        }
+                    }
+
+                    if (roMsg) {
+                        roMsg.innerHTML = data.message ? `<div class="alert ${data.eligible ? 'alert-info' : 'alert-danger'} py-2 px-3 mb-0">${data.message}</div>` : '';
+                    }
+
+                    const retSection = document.getElementById('returnItemsSection');
+                    const exchSection = document.getElementById('exchangeItemsSection');
+                    const finSection = document.getElementById('financialSummarySection');
+
+                    if (data.eligible) {
+                        renderReturnItemsTable(data.items || []);
+                        renderExchangeItemsTable();
+                        if (retSection) retSection.classList.remove('d-none');
+                        if (exchSection) exchSection.classList.remove('d-none');
+                        if (finSection) finSection.classList.remove('d-none');
+                        calculateReturnTotals();
+                    } else {
+                        if (retSection) retSection.classList.add('d-none');
+                        if (exchSection) exchSection.classList.add('d-none');
+                        if (finSection) finSection.classList.add('d-none');
+                    }
+
+                } catch (err) {
+                    console.error('Lỗi tra cứu đơn đổi trả:', err);
+                    showToast('Lỗi', 'Không thể tra cứu đơn hàng!', false);
+                } finally {
+                    if (btnLookup) {
+                        btnLookup.disabled = false;
+                        btnLookup.innerHTML = '<i class="bi bi-search me-1"></i>Tra cứu đơn';
+                    }
+                }
+            }
+
+            function renderReturnItemsTable(items) {
+                const tbody = document.getElementById('returnItemsTableBody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+
+                if (!items || items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">Không có sản phẩm nào trong đơn hàng</td></tr>';
+                    return;
+                }
+
+                items.forEach(it => {
+                    const canReturn = (it.remainingReturnableQuantity || 0) > 0;
+                    const tr = document.createElement('tr');
+                    tr.id = `returnRow_${it.productId}`;
+                    tr.innerHTML = `
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input" id="chk_ret_${it.productId}" 
+                                   ${canReturn ? '' : 'disabled title="Đã đổi/trả hết số lượng"'}
+                                   onchange="toggleReturnItem(${it.productId})">
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">${it.productName || 'Sản phẩm'}</div>
+                            <div class="font-monospace text-muted small">${it.productCode || ''}</div>
+                        </td>
+                        <td class="text-center">
+                            ${it.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">${it.size}</span>` : '—'}
+                        </td>
+                        <td class="text-center">
+                            ${it.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border">${it.color}</span>` : '—'}
+                        </td>
+                        <td class="text-end fw-semibold">${formatVND(it.unitPrice)}</td>
+                        <td class="text-center">${it.originalQuantity}</td>
+                        <td class="text-center fw-bold ${canReturn ? 'text-success' : 'text-muted'}">${it.remainingReturnableQuantity}</td>
+                        <td>
+                            <input type="number" class="biz-input py-1 px-2 text-center" id="qty_ret_${it.productId}" 
+                                   min="1" max="${it.remainingReturnableQuantity}" value="1" disabled
+                                   onchange="onReturnQtyChange(${it.productId}, this.value)">
+                        </td>
+                        <td>
+                            <select class="biz-input py-1 px-2 small" id="reason_ret_${it.productId}" disabled
+                                    onchange="onReturnReasonChange(${it.productId}, this.value)">
+                                <option value="WRONG_SIZE">Size không vừa</option>
+                                <option value="DEFECTIVE">Lỗi may / Lỗi vải</option>
+                                <option value="COLOR_MISMATCH">Không hợp màu</option>
+                                <option value="CUSTOMER_CHANGE_MIND">Đổi ý</option>
+                                <option value="OTHER">Lý do khác</option>
+                            </select>
+                        </td>
+                        <td class="text-end fw-bold text-danger" id="refund_ret_${it.productId}">0 đ</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            function toggleReturnItem(productId) {
+                if (!returnOrderData) return;
+                const item = returnOrderData.items.find(i => i.productId === productId);
+                if (!item) return;
+
+                const chk = document.getElementById(`chk_ret_${productId}`);
+                const qtyInput = document.getElementById(`qty_ret_${productId}`);
+                const reasonSel = document.getElementById(`reason_ret_${productId}`);
+                const refundEl = document.getElementById(`refund_ret_${productId}`);
+
+                if (chk && chk.checked) {
+                    qtyInput.disabled = false;
+                    reasonSel.disabled = false;
+                    const maxQty = item.remainingReturnableQuantity || 1;
+                    qtyInput.value = 1;
+                    selectedReturnItems[productId] = {
+                        quantity: 1,
+                        reason: reasonSel.value || 'WRONG_SIZE',
+                        note: ''
+                    };
+                    const lineRefund = Number(item.unitPrice) * 1;
+                    if (refundEl) refundEl.textContent = formatVND(lineRefund);
+                } else {
+                    if (qtyInput) qtyInput.disabled = true;
+                    if (reasonSel) reasonSel.disabled = true;
+                    if (refundEl) refundEl.textContent = '0 đ';
+                    delete selectedReturnItems[productId];
+                }
+
+                calculateReturnTotals();
+            }
+
+            function onReturnQtyChange(productId, val) {
+                if (!returnOrderData || !selectedReturnItems[productId]) return;
+                const item = returnOrderData.items.find(i => i.productId === productId);
+                if (!item) return;
+
+                let qty = parseInt(val) || 1;
+                const maxQty = item.remainingReturnableQuantity || 1;
+                if (qty < 1) qty = 1;
+                if (qty > maxQty) {
+                    qty = maxQty;
+                    showToast('Cảnh báo', `Số lượng trả không thể vượt quá ${maxQty}!`, false);
+                }
+
+                const qtyInput = document.getElementById(`qty_ret_${productId}`);
+                if (qtyInput) qtyInput.value = qty;
+
+                selectedReturnItems[productId].quantity = qty;
+                const lineRefund = Number(item.unitPrice) * qty;
+                const refundEl = document.getElementById(`refund_ret_${productId}`);
+                if (refundEl) refundEl.textContent = formatVND(lineRefund);
+
+                calculateReturnTotals();
+            }
+
+            function onReturnReasonChange(productId, reason) {
+                if (selectedReturnItems[productId]) {
+                    selectedReturnItems[productId].reason = reason;
+                }
+            }
+
+            function addExchangeItem() {
+                const sel = document.getElementById('exchangeProductSelect');
+                const qtyInput = document.getElementById('exchangeProductQty');
+                const prodId = sel ? parseInt(sel.value) : null;
+                let qty = qtyInput ? parseInt(qtyInput.value) : 1;
+
+                if (!prodId) {
+                    showToast('Chọn sản phẩm', 'Vui lòng chọn sản phẩm đổi mới trong danh sách!', false);
+                    return;
+                }
+
+                if (isNaN(qty) || qty < 1) qty = 1;
+
+                const product = allProducts.find(p => p.id === prodId);
+                if (!product) {
+                    showToast('Lỗi', 'Không tìm thấy thông tin sản phẩm!', false);
+                    return;
+                }
+
+                const stock = product.stockQuantity || 0;
+                const existing = selectedExchangeItems.find(i => i.product.id === prodId);
+                const currentQty = existing ? existing.quantity : 0;
+
+                if (currentQty + qty > stock) {
+                    showToast('Không đủ tồn kho', `Sản phẩm "${product.name}" chỉ còn ${stock} món trong kho!`, false);
+                    return;
+                }
+
+                if (existing) {
+                    existing.quantity += qty;
+                } else {
+                    selectedExchangeItems.push({
+                        product: product,
+                        quantity: qty
+                    });
+                }
+
+                if (qtyInput) qtyInput.value = 1;
+                if (sel) sel.value = '';
+
+                renderExchangeItemsTable();
+                calculateReturnTotals();
+            }
+
+            function removeExchangeItem(productId) {
+                selectedExchangeItems = selectedExchangeItems.filter(i => i.product.id !== productId);
+                renderExchangeItemsTable();
+                calculateReturnTotals();
+            }
+
+            function renderExchangeItemsTable() {
+                const tbody = document.getElementById('exchangeItemsTableBody');
+                if (!tbody) return;
+
+                if (selectedExchangeItems.length === 0) {
+                    tbody.innerHTML = `
+                        <tr id="exchangeEmptyRow">
+                            <td colspan="7" class="text-center text-muted small py-3">
+                                Chưa chọn món đổi mới nào (Khách chỉ trả hàng hoàn tiền)
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                selectedExchangeItems.forEach(it => {
+                    const p = it.product;
+                    const lineTotal = (Number(p.price) || 0) * it.quantity;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            <div class="fw-semibold text-dark">${p.name}</div>
+                            <div class="font-monospace text-muted small">${p.code || ''}</div>
+                        </td>
+                        <td class="text-center">
+                            ${p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">${p.size}</span>` : '—'}
+                        </td>
+                        <td class="text-center">
+                            ${p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border">${p.color}</span>` : '—'}
+                        </td>
+                        <td class="text-end">${formatVND(p.price)}</td>
+                        <td class="text-center fw-bold">${it.quantity}</td>
+                        <td class="text-end fw-bold text-primary">${formatVND(lineTotal)}</td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm text-danger p-0 border-0" onclick="removeExchangeItem(${p.id})" title="Xóa món đổi này">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            function calculateReturnTotals() {
+                let totalRefund = 0;
+                if (returnOrderData && returnOrderData.items) {
+                    Object.keys(selectedReturnItems).forEach(pId => {
+                        const item = returnOrderData.items.find(i => i.productId === Number(pId));
+                        if (item) {
+                            const q = selectedReturnItems[pId].quantity || 0;
+                            totalRefund += (Number(item.unitPrice) || 0) * q;
+                        }
+                    });
+                }
+
+                let totalExchange = 0;
+                selectedExchangeItems.forEach(it => {
+                    const p = it.product;
+                    const q = it.quantity || 0;
+                    totalExchange += (Number(p.price) || 0) * q;
+                });
+
+                const netAmount = totalExchange - totalRefund;
+
+                const calcRefundEl = document.getElementById('calcTotalRefund');
+                const calcExchangeEl = document.getElementById('calcTotalExchange');
+                const calcNetBadge = document.getElementById('calcNetAmountBadge');
+                const calcNetDesc = document.getElementById('calcNetActionDesc');
+                const btnSubmit = document.getElementById('btnSubmitReturn');
+                const btnSubmitText = document.getElementById('btnSubmitReturnText');
+
+                if (calcRefundEl) calcRefundEl.textContent = formatVND(totalRefund);
+                if (calcExchangeEl) calcExchangeEl.textContent = formatVND(totalExchange);
+
+                if (calcNetBadge) {
+                    if (netAmount > 0) {
+                        calcNetBadge.textContent = `+ ${formatVND(netAmount)}`;
+                        calcNetBadge.className = 'fs-5 fw-bold text-primary';
+                    } else if (netAmount < 0) {
+                        calcNetBadge.textContent = `- ${formatVND(Math.abs(netAmount))}`;
+                        calcNetBadge.className = 'fs-5 fw-bold text-success';
+                    } else {
+                        calcNetBadge.textContent = '0 đ';
+                        calcNetBadge.className = 'fs-5 fw-bold text-secondary';
+                    }
+                }
+
+                if (calcNetDesc) {
+                    if (netAmount > 0) {
+                        calcNetDesc.innerHTML = `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-2 py-1">Khách cần thanh toán thêm: ${formatVND(netAmount)}</span>`;
+                    } else if (netAmount < 0) {
+                        calcNetDesc.innerHTML = `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1">Cửa hàng hoàn tiền cho khách: ${formatVND(Math.abs(netAmount))}</span>`;
+                    } else {
+                        calcNetDesc.innerHTML = `<span class="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1">Đổi ngang giá trị (0 đ)</span>`;
+                    }
+                }
+
+                const returnItemCount = Object.keys(selectedReturnItems).length;
+                if (btnSubmit) {
+                    btnSubmit.disabled = returnItemCount === 0;
+                }
+                if (btnSubmitText) {
+                    if (selectedExchangeItems.length > 0) {
+                        btnSubmitText.textContent = `Xác nhận Đổi hàng (${returnItemCount} món trả, ${selectedExchangeItems.length} món đổi)`;
+                    } else {
+                        btnSubmitText.textContent = `Xác nhận Trả hàng (${returnItemCount} món trả)`;
+                    }
+                }
+            }
+
+            async function handleExecuteReturn() {
+                if (!returnOrderData) return;
+                const returnKeys = Object.keys(selectedReturnItems);
+                if (returnKeys.length === 0) {
+                    showToast('Cảnh báo', 'Vui lòng chọn ít nhất 1 sản phẩm cần trả lại!', false);
+                    return;
+                }
+
+                const mainReasonEl = document.getElementById('returnMainReason');
+                const mainReason = mainReasonEl ? mainReasonEl.value : 'WRONG_SIZE';
+
+                const noteEl = document.getElementById('returnNote');
+                const note = noteEl ? noteEl.value.trim() : '';
+
+                const isExchange = selectedExchangeItems.length > 0;
+                const returnType = isExchange ? 'EXCHANGE' : 'RETURN_ONLY';
+
+                const returnItemsPayload = returnKeys.map(pId => ({
+                    productId: Number(pId),
+                    quantity: selectedReturnItems[pId].quantity,
+                    reason: selectedReturnItems[pId].reason || mainReason,
+                    note: selectedReturnItems[pId].note || null
+                }));
+
+                const exchangeItemsPayload = selectedExchangeItems.map(it => ({
+                    productId: it.product.id,
+                    quantity: it.quantity
+                }));
+
+                const payload = {
+                    orderCode: returnOrderData.orderCode,
+                    returnType: returnType,
+                    mainReason: mainReason,
+                    note: note || null,
+                    returnItems: returnItemsPayload,
+                    exchangeItems: isExchange ? exchangeItemsPayload : null
+                };
+
+                const btnSubmit = document.getElementById('btnSubmitReturn');
+                const btnSubmitText = document.getElementById('btnSubmitReturnText');
+                if (btnSubmit) {
+                    btnSubmit.disabled = true;
+                    if (btnSubmitText) btnSubmitText.textContent = 'ĐANG XỬ LÝ...';
+                }
+
+                try {
+                    const response = await fetch('/api/returns', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (btnSubmit) btnSubmit.disabled = false;
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (response.status === 201 || response.ok) {
+                        const retModal = getReturnModal();
+                        if (retModal) retModal.hide();
+
+                        showReturnSuccessModal(data);
+                        showToast('Thành công', `Phiếu [${data.returnCode}] đã xử lý thành công!`, true);
+
+                        await loadProducts();
+                    } else {
+                        showToast('Lỗi xử lý', data.message || 'Không thể tạo phiếu đổi trả!', false);
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi gửi phiếu đổi trả:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btnSubmit) btnSubmit.disabled = false;
+                    calculateReturnTotals();
+                }
+            }
+
+            function showReturnSuccessModal(data) {
+                const timeEl = document.getElementById('retSuccessTimestamp');
+                const codeEl = document.getElementById('retSuccessCode');
+                const typeEl = document.getElementById('retSuccessType');
+                const orderEl = document.getElementById('retSuccessOrderCode');
+                const custEl = document.getElementById('retSuccessCustomer');
+                const userEl = document.getElementById('retSuccessUser');
+                const reasonEl = document.getElementById('retSuccessReason');
+                const refEl = document.getElementById('retSuccessRefund');
+                const exchEl = document.getElementById('retSuccessExchange');
+                const netEl = document.getElementById('retSuccessNetAmount');
+                const descEl = document.getElementById('retSuccessActionDesc');
+
+                if (timeEl) {
+                    const d = data.createdAt ? new Date(data.createdAt) : new Date();
+                    timeEl.textContent = d.toLocaleString('vi-VN');
+                }
+                if (codeEl) codeEl.textContent = data.returnCode || '—';
+                if (typeEl) {
+                    typeEl.textContent = data.returnType === 'EXCHANGE' ? 'ĐỔI HÀNG' : 'TRẢ HÀNG';
+                    typeEl.className = data.returnType === 'EXCHANGE' ? 'badge bg-primary px-2 py-1' : 'badge bg-danger px-2 py-1';
+                }
+                if (orderEl) orderEl.textContent = data.orderCode || '—';
+                if (custEl) custEl.textContent = data.customerName || 'Khách lẻ';
+                if (userEl) userEl.textContent = data.processedByUsername || 'Nhân viên';
+
+                const reasonMap = {
+                    'WRONG_SIZE': 'Mặc chật / Rộng kích cỡ',
+                    'DEFECTIVE': 'Lỗi sản phẩm / Đường may',
+                    'COLOR_MISMATCH': 'Không ưng màu sắc',
+                    'CUSTOMER_CHANGE_MIND': 'Khách đổi ý',
+                    'OTHER': 'Lý do khác'
+                };
+                if (reasonEl) reasonEl.textContent = reasonMap[data.mainReason] || data.mainReason || '—';
+
+                if (refEl) refEl.textContent = formatVND(data.totalRefundAmount);
+                if (exchEl) exchEl.textContent = formatVND(data.totalExchangeAmount);
+
+                const net = Number(data.netAmount) || 0;
+                if (netEl) {
+                    if (net > 0) {
+                        netEl.textContent = `+ ${formatVND(net)}`;
+                        netEl.className = 'fs-5 fw-bold text-primary';
+                    } else if (net < 0) {
+                        netEl.textContent = `- ${formatVND(Math.abs(net))}`;
+                        netEl.className = 'fs-5 fw-bold text-success';
+                    } else {
+                        netEl.textContent = '0 đ';
+                        netEl.className = 'fs-5 fw-bold text-secondary';
+                    }
+                }
+
+                if (descEl) {
+                    if (net > 0) {
+                        descEl.innerHTML = `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-2 py-1">Khách đã trả thêm: ${formatVND(net)}</span>`;
+                    } else if (net < 0) {
+                        descEl.innerHTML = `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1">Đã hoàn tiền cho khách: ${formatVND(Math.abs(net))}</span>`;
+                    } else {
+                        descEl.innerHTML = `<span class="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1">Đổi ngang giá trị (0 đ)</span>`;
+                    }
+                }
+
+                const modal = getReturnSuccessModal();
+                if (modal) modal.show();
+            }
+
+            // ================= 10. CẢNH BÁO RỜI KHỎI TRANG KHI GIỎ HÀNG CÒN HÀNG =================
             window.addEventListener('beforeunload', (e) => {
                 if (cart && cart.length > 0) {
                     e.preventDefault();
@@ -928,6 +1831,17 @@
             window.handleSearchInput = handleSearchInput;
             window.clearSearch = clearSearch;
             window.hideToast = hideToast;
+
+            // Nghiệp vụ Đổi - Trả hàng
+            window.handleSizeFilter = handleSizeFilter;
+            window.openReturnModal = openReturnModal;
+            window.lookupReturnOrder = lookupReturnOrder;
+            window.toggleReturnItem = toggleReturnItem;
+            window.onReturnQtyChange = onReturnQtyChange;
+            window.onReturnReasonChange = onReturnReasonChange;
+            window.addExchangeItem = addExchangeItem;
+            window.removeExchangeItem = removeExchangeItem;
+            window.handleExecuteReturn = handleExecuteReturn;
 
             // Khởi chạy khi tải trang
             async function initPos() {
