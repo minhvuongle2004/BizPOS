@@ -1407,7 +1407,9 @@
                 }
 
                 items.forEach(it => {
-                    const canReturn = (it.remainingReturnableQuantity || 0) > 0;
+                    const remainQty = (it.remainingQuantity !== undefined) ? it.remainingQuantity : (it.remainingReturnableQuantity || 0);
+                    const boughtQty = (it.purchasedQuantity !== undefined) ? it.purchasedQuantity : (it.originalQuantity || 0);
+                    const canReturn = (it.canReturn !== undefined) ? it.canReturn : (remainQty > 0);
                     const tr = document.createElement('tr');
                     tr.id = `returnRow_${it.productId}`;
                     tr.innerHTML = `
@@ -1427,11 +1429,11 @@
                             ${it.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border">${it.color}</span>` : '—'}
                         </td>
                         <td class="text-end fw-semibold">${formatVND(it.unitPrice)}</td>
-                        <td class="text-center">${it.originalQuantity}</td>
-                        <td class="text-center fw-bold ${canReturn ? 'text-success' : 'text-muted'}">${it.remainingReturnableQuantity}</td>
+                        <td class="text-center">${boughtQty}</td>
+                        <td class="text-center fw-bold ${canReturn ? 'text-success' : 'text-muted'}">${remainQty}</td>
                         <td>
                             <input type="number" class="biz-input py-1 px-2 text-center" id="qty_ret_${it.productId}" 
-                                   min="1" max="${it.remainingReturnableQuantity}" value="1" disabled
+                                   min="1" max="${remainQty}" value="1" disabled
                                    onchange="onReturnQtyChange(${it.productId}, this.value)">
                         </td>
                         <td>
@@ -1460,10 +1462,12 @@
                 const reasonSel = document.getElementById(`reason_ret_${productId}`);
                 const refundEl = document.getElementById(`refund_ret_${productId}`);
 
+                const remainQty = (item.remainingQuantity !== undefined) ? item.remainingQuantity : (item.remainingReturnableQuantity || 1);
+
                 if (chk && chk.checked) {
                     qtyInput.disabled = false;
                     reasonSel.disabled = false;
-                    const maxQty = item.remainingReturnableQuantity || 1;
+                    const maxQty = remainQty || 1;
                     qtyInput.value = 1;
                     selectedReturnItems[productId] = {
                         quantity: 1,
@@ -1487,8 +1491,9 @@
                 const item = returnOrderData.items.find(i => i.productId === productId);
                 if (!item) return;
 
+                const remainQty = (item.remainingQuantity !== undefined) ? item.remainingQuantity : (item.remainingReturnableQuantity || 1);
                 let qty = parseInt(val) || 1;
-                const maxQty = item.remainingReturnableQuantity || 1;
+                const maxQty = remainQty || 1;
                 if (qty < 1) qty = 1;
                 if (qty > maxQty) {
                     qty = maxQty;
