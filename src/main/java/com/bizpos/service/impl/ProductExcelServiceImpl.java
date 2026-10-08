@@ -100,6 +100,9 @@ public class ProductExcelServiceImpl implements ProductExcelService {
                     "Mã sản phẩm",
                     "Tên sản phẩm",
                     "Danh mục",
+                    "Kích cỡ",
+                    "Màu sắc",
+                    "Chất liệu",
                     "Giá bán (VNĐ)",
                     "Tồn kho",
                     "Ngày tạo"
@@ -135,26 +138,42 @@ public class ProductExcelServiceImpl implements ProductExcelService {
                 cell2.setCellValue(p.getCategory() != null ? p.getCategory().getName() : "—");
                 cell2.setCellStyle(textStyle);
 
-                // Cột 3: Giá bán (VNĐ)
+                // Cột 3: Kích cỡ
                 Cell cell3 = row.createCell(3);
-                if (p.getPrice() != null) {
-                    cell3.setCellValue(p.getPrice().doubleValue());
-                } else {
-                    cell3.setCellValue(0);
-                }
-                cell3.setCellStyle(priceStyle);
+                cell3.setCellValue(p.getSize() != null ? p.getSize() : "—");
+                cell3.setCellStyle(centerStyle);
 
-                // Cột 4: Tồn kho
+                // Cột 4: Màu sắc
                 Cell cell4 = row.createCell(4);
-                cell4.setCellValue(p.getStockQuantity() != null ? p.getStockQuantity() : 0);
-                cell4.setCellStyle(numberStyle);
+                cell4.setCellValue(p.getColor() != null ? p.getColor() : "—");
+                cell4.setCellStyle(centerStyle);
 
-                // Cột 5: Ngày tạo
+                // Cột 5: Chất liệu
                 Cell cell5 = row.createCell(5);
+                cell5.setCellValue(p.getMaterial() != null ? p.getMaterial() : "—");
+                cell5.setCellStyle(textStyle);
+
+                // Cột 6: Giá bán (VNĐ)
+                Cell cell6 = row.createCell(6);
+                if (p.getPrice() != null) {
+                    cell6.setCellValue(p.getPrice().doubleValue());
+                } else {
+                    cell6.setCellValue(0);
+                }
+                cell6.setCellStyle(priceStyle);
+
+                // Cột 7: Tồn kho
+                Cell cell7 = row.createCell(7);
+                cell7.setCellValue(p.getStockQuantity() != null ? p.getStockQuantity() : 0);
+                cell7.setCellStyle(numberStyle);
+
+                // Cột 8: Ngày tạo
+                Cell cell8 = row.createCell(8);
                 String createdAtStr = p.getCreatedAt() != null ? p.getCreatedAt().format(DATE_TIME_FORMATTER) : "—";
-                cell5.setCellValue(createdAtStr);
-                cell5.setCellStyle(centerStyle);
+                cell8.setCellValue(createdAtStr);
+                cell8.setCellStyle(centerStyle);
             }
+
 
             // 4. Auto-fit column widths
             for (int i = 0; i < headers.length; i++) {
@@ -216,6 +235,18 @@ public class ProductExcelServiceImpl implements ProductExcelService {
 
             int lastRowNum = sheet.getLastRowNum();
 
+            Row headerRow = sheet.getRow(0);
+            boolean hasFashionColumns = false;
+            if (headerRow != null) {
+                for (int c = 0; c < headerRow.getLastCellNum(); c++) {
+                    String h = getCellString(headerRow.getCell(c)).toLowerCase();
+                    if (h.contains("size") || h.contains("cỡ") || h.contains("màu") || h.contains("color")) {
+                        hasFashionColumns = true;
+                        break;
+                    }
+                }
+            }
+
             // Duyệt từng dòng (bỏ qua dòng Header index 0)
             for (int r = 1; r <= lastRowNum; r++) {
                 Row row = sheet.getRow(r);
@@ -229,8 +260,22 @@ public class ProductExcelServiceImpl implements ProductExcelService {
                 String code = getCellString(row.getCell(0));
                 String name = getCellString(row.getCell(1));
                 String categoryName = getCellString(row.getCell(2));
-                BigDecimal price = getCellBigDecimal(row.getCell(3));
-                Integer stock = getCellInteger(row.getCell(4));
+                String size = null;
+                String color = null;
+                String material = null;
+                BigDecimal price;
+                Integer stock;
+
+                if (hasFashionColumns) {
+                    size = getCellString(row.getCell(3));
+                    color = getCellString(row.getCell(4));
+                    material = getCellString(row.getCell(5));
+                    price = getCellBigDecimal(row.getCell(6));
+                    stock = getCellInteger(row.getCell(7));
+                } else {
+                    price = getCellBigDecimal(row.getCell(3));
+                    stock = getCellInteger(row.getCell(4));
+                }
 
                 List<String> rowErrors = new ArrayList<>();
 
@@ -289,6 +334,9 @@ public class ProductExcelServiceImpl implements ProductExcelService {
                             .code(code)
                             .name(name)
                             .category(matchedCategory)
+                            .size(size != null && !size.trim().isEmpty() ? size.trim() : null)
+                            .color(color != null && !color.trim().isEmpty() ? color.trim() : null)
+                            .material(material != null && !material.trim().isEmpty() ? material.trim() : null)
                             .price(price)
                             .stockQuantity(stock)
                             .description("Nhập từ file Excel")

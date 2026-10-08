@@ -70,9 +70,12 @@ public class ProductExcelIntegrationTest {
             assertEquals("Mã sản phẩm", headerRow.getCell(0).getStringCellValue());
             assertEquals("Tên sản phẩm", headerRow.getCell(1).getStringCellValue());
             assertEquals("Danh mục", headerRow.getCell(2).getStringCellValue());
-            assertEquals("Giá bán (VNĐ)", headerRow.getCell(3).getStringCellValue());
-            assertEquals("Tồn kho", headerRow.getCell(4).getStringCellValue());
-            assertEquals("Ngày tạo", headerRow.getCell(5).getStringCellValue());
+            assertEquals("Kích cỡ", headerRow.getCell(3).getStringCellValue());
+            assertEquals("Màu sắc", headerRow.getCell(4).getStringCellValue());
+            assertEquals("Chất liệu", headerRow.getCell(5).getStringCellValue());
+            assertEquals("Giá bán (VNĐ)", headerRow.getCell(6).getStringCellValue());
+            assertEquals("Tồn kho", headerRow.getCell(7).getStringCellValue());
+            assertEquals("Ngày tạo", headerRow.getCell(8).getStringCellValue());
         }
     }
 
@@ -278,4 +281,84 @@ public class ProductExcelIntegrationTest {
         assertTrue(productRepository.findByCode("NEG_PRICE_" + uniqueSuffix).isEmpty());
         assertTrue(productRepository.findByCode("NEG_STOCK_" + uniqueSuffix).isEmpty());
     }
+
+    @Test
+    @DisplayName("4. Test Import File Excel chuẩn Thời trang với Size, Màu sắc, Chất liệu")
+    void testImportFashionProductsWithAttributes() throws IOException {
+        String uniqueSuffix = String.valueOf(System.currentTimeMillis()).substring(7);
+        String poloCode = "FASHION_POLO_" + uniqueSuffix;
+        String jeanCode = "FASHION_JEAN_" + uniqueSuffix;
+
+        byte[] xlsxBytes;
+        try (Workbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("FashionImport");
+
+            // Header Thời trang 8 cột
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Mã sản phẩm");
+            header.createCell(1).setCellValue("Tên sản phẩm");
+            header.createCell(2).setCellValue("Danh mục");
+            header.createCell(3).setCellValue("Kích cỡ");
+            header.createCell(4).setCellValue("Màu sắc");
+            header.createCell(5).setCellValue("Chất liệu");
+            header.createCell(6).setCellValue("Giá");
+            header.createCell(7).setCellValue("Tồn kho");
+
+            // Row 1: Áo Polo
+            Row r1 = sheet.createRow(1);
+            r1.createCell(0).setCellValue(poloCode);
+            r1.createCell(1).setCellValue("Áo Polo Fashion Test");
+            r1.createCell(2).setCellValue(testCategory.getName());
+            r1.createCell(3).setCellValue("XL");
+            r1.createCell(4).setCellValue("Xanh Navy");
+            r1.createCell(5).setCellValue("Cotton Pique 100%");
+            r1.createCell(6).setCellValue(320000);
+            r1.createCell(7).setCellValue(40);
+
+            // Row 2: Quần Jean
+            Row r2 = sheet.createRow(2);
+            r2.createCell(0).setCellValue(jeanCode);
+            r2.createCell(1).setCellValue("Quần Jean Fashion Test");
+            r2.createCell(2).setCellValue(testCategory.getName());
+            r2.createCell(3).setCellValue("32");
+            r2.createCell(4).setCellValue("Đen Xước");
+            r2.createCell(5).setCellValue("Denim Spandex");
+            r2.createCell(6).setCellValue(480000);
+            r2.createCell(7).setCellValue(25);
+
+            workbook.write(bos);
+            xlsxBytes = bos.toByteArray();
+        }
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "fashion_import.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                xlsxBytes
+        );
+
+        ProductImportResultResponse result = productExcelService.importProductsFromExcel(file);
+
+        assertEquals(2, result.getTotalRows());
+        assertEquals(2, result.getSuccessCount());
+        assertEquals(0, result.getErrorCount());
+
+        // Kiểm tra dữ liệu được lưu đúng size, color, material
+        Optional<Product> poloOpt = productRepository.findByCode(poloCode);
+        assertTrue(poloOpt.isPresent());
+        Product polo = poloOpt.get();
+        assertEquals("XL", polo.getSize());
+        assertEquals("Xanh Navy", polo.getColor());
+        assertEquals("Cotton Pique 100%", polo.getMaterial());
+        assertEquals(40, polo.getStockQuantity());
+
+        Optional<Product> jeanOpt = productRepository.findByCode(jeanCode);
+        assertTrue(jeanOpt.isPresent());
+        Product jean = jeanOpt.get();
+        assertEquals("32", jean.getSize());
+        assertEquals("Đen Xước", jean.getColor());
+        assertEquals("Denim Spandex", jean.getMaterial());
+        assertEquals(25, jean.getStockQuantity());
+    }
 }
+
