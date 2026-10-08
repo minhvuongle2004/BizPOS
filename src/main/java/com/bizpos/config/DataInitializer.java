@@ -43,6 +43,9 @@ public class DataInitializer implements CommandLineRunner {
         // 0. Khởi tạo tài khoản mẫu ADMIN và STAFF
         initUsers();
 
+        // 0b. Tự động dọn dẹp các danh mục và sản phẩm cũ ngoài ngành thời trang
+        cleanupLegacyNonFashionData();
+
         // 1. Khởi tạo Danh mục và Sản phẩm Thời trang (Size, Màu sắc, Chất liệu)
         initFashionCatalog();
 
@@ -74,6 +77,31 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             userRepository.save(staff);
             log.info(">> [TẠO TÀI KHOẢN] staff (Role: STAFF, Mật khẩu: staff123)");
+        }
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    protected void cleanupLegacyNonFashionData() {
+        java.util.List<String> fashionCatNames = java.util.List.of("áo thời trang", "quần & chân váy", "giày dép", "phụ kiện");
+        java.util.List<Category> nonFashionCats = categoryRepository.findAll().stream()
+                .filter(c -> !fashionCatNames.contains(c.getName().trim().toLowerCase()))
+                .toList();
+
+        if (!nonFashionCats.isEmpty()) {
+            for (Category cat : nonFashionCats) {
+                java.util.List<Product> prods = productRepository.findByCategoryId(cat.getId());
+                for (Product p : prods) {
+                    try {
+                        productRepository.delete(p);
+                    } catch (Exception ignored) {
+                    }
+                }
+                try {
+                    categoryRepository.delete(cat);
+                } catch (Exception ignored) {
+                }
+            }
+            log.info(">> [DỌN DẸP DỮ LIỆU CŨ] Đã loại bỏ các danh mục và sản phẩm cũ không thuộc ngành thời trang.");
         }
     }
 
