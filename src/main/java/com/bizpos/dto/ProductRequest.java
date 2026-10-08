@@ -37,6 +37,15 @@ public class ProductRequest {
     @jakarta.validation.constraints.Min(value = 0, message = "Số lượng tồn kho không được âm!")
     private Integer stockQuantity;
 
+    @Size(max = 30, message = "Kích cỡ sản phẩm không được vượt quá 30 ký tự!")
+    private String size;
+
+    @Size(max = 50, message = "Màu sắc sản phẩm không được vượt quá 50 ký tự!")
+    private String color;
+
+    @Size(max = 100, message = "Chất liệu sản phẩm không được vượt quá 100 ký tự!")
+    private String material;
+
     @NotNull(message = "Vui lòng chọn danh mục cho sản phẩm!")
     private Long categoryId;
 }

@@ -34,6 +34,15 @@ public class Product extends BaseEntity {
     @Builder.Default
     private Integer stockQuantity = 0;
 
+    @Column(name = "size", length = 30)
+    private String size;
+
+    @Column(name = "color", length = 50)
+    private String color;
+
+    @Column(name = "material", length = 100)
+    private String material;
+
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)

@@ -76,6 +76,9 @@ public class ProductServiceImpl implements ProductService {
                 .price(request.getPrice())
                 .description(request.getDescription() != null ? request.getDescription().trim() : null)
                 .stockQuantity(request.getStockQuantity() != null ? request.getStockQuantity() : 0)
+                .size(request.getSize() != null && !request.getSize().trim().isEmpty() ? request.getSize().trim() : null)
+                .color(request.getColor() != null && !request.getColor().trim().isEmpty() ? request.getColor().trim() : null)
+                .material(request.getMaterial() != null && !request.getMaterial().trim().isEmpty() ? request.getMaterial().trim() : null)
                 .category(category)
                 .build();
 
@@ -124,6 +127,9 @@ public class ProductServiceImpl implements ProductService {
         if (request.getStockQuantity() != null) {
             existingProduct.setStockQuantity(request.getStockQuantity());
         }
+        existingProduct.setSize(request.getSize() != null && !request.getSize().trim().isEmpty() ? request.getSize().trim() : null);
+        existingProduct.setColor(request.getColor() != null && !request.getColor().trim().isEmpty() ? request.getColor().trim() : null);
+        existingProduct.setMaterial(request.getMaterial() != null && !request.getMaterial().trim().isEmpty() ? request.getMaterial().trim() : null);
         existingProduct.setCategory(category);
 
         return productRepository.save(existingProduct);

@@ -23,6 +23,9 @@ public class ProductResponse {
     private BigDecimal price;
     private String description;
     private Integer stockQuantity;
+    private String size;
+    private String color;
+    private String material;
     private CategoryResponse category;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -38,9 +41,13 @@ public class ProductResponse {
                 .price(product.getPrice())
                 .description(product.getDescription())
                 .stockQuantity(product.getStockQuantity() != null ? product.getStockQuantity() : 0)
+                .size(product.getSize())
+                .color(product.getColor())
+                .material(product.getMaterial())
                 .category(CategoryResponse.fromEntity(product.getCategory()))
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
     }
+
 }
