@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -303,5 +304,39 @@ public class MasterDataIntegrationTest {
         mockMvc.perform(get("/api/customers/999999")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Product: Tạo sản phẩm thời trang đầy đủ Size, Color, Material và lọc theo Size")
+    void createProduct_andFilterBySize_shouldWorkAccurately() throws Exception {
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(7);
+
+        // Tạo 1 sản phẩm Size XL
+        ProductRequest reqXL = ProductRequest.builder()
+                .code("TSHIRT_XL_" + suffix)
+                .name("Áo Thun Oversize XL")
+                .size("XL")
+                .color("Đen")
+                .material("Cotton 100%")
+                .price(new BigDecimal("220000.00"))
+                .stockQuantity(25)
+                .categoryId(testCategory.getId())
+                .build();
+
+        mockMvc.perform(post("/api/products")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqXL)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.size").value("XL"))
+                .andExpect(jsonPath("$.color").value("Đen"))
+                .andExpect(jsonPath("$.material").value("Cotton 100%"));
+
+        // Lọc theo productSize=XL
+        mockMvc.perform(get("/api/products")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("productSize", "XL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.code == 'TSHIRT_XL_" + suffix + "')].size").value("XL"));
     }
 }

@@ -36,12 +36,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("SELECT p FROM Product p WHERE " +
            "(:categoryId IS NULL OR p.category.id = :categoryId) AND " +
+           "(:productSize IS NULL OR :productSize = '' OR LOWER(p.size) = LOWER(:productSize)) AND " +
            "(:keyword IS NULL OR :keyword = '' OR " +
            " LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           " LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+           " LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           " LOWER(p.size) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           " LOWER(p.color) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<Product> searchProducts(
             @Param("keyword") String keyword,
             @Param("categoryId") Long categoryId,
+            @Param("productSize") String productSize,
             Pageable pageable);
 
     @Query("SELECT COUNT(p) FROM Product p WHERE p.stockQuantity <= :threshold")

@@ -897,6 +897,7 @@
                 params.append('size', pageSize);
                 if (keyword) params.append('keyword', keyword);
                 if (categoryId) params.append('categoryId', categoryId);
+                if (selectedSize) params.append('productSize', selectedSize);
 
                 try {
                     const response = await fetch(`/api/products?${params.toString()}`, {
@@ -913,15 +914,10 @@
 
                     if (response.ok) {
                         const data = await response.json();
-                        let items = data.content || [];
-
-                        // Lọc theo kích cỡ phía client nếu chọn size filter
-                        if (selectedSize) {
-                            items = items.filter(p => p.size && p.size.toLowerCase() === selectedSize.toLowerCase());
-                        }
+                        const items = data.content || [];
 
                         totalPages = data.totalPages || 0;
-                        totalElements = selectedSize ? items.length : (data.totalElements || 0);
+                        totalElements = data.totalElements || 0;
 
                         if (tbody) tbody.innerHTML = '';
 

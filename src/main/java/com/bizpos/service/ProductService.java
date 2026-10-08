@@ -10,9 +10,13 @@ import java.util.List;
 public interface ProductService {
 
     /**
-     * Lấy danh sách sản phẩm có phân trang, kết hợp tìm kiếm theo từ khóa và lọc theo danh mục
+     * Lấy danh sách sản phẩm có phân trang, kết hợp tìm kiếm theo từ khóa, lọc theo danh mục và kích cỡ
      */
-    PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId);
+    PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId, String productSize);
+
+    default PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId) {
+        return getProducts(page, size, keyword, categoryId, null);
+    }
 
     /**
      * Lấy danh sách toàn bộ sản phẩm

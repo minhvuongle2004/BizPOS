@@ -33,14 +33,20 @@ public class ProductServiceImpl implements ProductService {
     private final com.bizpos.service.StockMovementService stockMovementService;
 
     @Override
-    public PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId) {
+    public PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId, String productSize) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by("id").descending());
         String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
+        String cleanSize = (productSize != null && !productSize.trim().isEmpty()) ? productSize.trim() : null;
 
-        Page<Product> productPage = productRepository.searchProducts(cleanKeyword, categoryId, pageable);
+        Page<Product> productPage = productRepository.searchProducts(cleanKeyword, categoryId, cleanSize, pageable);
         Page<ProductResponse> responsePage = productPage.map(ProductResponse::fromEntity);
 
         return PageResponse.from(responsePage);
+    }
+
+    @Override
+    public PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId) {
+        return getProducts(page, size, keyword, categoryId, null);
     }
 
     @Override

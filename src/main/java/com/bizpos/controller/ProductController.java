@@ -31,17 +31,18 @@ public class ProductController {
     private final ProductExcelService productExcelService;
 
     /**
-     * 1. Lấy danh sách sản phẩm có phân trang, kết hợp tìm kiếm và lọc theo danh mục
+     * 1. Lấy danh sách sản phẩm có phân trang, kết hợp tìm kiếm và lọc theo danh mục, kích cỡ
      * GET /api/products?page=0&size=10
-     * GET /api/products?page=0&size=10&keyword=cafe&categoryId=1
+     * GET /api/products?page=0&size=10&keyword=polo&categoryId=1&productSize=M
      */
     @GetMapping
     public ResponseEntity<PageResponse<ProductResponse>> getProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Long categoryId) {
-        PageResponse<ProductResponse> response = productService.getProducts(page, size, keyword, categoryId);
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String productSize) {
+        PageResponse<ProductResponse> response = productService.getProducts(page, size, keyword, categoryId, productSize);
         return ResponseEntity.ok(response);
     }
 
