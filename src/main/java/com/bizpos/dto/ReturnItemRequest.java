@@ -10,6 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public class ReturnItemRequest {
 
     @NotNull(message = "Vui lòng chọn sản phẩm muốn trả lại")

@@ -9,6 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public class ExchangeItemRequest {
 
     @NotNull(message = "Vui lòng chọn sản phẩm muốn đổi lấy mới")

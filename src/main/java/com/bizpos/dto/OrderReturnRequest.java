@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public class OrderReturnRequest {
 
     @NotNull(message = "Mã hóa đơn gốc không được để trống")
@@ -24,6 +25,12 @@ public class OrderReturnRequest {
 
     @NotNull(message = "Vui lòng chọn lý do đổi / trả hàng")
     private ReturnReason reason;
+
+    public void setMainReason(ReturnReason mainReason) {
+        if (this.reason == null) {
+            this.reason = mainReason;
+        }
+    }
 
     private String note;
 

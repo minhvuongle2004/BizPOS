@@ -1710,10 +1710,11 @@
                 const payload = {
                     orderCode: returnOrderData.orderCode,
                     returnType: returnType,
+                    reason: mainReason,
                     mainReason: mainReason,
                     note: note || null,
                     returnItems: returnItemsPayload,
-                    exchangeItems: isExchange ? exchangeItemsPayload : null
+                    exchangeItems: isExchange ? exchangeItemsPayload : []
                 };
 
                 const btnSubmit = document.getElementById('btnSubmitReturn');
@@ -1781,7 +1782,7 @@
                 }
                 if (orderEl) orderEl.textContent = data.orderCode || '—';
                 if (custEl) custEl.textContent = data.customerName || 'Khách lẻ';
-                if (userEl) userEl.textContent = data.processedByUsername || 'Nhân viên';
+                if (userEl) userEl.textContent = data.performedBy || data.processedByUsername || 'Nhân viên';
 
                 const reasonMap = {
                     'WRONG_SIZE': 'Mặc chật / Rộng kích cỡ',
@@ -1790,7 +1791,7 @@
                     'CUSTOMER_CHANGE_MIND': 'Khách đổi ý',
                     'OTHER': 'Lý do khác'
                 };
-                if (reasonEl) reasonEl.textContent = reasonMap[data.mainReason] || data.mainReason || '—';
+                if (reasonEl) reasonEl.textContent = data.reasonDescription || reasonMap[data.reason] || reasonMap[data.mainReason] || data.reason || '—';
 
                 if (refEl) refEl.textContent = formatVND(data.totalRefundAmount);
                 if (exchEl) exchEl.textContent = formatVND(data.totalExchangeAmount);

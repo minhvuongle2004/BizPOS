@@ -127,9 +127,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleMalformedJson(HttpMessageNotReadableException ex) {
+        log.error("HttpMessageNotReadableException: ", ex);
+        String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
         ErrorResponse response = ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
-                .message("Dữ liệu gửi lên không đúng định dạng JSON hoặc sai kiểu dữ liệu!")
+                .message("Dữ liệu gửi lên không đúng định dạng JSON hoặc sai kiểu dữ liệu! (" + detail + ")")
                 .timestamp(LocalDateTime.now())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
