@@ -377,25 +377,128 @@
                                 </span>
                             </div>
 
-                            <div class="biz-card p-3 mb-2 bg-light bg-opacity-25 border">
-                                <div class="row g-2 align-items-center">
-                                    <div class="col-md-7 col-12">
-                                        <label class="form-label small text-muted mb-1">Chọn sản phẩm đổi mới từ kho:</label>
-                                        <select id="exchangeProductSelect" class="biz-input py-2">
-                                            <option value="">-- Chọn sản phẩm thời trang trong kho --</option>
-                                            <!-- Load từ allProducts -->
+                            <!-- GIAO DIỆN TÌM KIẾM THÔNG MINH CHO SẢN PHẨM ĐỔI MỚI -->
+                            <div class="biz-card p-3 mb-3 border bg-light bg-opacity-25 rounded-3">
+                                <!-- Hàng tìm kiếm & Bộ lọc -->
+                                <div class="row g-2 align-items-center mb-2">
+                                    <!-- Ô tìm kiếm từ khóa/SKU/Barcode -->
+                                    <div class="col-lg-6 col-12">
+                                        <label class="form-label small text-muted mb-1 fw-semibold d-flex align-items-center justify-content-between">
+                                            <span><i class="bi bi-search me-1 text-primary"></i>Tìm sản phẩm đổi mới:</span>
+                                            <span class="text-muted fw-normal" style="font-size: 0.72rem;">(Tên, SKU, Barcode)</span>
+                                        </label>
+                                        <div class="position-relative">
+                                            <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                                            <input type="text" id="exchangeSearchInput" class="biz-input ps-5 pe-4 py-2" 
+                                                   placeholder="Nhập tên sản phẩm, mã barcode, SKU..." 
+                                                   autocomplete="off"
+                                                   oninput="handleExchangeSearchInput()"
+                                                   onfocus="onExchangeSearchFocus()">
+                                            <button type="button" id="btnClearExchangeSearch" 
+                                                    class="btn position-absolute top-50 end-0 translate-middle-y me-2 text-muted p-1 border-0 d-none" 
+                                                    onclick="clearExchangeSearch()" title="Xóa tìm kiếm">
+                                                <i class="bi bi-x-circle-fill"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bộ lọc Danh mục -->
+                                    <div class="col-lg-3 col-6">
+                                        <label class="form-label small text-muted mb-1 fw-semibold">
+                                            <i class="bi bi-tags me-1 text-primary"></i>Danh mục:
+                                        </label>
+                                        <select id="exchangeCategoryFilter" class="biz-input py-2" onchange="handleExchangeSearchFilter()">
+                                            <option value="">Tất cả danh mục</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-2 col-6">
-                                        <label class="form-label small text-muted mb-1">Số lượng:</label>
-                                        <input type="number" id="exchangeProductQty" class="biz-input py-2 text-center" min="1" value="1">
+
+                                    <!-- Bộ lọc Size -->
+                                    <div class="col-lg-3 col-6">
+                                        <label class="form-label small text-muted mb-1 fw-semibold">
+                                            <i class="bi bi-aspect-ratio me-1 text-primary"></i>Kích cỡ (Size):
+                                        </label>
+                                        <select id="exchangeSizeFilter" class="biz-input py-2" onchange="handleExchangeSearchFilter()">
+                                            <option value="">Tất cả kích cỡ</option>
+                                            <option value="S">Size S</option>
+                                            <option value="M">Size M</option>
+                                            <option value="L">Size L</option>
+                                            <option value="XL">Size XL</option>
+                                            <option value="2XL">Size 2XL</option>
+                                            <option value="3XL">Size 3XL</option>
+                                            <option value="29">Size 29</option>
+                                            <option value="30">Size 30</option>
+                                            <option value="31">Size 31</option>
+                                            <option value="32">Size 32</option>
+                                            <option value="33">Size 33</option>
+                                            <option value="34">Size 34</option>
+                                            <option value="39">Size 39</option>
+                                            <option value="40">Size 40</option>
+                                            <option value="41">Size 41</option>
+                                            <option value="42">Size 42</option>
+                                            <option value="Freesize">Freesize</option>
+                                        </select>
                                     </div>
-                                    <div class="col-md-3 col-6 d-flex align-items-end">
-                                        <button type="button" class="btn btn-biz-outline w-100 py-2 d-inline-flex align-items-center justify-content-center gap-1" onclick="addExchangeItem()">
-                                            <i class="bi bi-plus-circle text-primary"></i>
-                                            <span>Thêm món đổi</span>
-                                        </button>
+                                </div>
+
+                                <!-- Hidden legacy select for backward compatibility -->
+                                <select id="exchangeProductSelect" class="d-none"></select>
+
+                                <!-- Container kết quả gợi ý tìm kiếm -->
+                                <div id="exchangeSearchResultsContainer" class="border rounded-3 bg-white shadow-sm p-2 mb-2" style="max-height: 220px; overflow-y: auto;">
+                                    <div class="d-flex justify-content-between align-items-center px-2 py-1 mb-1 border-bottom bg-light rounded-top">
+                                        <span class="small fw-semibold text-secondary" id="exchangeSearchCountLabel">
+                                            <i class="bi bi-box-seam me-1 text-primary"></i>Sản phẩm gợi ý trong kho
+                                        </span>
+                                        <span class="badge bg-light text-muted border small" style="font-size: 0.7rem;">Nhấp vào món để chọn</span>
                                     </div>
+                                    <div id="exchangeSearchResultsList" class="d-flex flex-column gap-1">
+                                        <!-- Nạp động qua JS -->
+                                    </div>
+                                </div>
+
+                                <!-- Card xem trước & tùy chỉnh số lượng sản phẩm được chọn -->
+                                <div id="exchangeSelectedItemCard" class="card border border-primary border-opacity-50 bg-white p-3 rounded-3 shadow-sm d-none">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-md-7 col-12">
+                                            <div class="d-flex align-items-start gap-2">
+                                                <span class="badge bg-primary text-white rounded-circle p-2 mt-1">
+                                                    <i class="bi bi-check-lg fs-6"></i>
+                                                </span>
+                                                <div>
+                                                    <div class="fw-bold text-dark fs-6" id="selectedExchangeName">Áo sơ mi Oxford Nam</div>
+                                                    <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
+                                                        <span class="font-monospace text-muted small" id="selectedExchangeCode">AO-SM-001</span>
+                                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" id="selectedExchangeSize">Size L</span>
+                                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border" id="selectedExchangeColor">Trắng</span>
+                                                        <span class="text-primary fw-bold ms-1" id="selectedExchangePrice">250.000 đ</span>
+                                                        <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle" id="selectedExchangeStock">Kho: 20</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2 col-6">
+                                            <label class="form-label small text-muted mb-1">Số lượng đổi:</label>
+                                            <div class="input-group input-group-sm">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="adjustExchangeQty(-1)">-</button>
+                                                <input type="number" id="exchangeProductQty" class="form-control text-center fw-bold" min="1" value="1">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="adjustExchangeQty(1)">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3 col-6 d-flex align-items-end gap-1">
+                                            <button type="button" class="btn btn-primary w-100 py-2 d-inline-flex align-items-center justify-content-center gap-1 shadow-sm fw-semibold" onclick="addExchangeItem()">
+                                                <i class="bi bi-plus-circle-fill"></i>
+                                                <span>Thêm món đổi</span>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary py-2" onclick="cancelSelectedExchangeProduct()" title="Bỏ chọn món này">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Gợi ý nếu chưa chọn sản phẩm nào -->
+                                <div id="exchangeNoSelectionPrompt" class="text-center py-2 text-muted small bg-light rounded-2 border border-dashed">
+                                    <i class="bi bi-hand-index-thumb me-1 text-primary"></i>Chọn một sản phẩm từ danh sách gợi ý ở trên để tiến hành đổi hàng.
                                 </div>
                             </div>
 
@@ -570,6 +673,9 @@
             let returnOrderData = null;
             let selectedReturnItems = {}; // { [productId]: { quantity, reason, note } }
             let selectedExchangeItems = []; // [ { product, quantity } ]
+            let currentSelectedExchangeProduct = null;
+            let lastExchangeSearchResults = [];
+            let exchangeSearchDebounceTimer = null;
 
             // Modal instances
             let clearCartModalInstance = null;
@@ -1278,6 +1384,7 @@
                 selectedExchangeItems = [];
 
                 populateExchangeProductSelect();
+                resetExchangeSearchUI();
 
                 try {
                     const modal = getReturnModal();
@@ -1286,6 +1393,259 @@
                     console.error('Lỗi hiển thị modal đổi trả:', e);
                 }
                 if (input) setTimeout(() => input.focus(), 300);
+            }
+
+            function resetExchangeSearchUI() {
+                const searchInput = document.getElementById('exchangeSearchInput');
+                const btnClear = document.getElementById('btnClearExchangeSearch');
+                const catFilter = document.getElementById('exchangeCategoryFilter');
+                const sizeFilter = document.getElementById('exchangeSizeFilter');
+
+                if (searchInput) searchInput.value = '';
+                if (btnClear) btnClear.classList.add('d-none');
+                if (catFilter) catFilter.value = '';
+                if (sizeFilter) sizeFilter.value = '';
+
+                cancelSelectedExchangeProduct();
+                populateExchangeFilters();
+                searchExchangeProducts();
+            }
+
+            function populateExchangeFilters() {
+                const catSel = document.getElementById('exchangeCategoryFilter');
+                if (!catSel) return;
+                const currentVal = catSel.value;
+                catSel.innerHTML = '<option value="">Tất cả danh mục</option>';
+                if (allCategories && allCategories.length > 0) {
+                    allCategories.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.name;
+                        catSel.appendChild(opt);
+                    });
+                }
+                if (currentVal) catSel.value = currentVal;
+            }
+
+            function handleExchangeSearchInput() {
+                const input = document.getElementById('exchangeSearchInput');
+                const btnClear = document.getElementById('btnClearExchangeSearch');
+                const val = input ? input.value.trim() : '';
+
+                if (btnClear) {
+                    if (val) btnClear.classList.remove('d-none');
+                    else btnClear.classList.add('d-none');
+                }
+
+                clearTimeout(exchangeSearchDebounceTimer);
+                exchangeSearchDebounceTimer = setTimeout(() => {
+                    searchExchangeProducts();
+                }, 250);
+            }
+
+            function handleExchangeSearchFilter() {
+                searchExchangeProducts();
+            }
+
+            function clearExchangeSearch() {
+                const input = document.getElementById('exchangeSearchInput');
+                const btnClear = document.getElementById('btnClearExchangeSearch');
+                if (input) input.value = '';
+                if (btnClear) btnClear.classList.add('d-none');
+                searchExchangeProducts();
+            }
+
+            function onExchangeSearchFocus() {
+                const list = document.getElementById('exchangeSearchResultsList');
+                if (list && list.children.length === 0) {
+                    searchExchangeProducts();
+                }
+            }
+
+            async function searchExchangeProducts() {
+                const input = document.getElementById('exchangeSearchInput');
+                const catSel = document.getElementById('exchangeCategoryFilter');
+                const sizeSel = document.getElementById('exchangeSizeFilter');
+
+                const kw = input ? input.value.trim().toLowerCase() : '';
+                const catId = catSel ? catSel.value : '';
+                const size = sizeSel ? sizeSel.value : '';
+
+                // 1. Lọc nhanh từ bộ nhớ allProducts có sẵn (phản hồi tức thì)
+                let localFiltered = allProducts.filter(p => {
+                    if (kw) {
+                        const nameMatch = (p.name || '').toLowerCase().includes(kw);
+                        const codeMatch = (p.code || '').toLowerCase().includes(kw);
+                        if (!nameMatch && !codeMatch) return false;
+                    }
+                    if (catId) {
+                        const pCatId = p.category ? p.category.id : null;
+                        if (String(pCatId) !== String(catId)) return false;
+                    }
+                    if (size) {
+                        if ((p.size || '').toLowerCase() !== size.toLowerCase()) return false;
+                    }
+                    return true;
+                });
+
+                renderExchangeSearchResults(localFiltered);
+
+                // 2. Tra cứu thêm từ API backend để hỗ trợ tìm kiếm trên toàn bộ dữ liệu kho
+                try {
+                    const params = new URLSearchParams();
+                    params.append('page', 0);
+                    params.append('size', 50);
+                    if (kw) params.append('keyword', kw);
+                    if (catId) params.append('categoryId', catId);
+                    if (size) params.append('productSize', size);
+
+                    const response = await fetch(`/api/products?${params.toString()}`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const serverProducts = data.content || [];
+                        const productMap = new Map();
+                        localFiltered.forEach(p => productMap.set(p.id, p));
+                        serverProducts.forEach(p => productMap.set(p.id, p));
+                        renderExchangeSearchResults(Array.from(productMap.values()));
+                    }
+                } catch (e) {
+                    // Tiếp tục hiển thị kết quả local
+                }
+            }
+
+            function renderExchangeSearchResults(products) {
+                const listEl = document.getElementById('exchangeSearchResultsList');
+                const countEl = document.getElementById('exchangeSearchCountLabel');
+                if (!listEl) return;
+
+                lastExchangeSearchResults = products || [];
+
+                if (countEl) {
+                    countEl.innerHTML = `<i class="bi bi-box-seam me-1 text-primary"></i>Tìm thấy <strong>${lastExchangeSearchResults.length}</strong> sản phẩm phù hợp`;
+                }
+
+                if (!products || products.length === 0) {
+                    listEl.innerHTML = `
+                        <div class="text-center py-3 text-muted small">
+                            <i class="bi bi-search me-1"></i>Không tìm thấy sản phẩm nào phù hợp với điều kiện tìm kiếm.
+                        </div>
+                    `;
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                const displayList = products.slice(0, 30);
+                displayList.forEach(p => {
+                    const stock = (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0;
+                    const isOutOfStock = stock <= 0;
+                    const itemEl = document.createElement('div');
+                    itemEl.className = `p-2 rounded-2 border border-light bg-light bg-opacity-50 d-flex justify-content-between align-items-center transition-all ${isOutOfStock ? 'opacity-50' : ''}`;
+                    itemEl.style.cursor = isOutOfStock ? 'not-allowed' : 'pointer';
+
+                    if (!isOutOfStock) {
+                        itemEl.onmouseenter = () => { itemEl.classList.add('bg-white', 'shadow-sm', 'border-primary'); };
+                        itemEl.onmouseleave = () => { itemEl.classList.remove('bg-white', 'shadow-sm', 'border-primary'); };
+                        itemEl.onclick = () => selectExchangeProduct(p.id);
+                    }
+
+                    itemEl.innerHTML = `
+                        <div class="d-flex flex-column gap-1 text-truncate pe-2">
+                            <div class="fw-semibold text-dark small text-truncate" title="${p.name}">${p.name}</div>
+                            <div class="d-flex align-items-center gap-1 flex-wrap">
+                                <span class="font-monospace text-muted small" style="font-size: 0.72rem;">${p.code || ''}</span>
+                                ${p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" style="font-size: 0.68rem; font-weight: 600;">Size: ${p.size}</span>` : ''}
+                                ${p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size: 0.68rem;">${p.color}</span>` : ''}
+                                <span class="text-primary fw-bold ms-1" style="font-size: 0.78rem;">${formatVND(p.price)}</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                            ${!isOutOfStock
+                                ? `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle small px-2 py-1">Kho: ${stock}</span>
+                                   <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 small d-inline-flex align-items-center gap-1" onclick="event.stopPropagation(); selectExchangeProduct(${p.id})">
+                                       <i class="bi bi-check2"></i><span class="d-none d-sm-inline">Chọn</span>
+                                   </button>`
+                                : `<span class="badge bg-secondary bg-opacity-10 text-muted border small px-2 py-1">Hết hàng</span>`
+                            }
+                        </div>
+                    `;
+                    listEl.appendChild(itemEl);
+                });
+            }
+
+            function selectExchangeProduct(productId) {
+                let product = allProducts.find(p => p.id === productId);
+                if (!product && lastExchangeSearchResults) {
+                    product = lastExchangeSearchResults.find(p => p.id === productId);
+                }
+                if (!product) return;
+
+                currentSelectedExchangeProduct = product;
+
+                // Sync legacy select for compatibility
+                const sel = document.getElementById('exchangeProductSelect');
+                if (sel) sel.value = productId;
+
+                const card = document.getElementById('exchangeSelectedItemCard');
+                const prompt = document.getElementById('exchangeNoSelectionPrompt');
+                const nameEl = document.getElementById('selectedExchangeName');
+                const codeEl = document.getElementById('selectedExchangeCode');
+                const sizeEl = document.getElementById('selectedExchangeSize');
+                const colorEl = document.getElementById('selectedExchangeColor');
+                const priceEl = document.getElementById('selectedExchangePrice');
+                const stockEl = document.getElementById('selectedExchangeStock');
+                const qtyInput = document.getElementById('exchangeProductQty');
+
+                if (nameEl) nameEl.textContent = product.name;
+                if (codeEl) codeEl.textContent = product.code || '—';
+                if (sizeEl) {
+                    sizeEl.textContent = product.size ? `Size: ${product.size}` : 'Không size';
+                    sizeEl.className = product.size ? 'badge bg-danger bg-opacity-10 text-danger border border-danger-subtle' : 'badge bg-light text-muted border';
+                }
+                if (colorEl) {
+                    colorEl.textContent = product.color || '—';
+                    colorEl.className = product.color ? 'badge bg-secondary bg-opacity-10 text-secondary border' : 'd-none';
+                }
+                if (priceEl) priceEl.textContent = formatVND(product.price);
+                if (stockEl) {
+                    const stock = (product.stockQuantity !== null && product.stockQuantity !== undefined) ? product.stockQuantity : 0;
+                    stockEl.textContent = `Kho: ${stock}`;
+                    stockEl.className = stock > 0 ? 'badge bg-success bg-opacity-10 text-success border border-success-subtle' : 'badge bg-danger bg-opacity-10 text-danger border';
+                }
+                if (qtyInput) qtyInput.value = 1;
+
+                if (card) card.classList.remove('d-none');
+                if (prompt) prompt.classList.add('d-none');
+            }
+
+            function cancelSelectedExchangeProduct() {
+                currentSelectedExchangeProduct = null;
+                const card = document.getElementById('exchangeSelectedItemCard');
+                const prompt = document.getElementById('exchangeNoSelectionPrompt');
+                const sel = document.getElementById('exchangeProductSelect');
+                const qtyInput = document.getElementById('exchangeProductQty');
+
+                if (card) card.classList.add('d-none');
+                if (prompt) prompt.classList.remove('d-none');
+                if (sel) sel.value = '';
+                if (qtyInput) qtyInput.value = 1;
+            }
+
+            function adjustExchangeQty(delta) {
+                const qtyInput = document.getElementById('exchangeProductQty');
+                if (!qtyInput) return;
+                let val = (parseInt(qtyInput.value) || 1) + delta;
+                if (val < 1) val = 1;
+                if (currentSelectedExchangeProduct) {
+                    const stock = (currentSelectedExchangeProduct.stockQuantity !== null && currentSelectedExchangeProduct.stockQuantity !== undefined) ? currentSelectedExchangeProduct.stockQuantity : 1;
+                    if (val > stock) {
+                        val = stock;
+                        showToast('Cảnh báo', `Tồn kho chỉ còn ${stock} sản phẩm!`, false);
+                    }
+                }
+                qtyInput.value = val;
             }
 
             function populateExchangeProductSelect() {
@@ -1518,26 +1878,26 @@
             }
 
             function addExchangeItem() {
-                const sel = document.getElementById('exchangeProductSelect');
-                const qtyInput = document.getElementById('exchangeProductQty');
-                const prodId = sel ? parseInt(sel.value) : null;
-                let qty = qtyInput ? parseInt(qtyInput.value) : 1;
+                let product = currentSelectedExchangeProduct;
+                if (!product) {
+                    const sel = document.getElementById('exchangeProductSelect');
+                    const prodId = sel ? parseInt(sel.value) : null;
+                    if (prodId) {
+                        product = allProducts.find(p => p.id === prodId) || (lastExchangeSearchResults && lastExchangeSearchResults.find(p => p.id === prodId));
+                    }
+                }
 
-                if (!prodId) {
-                    showToast('Chọn sản phẩm', 'Vui lòng chọn sản phẩm đổi mới trong danh sách!', false);
+                if (!product) {
+                    showToast('Chưa chọn sản phẩm', 'Vui lòng nhấp chọn một sản phẩm trong danh sách gợi ý ở trên!', false);
                     return;
                 }
 
+                const qtyInput = document.getElementById('exchangeProductQty');
+                let qty = qtyInput ? parseInt(qtyInput.value) : 1;
                 if (isNaN(qty) || qty < 1) qty = 1;
 
-                const product = allProducts.find(p => p.id === prodId);
-                if (!product) {
-                    showToast('Lỗi', 'Không tìm thấy thông tin sản phẩm!', false);
-                    return;
-                }
-
-                const stock = product.stockQuantity || 0;
-                const existing = selectedExchangeItems.find(i => i.product.id === prodId);
+                const stock = (product.stockQuantity !== null && product.stockQuantity !== undefined) ? product.stockQuantity : 0;
+                const existing = selectedExchangeItems.find(i => i.product.id === product.id);
                 const currentQty = existing ? existing.quantity : 0;
 
                 if (currentQty + qty > stock) {
@@ -1554,11 +1914,11 @@
                     });
                 }
 
-                if (qtyInput) qtyInput.value = 1;
-                if (sel) sel.value = '';
+                cancelSelectedExchangeProduct();
 
                 renderExchangeItemsTable();
                 calculateReturnTotals();
+                showToast('Thành công', `Đã thêm ${qty} x "${product.name}" vào danh sách đổi mới!`, true);
             }
 
             function removeExchangeItem(productId) {
@@ -1857,6 +2217,13 @@
             window.addExchangeItem = addExchangeItem;
             window.removeExchangeItem = removeExchangeItem;
             window.handleExecuteReturn = handleExecuteReturn;
+            window.handleExchangeSearchInput = handleExchangeSearchInput;
+            window.handleExchangeSearchFilter = handleExchangeSearchFilter;
+            window.clearExchangeSearch = clearExchangeSearch;
+            window.onExchangeSearchFocus = onExchangeSearchFocus;
+            window.selectExchangeProduct = selectExchangeProduct;
+            window.cancelSelectedExchangeProduct = cancelSelectedExchangeProduct;
+            window.adjustExchangeQty = adjustExchangeQty;
 
             // Khởi chạy khi tải trang
             async function initPos() {
