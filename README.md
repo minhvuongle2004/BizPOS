@@ -45,39 +45,50 @@
 
 ## ✨ Tính năng nổi bật
 
-### 1. Chuyên biệt hóa ngành Thời trang (Size, Color, Material)
-* **Mô hình thuộc tính linh hoạt**:
-  * **Kích cỡ (Size)**: Hỗ trợ size chữ (`S`, `M`, `L`, `XL`, `XXL`, `Freesize`), size số quần (`29`, `30`, `31`, `32`), size giày dép (`39`, `40`, `41`, `42`).
-  * **Màu sắc (Color)**: *Đen, Trắng, Xanh Indigo, Xanh Navy, Be, Nâu Bò, Xám Ghi...*
-  * **Chất liệu (Material)**: *Cotton Pique 100%, Denim co giãn, Da bò thật, Vải Oxford...*
-* **Trực quan hóa trên giao diện**:
-  * Card sản phẩm hiển thị huy hiệu (Badge) Size, Màu sắc và Chất liệu trực quan.
-  * Giỏ hàng POS lưu và hiển thị rõ ràng nhãn Size & Màu tương ứng cho từng món được chọn.
-  * Bộ lọc Size nhanh trên thanh công cụ POS và trang Quản lý Sản phẩm (`?productSize=M`).
+### 1. Kiến trúc Chuẩn Ngành Thời trang: Phân cấp SPU — SKU (Product & ProductVariant)
+* **Tách bạch Mẫu mã (SPU) và Biến thể (SKU)**:
+  * **Product (SPU - Standard Product Unit)**: Đại diện cho mẫu thiết kế chung (*Tên mẫu, Mã phong cách, Danh mục, Chất liệu, Giá gốc tham chiếu*).
+  * **ProductVariant (SKU - Stock Keeping Unit)**: Đại diện cho từng sản phẩm vật lý cụ thể (*Mã SKU riêng, Barcode EAN-13, Kích cỡ Size, Màu sắc, Giá bán ghi đè, Tồn kho độc lập*).
+* **Ma trận biến thể Size × Màu sắc (Variant Matrix Generator)**:
+  * Tự động sinh tổ hợp biến thể khi tạo sản phẩm mới thông qua các thẻ chọn nhanh kích cỡ (`S`, `M`, `L`, `XL`, `XXL`, `29`, `30`, `31`, `32`, `Freesize`) và danh sách màu sắc.
+  * Tự động tạo mã vạch chuẩn quốc tế **EAN-13** (đầu số quốc gia `893` của Việt Nam) tính kèm số kiểm tra Check Digit chuẩn GS1 (`893 + 9 chữ số ngẫu nhiên + 1 số kiểm tra checksum`).
+* **Hỗ trợ ghi đè giá theo biến thể (Variant Price Override)**:
+  * Cho phép các size ngoại cỡ hoặc màu sắc đặc biệt áp dụng giá bán riêng biệt so với mẫu gốc.
+* **Flyway Migration không mất dữ liệu (Zero-Downtime Data Migration)**:
+  * Tự động di chuyển toàn bộ dữ liệu đơn hàng cũ, thẻ kho và phiếu đổi trả sang khóa ngoại `variant_id` bằng script Flyway `V1.1`.
 
 ### 2. Module Đổi - Trả hàng Thông minh (Return & Exchange Engine)
 Quy trình Đổi - Trả hàng giải quyết trọn vẹn bài toán có tỷ lệ phát sinh cao nhất trong ngành bán lẻ thời trang (15% - 30% doanh số):
 * **Chính sách hạn đổi trả (Policy Enforcement)**: Tự động kiểm tra hóa đơn gốc trong thời hạn quy định (mặc định: **tối đa 7 ngày** kể từ ngày mua hàng).
+* **Tìm kiếm sản phẩm đổi mới siêu tốc (Type-to-Search & Autocomplete)**:
+  * Thay thế toàn bộ dropdown cũ bằng ô tìm kiếm gợi ý tức thì qua API `/api/products/variants/search?keyword=...`.
+  * Hỗ trợ tìm kiếm theo Tên mẫu, Mã SKU hoặc quét mã vạch Barcode.
+* **Nhận diện trực quan Cùng mẫu vs Khác mẫu**:
+  * Tự động đối chiếu biến thể chọn đổi với các sản phẩm đang được trả:
+    * Huy hiệu màu xanh lá: **`[Cùng mẫu (Đổi size)]`** khi đổi kích cỡ/màu trong cùng một mã sản phẩm cha.
+    * Huy hiệu màu xanh dương: **`[Khác mẫu]`** khi đổi sang mẫu sản phẩm khác.
 * **Hỗ trợ 2 hình thức nghiệp vụ**:
-  1. **Trả hàng hoàn tiền (`RETURN_ONLY`)**: Khách trả lại sản phẩm, hệ thống hoàn tiền và cộng lại số lượng vào kho.
+  1. **Trả hàng hoàn tiền (`RETURN_ONLY`)**: Khách trả lại sản phẩm, hệ thống hoàn tiền và cộng lại số lượng vào kho của đúng biến thể SKU.
   2. **Đổi hàng lấy mẫu mới (`EXCHANGE`)**: Khách đổi sang size khác (cùng mẫu) hoặc đổi sang mẫu hoàn toàn khác có giá trị tương đương / cao hơn / thấp hơn.
 * **Tự động tính toán bù trừ tài chính ($\Delta = \text{Tiền đổi mới} - \text{Tiền hàng trả}$)**:
   * $\Delta > 0$: Khách cần bù thêm tiền cho cửa hàng.
   * $\Delta < 0$: Cửa hàng hoàn lại tiền chênh lệch cho khách.
   * $\Delta = 0$: Đổi ngang giá trị (ví dụ: đổi cùng một mẫu áo từ Size M sang Size L).
 * **Kiểm soát & Chống gian lận (Anti-Fraud & Over-return Protection)**:
-  * Ràng buộc số lượng: $\text{Số lượng trả} \le \text{Số lượng đã mua} - \text{Số lượng đã trả trước đó}$.
+  * Ràng buộc số lượng theo từng biến thể: $\text{Số lượng trả} \le \text{Số lượng đã mua} - \text{Số lượng đã trả trước đó}$.
   * Chặn tuyệt đối hành vi hoàn trả vượt quá số lượng trên hóa đơn gốc (HTTP 400 Bad Request).
 * **Điều phối tồn kho hai chiều & Khóa bi quan (Pessimistic Locking)**:
-  * Sản phẩm trả: Tăng tồn kho, ghi thẻ kho loại **`RETURN`** kèm mã phiếu đổi trả.
-  * Sản phẩm đổi mới: Giảm tồn kho, ghi thẻ kho loại **`SALE`** kèm mã phiếu đổi trả.
+  * Biến thể trả: Tăng tồn kho SKU, ghi thẻ kho loại **`RETURN`** kèm mã phiếu đổi trả và `variant_id`.
+  * Biến thể đổi mới: Giảm tồn kho SKU, ghi thẻ kho loại **`SALE`** kèm mã phiếu đổi trả và `variant_id`.
   * Cơ chế khóa dòng `PESSIMISTIC_WRITE` trên danh sách `productId` sắp xếp tăng dần triệt tiêu nguy cơ Deadlock khi nhiều quầy POS cùng thao tác.
-* **Biên lai Đổi - Trả**: Tự động sinh mã phiếu định dạng `RET-YYYYMMDDHHmmss-XXXX`, hiển thị thông tin thu ngân, khách hàng, lý do (*Mặc chật, Rộng size, Lỗi vải, Không ưng màu, Đổi ý...*) và hỗ trợ in biên lai ngay tại quầy.
+* **Biên lai Đổi - Trả**: Tự động sinh mã phiếu định dạng `RET-YYYYMMDDHHmmss-XXXX`, hiển thị thông tin thu ngân, khách hàng, lý do (*Mặc chật, Rộng size, Lỗi vải, Không ưng màu, Đổi ý...*), thông tin biến thể đổi/trả và hỗ trợ in biên lai ngay tại quầy.
 
 ### 3. Quầy bán hàng thời gian thực (POS)
-* Tìm kiếm sản phẩm thông minh qua Tên hoặc Mã SKU.
-* Bộ lọc kết hợp: Danh mục ngành hàng + Kích cỡ (Size).
-* Kiểm soát giỏ hàng thông minh: Chặn bán khi hết hàng (`stockQuantity <= 0`), cảnh báo khi sản phẩm sắp hết kho ($\le 5$).
+* **Quét mã vạch Barcode tức thì**: Thanh tìm kiếm POS hỗ trợ đầu đọc mã vạch (Barcode Scanner) quét trực tiếp mã EAN-13 / SKU để thêm ngay biến thể vào giỏ hàng.
+* **Popup chọn nhanh Size & Màu**: Khi click vào sản phẩm có nhiều biến thể, hệ thống hiển thị modal trực quan cho phép thu ngân chọn kích cỡ và màu sắc có sẵn trong kho.
+* **Quản lý giỏ hàng theo Biến thể**: Giỏ hàng hiển thị chi tiết tên mẫu, mã SKU, nhãn Size, Màu sắc và kiểm tra tồn kho độc lập theo từng biến thể.
+* **Kiểm soát giỏ hàng thông minh**: Chặn bán khi biến thể hết hàng (`stockQuantity <= 0`), cảnh báo khi biến thể sắp hết kho ($\le 5$).
+* **Tạo đơn hàng nguyên tử trong `@Transactional`**, trừ kho biến thể, ghi thẻ kho kèm snapshot giá tại thời điểm bán để bảo toàn doanh thu.
 * Tạo đơn hàng nguyên tử trong `@Transactional`, lưu snapshot giá tại thời điểm bán để bảo toàn doanh thu.
 
 ### 4. Quản lý kho hàng & Sổ thẻ kho (Inventory & Stock Movement Ledger)
@@ -169,6 +180,21 @@ erDiagram
         datetime updated_at
     }
 
+    PRODUCT_VARIANTS {
+        bigint id PK
+        bigint product_id FK
+        varchar sku UK
+        varchar barcode UK
+        varchar size
+        varchar color
+        decimal price
+        decimal cost_price
+        int stock_quantity
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
     ORDERS {
         bigint id PK
         varchar order_code UK
@@ -184,6 +210,7 @@ erDiagram
         bigint id PK
         bigint order_id FK
         bigint product_id FK
+        bigint variant_id FK
         varchar product_name
         decimal unit_price
         int quantity
@@ -210,6 +237,7 @@ erDiagram
         bigint id PK
         bigint order_return_id FK
         bigint product_id FK
+        bigint variant_id FK
         varchar product_code
         varchar product_name
         varchar size
@@ -225,6 +253,7 @@ erDiagram
         bigint id PK
         bigint order_return_id FK
         bigint product_id FK
+        bigint variant_id FK
         varchar product_code
         varchar product_name
         varchar size
@@ -232,11 +261,13 @@ erDiagram
         decimal unit_price
         int quantity
         decimal line_total
+        boolean is_same_model
     }
 
     STOCK_MOVEMENTS {
         bigint id PK
         bigint product_id FK
+        bigint variant_id FK
         varchar movement_type
         int quantity
         int previous_stock
@@ -272,39 +303,52 @@ erDiagram
     }
 
     CATEGORIES ||--o{ PRODUCTS : "contains"
+    PRODUCTS ||--|{ PRODUCT_VARIANTS : "has_variants"
     PRODUCTS ||--o{ STOCK_MOVEMENTS : "tracks"
+    PRODUCT_VARIANTS ||--o{ STOCK_MOVEMENTS : "variant_tracked"
     CUSTOMERS ||--o{ ORDERS : "places"
     ORDERS ||--|{ ORDER_ITEMS : "has"
     PRODUCTS ||--o{ ORDER_ITEMS : "referenced_in"
+    PRODUCT_VARIANTS ||--o{ ORDER_ITEMS : "sku_ordered"
     ORDERS ||--o{ ORDER_RETURNS : "has"
     ORDER_RETURNS ||--|{ ORDER_RETURN_ITEMS : "contains"
     ORDER_RETURNS ||--o{ ORDER_EXCHANGE_ITEMS : "contains"
     PRODUCTS ||--o{ ORDER_RETURN_ITEMS : "returned"
     PRODUCTS ||--o{ ORDER_EXCHANGE_ITEMS : "exchanged"
+    PRODUCT_VARIANTS ||--o{ ORDER_RETURN_ITEMS : "variant_returned"
+    PRODUCT_VARIANTS ||--o{ ORDER_EXCHANGE_ITEMS : "variant_exchanged"
 ```
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (172 Automated Tests)
+## 🧪 Hệ thống Kiểm thử Tự động (178 Automated Tests - 100% Pass)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 172, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 178, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
-Total time:  17.103 s
+Total time:  24.120 s
 ```
 
-### 1. Integration Tests Module Đổi - Trả hàng Thời trang (`OrderReturnIntegrationTest`) — 6 tests
-* **`getEligibleReturnInfo_shouldReturnCorrectQuantities`**: Tra cứu đơn hàng mới mua trong hạn 7 ngày, tính toán chính xác số lượng đã mua, đã trả và số lượng còn được phép trả.
+### 1. Integration Tests Mô hình SPU — SKU (`ProductVariantIntegrationTest`) — 6 tests
+* **`createProductWithVariants_shouldPersistHierarchicalHierarchy`**: Tạo mẫu cha (SPU) và liên kết ma trận biến thể con (SKU: M, L, XL), kiểm tra tính toàn vẹn phân cấp và độc lập tồn kho.
+* **`variantBarcode_shouldFollowEan13Standard`**: Kiểm định thuật toán sinh mã vạch quốc tế EAN-13: 13 chữ số, đầu số quốc gia `893` và Check Digit chuẩn GS1.
+* **`variantPriceOverride_shouldWorkIndependently`**: Xác minh tính năng ghi đè giá bán theo kích cỡ (size XL giá cao hơn size thường mà không làm ảnh hưởng giá gốc).
+* **`orderWithVariant_shouldDeductVariantStockAndRecordMovement`**: Bán hàng theo biến thể SKU, trừ kho chính xác ở cấp biến thể và ghi nhận thẻ kho gắn `variant_id`.
+* **`exchangeWithVariant_sameModelVsDifferentModel_shouldDetectCorrectly`**: Đổi hàng theo biến thể, tự động xác định chính xác cờ `isSameModel = true` (khi đổi size cùng mẫu) và `isSameModel = false` (khi đổi mẫu khác).
+* **`pessimisticLocking_onProductAndVariants_shouldPreventOverselling`**: Khóa bi quan chống bán vượt tồn kho đồng thời trên các biến thể cùng mẫu.
+
+### 2. Integration Tests Module Đổi - Trả hàng Thời trang (`OrderReturnIntegrationTest`) — 6 tests
+* **`getEligibleReturnInfo_shouldReturnCorrectQuantities`**: Tra cứu đơn hàng mới mua trong hạn 7 ngày, tính toán chính xác số lượng đã mua, đã trả và số lượng còn được phép trả theo từng biến thể.
 * **`processReturn_returnOnly_shouldIncreaseStockAndRecordMovement`**: Xử lý trả hàng hoàn tiền (`RETURN_ONLY`), tăng tồn kho chính xác, ghi nhận thẻ kho `RETURN`, tính đúng tiền hoàn.
 * **`processReturn_exchange_shouldUpdateBothStocksAndCalculateNet`**: Xử lý đổi hàng lấy mẫu mới (`EXCHANGE`), tồn kho món trả tăng 1 (`RETURN`), tồn kho món mới giảm 1 (`SALE`), tính đúng tiền bù trừ chênh lệch ($\Delta = \text{Đổi mới} - \text{Hoàn trả}$).
 * **`processReturn_shouldFail_whenReturningMoreThanRemaining`**: Chống gian lận: Chặn đứng yêu cầu trả vượt quá số lượng đã mua (trả về HTTP 400 Bad Request).
 * **`getEligibleReturnInfo_shouldBeIneligible_whenExpired`**: Kiểm tra vi phạm chính sách: Đơn hàng mua quá hạn 7 ngày bị đánh dấu `eligible = false` và chặn tạo phiếu đổi trả.
 * **`processReturn_shouldFail_whenProductNotInOrder`**: Chặn yêu cầu trả sản phẩm không tồn tại trong hóa đơn gốc.
 
-### 2. Bộ Unit & Integration Tests Cốt lõi — 166 tests
+### 3. Bộ Unit & Integration Tests Cốt lõi — 166 tests
 * **`AuditLogServiceTest` & `AuditLogIntegrationTest` (8 tests)**: Bắt vết Spring AOP khi sửa giá, sửa đơn, hủy đơn, chặn STAFF (403), cấp quyền ADMIN.
 * **`StockMovementServiceTest` & `StockMovementIntegrationTest` (10 tests)**: Tính toàn vẹn thẻ kho cho các sự kiện `SALE`, `IMPORT`, `RETURN`, `ADJUSTMENT`.
 * **`OrderConcurrencyIntegrationTest` (2 tests)**: Kiểm thử đua lệnh 20 threads đồng thời tranh mua tồn kho và chống Deadlock đa sản phẩm bằng thuật toán sắp xếp khóa ID tăng dần.

@@ -219,6 +219,43 @@
                                 </div>
                             </div>
 
+                            <!-- Khối sinh ma trận biến thể (Size x Màu) khi thêm mới sản phẩm -->
+                            <div id="modalVariantMatrixBox" class="p-3 mb-3 bg-light rounded-3 border">
+                                <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-1">
+                                    <label class="biz-label mb-0 fw-bold text-dark d-flex align-items-center gap-1">
+                                        <i class="bi bi-grid-3x3-gap-fill text-danger"></i>
+                                        <span>Tạo nhanh ma trận biến thể (Size × Màu sắc)</span>
+                                    </label>
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle small px-2 py-1">Tự sinh Barcode EAN-13 & SKU</span>
+                                </div>
+                                <div class="small text-muted mb-2">Chọn nhanh các kích cỡ và nhập màu sắc, hệ thống sẽ tự sinh các biến thể SKU & mã vạch riêng biệt:</div>
+                                
+                                <div class="mb-2">
+                                    <label class="form-label small text-secondary mb-1 fw-semibold">Kích cỡ (nhấp để chọn / bỏ chọn):</label>
+                                    <div id="quickSizeChips" class="d-flex flex-wrap gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, 'S')">S</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, 'M')">M</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, 'L')">L</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, 'XL')">XL</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, 'XXL')">XXL</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, '29')">29</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, '30')">30</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, '31')">31</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, '32')">32</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 size-chip" onclick="toggleSizeChip(this, 'Freesize')">Freesize</button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label small text-secondary mb-1 fw-semibold" for="matrixColorInput">Màu sắc (phân cách bằng dấu phẩy):</label>
+                                    <input type="text" id="matrixColorInput" class="biz-input py-1" placeholder="Ví dụ: Đen, Trắng, Xanh Navy, Be" oninput="updateMatrixPreview()">
+                                </div>
+
+                                <div id="matrixPreviewNotice" class="small p-2 rounded-2 bg-white border text-secondary d-none">
+                                    <i class="bi bi-info-circle text-primary me-1"></i><span id="matrixPreviewText">Sẽ tạo 0 biến thể</span>
+                                </div>
+                            </div>
+
 
                             <div class="row g-3 mb-3">
                                 <!-- Giá bán -->
@@ -656,6 +693,59 @@
             </div>
         </div>
 
+        <!-- ================= MODAL 4: XEM DANH SÁCH BIẾN THỂ (VARIANTS) CỦA SẢN PHẨM ================= -->
+        <div class="modal fade" id="productVariantsModal" tabindex="-1" aria-labelledby="productVariantsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="p-2 rounded-3 bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-stack fs-5"></i>
+                            </div>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark mb-0" id="pvModalTitle">Danh sách phân loại sản phẩm (SKU)</h5>
+                                <span class="small text-muted font-monospace" id="pvModalSubtitle">SP-001</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div id="pvModalLoading" class="text-center py-4 d-none">
+                            <div class="spinner-border text-danger" role="status">
+                                <span class="visually-hidden">Đang tải...</span>
+                            </div>
+                            <div class="small text-muted mt-2">Đang tải biến thể...</div>
+                        </div>
+                        <div class="table-responsive" id="pvModalTableWrapper">
+                            <table class="biz-table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 140px;">Mã SKU</th>
+                                        <th style="width: 150px;">Mã Barcode (EAN-13)</th>
+                                        <th class="text-center" style="width: 80px;">Size</th>
+                                        <th class="text-center" style="width: 90px;">Màu sắc</th>
+                                        <th class="text-end" style="width: 120px;">Giá bán</th>
+                                        <th class="text-center" style="width: 90px;">Tồn kho</th>
+                                        <th class="text-center" style="width: 100px;">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pvModalTableBody">
+                                    <!-- Render qua JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="pvModalEmptyState" class="text-center py-4 d-none">
+                            <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+                            <div class="small text-muted">Sản phẩm này chưa có biến thể chi tiết nào</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50">
+                        <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- JAVASCRIPT XỬ LÝ QUẢN LÝ SẢN PHẨM (ĐẶT BÊN TRONG FRAGMENT ĐỂ ĐƯỢC CHÈN VÀO LAYOUT) -->
         <script>
             // Trạng thái phân trang & lọc hiện tại
@@ -747,6 +837,87 @@
                     }
                 }
                 return auditLogModalInstance;
+            }
+
+            let productVariantsModalInstance = null;
+
+            function getProductVariantsModal() {
+                if (!productVariantsModalInstance) {
+                    const el = document.getElementById('productVariantsModal');
+                    if (el && window.bootstrap) {
+                        productVariantsModalInstance = (bootstrap.Modal.getOrCreateInstance) ? bootstrap.Modal.getOrCreateInstance(el) : new bootstrap.Modal(el);
+                    }
+                }
+                return productVariantsModalInstance;
+            }
+
+            // ================= TIỆN ÍCH MA TRẬN BIẾN THỂ (SIZE × MÀU) =================
+            let selectedMatrixSizes = [];
+
+            function toggleSizeChip(btn, size) {
+                const idx = selectedMatrixSizes.indexOf(size);
+                if (idx >= 0) {
+                    selectedMatrixSizes.splice(idx, 1);
+                    btn.classList.remove('btn-danger', 'text-white');
+                    btn.classList.add('btn-outline-secondary');
+                } else {
+                    selectedMatrixSizes.push(size);
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('btn-danger', 'text-white');
+                }
+                updateMatrixPreview();
+            }
+
+            function getMatrixColors() {
+                const input = document.getElementById('matrixColorInput');
+                if (!input) return [];
+                const val = input.value.trim();
+                if (!val) return [];
+                return val.split(',').map(c => c.trim()).filter(Boolean);
+            }
+
+            function updateMatrixPreview() {
+                const colors = getMatrixColors();
+                const noticeEl = document.getElementById('matrixPreviewNotice');
+                const textEl = document.getElementById('matrixPreviewText');
+                if (!noticeEl || !textEl) return;
+
+                const sizeCount = selectedMatrixSizes.length;
+                const colorCount = colors.length;
+
+                if (sizeCount === 0 && colorCount === 0) {
+                    noticeEl.classList.add('d-none');
+                    return;
+                }
+
+                let totalVariants = 0;
+                let desc = '';
+                if (sizeCount > 0 && colorCount > 0) {
+                    totalVariants = sizeCount * colorCount;
+                    desc = `Sẽ tự động tạo ma trận <strong>${totalVariants} biến thể</strong> (${sizeCount} kích cỡ &times; ${colorCount} màu sắc) với Barcode EAN-13 riêng biệt.`;
+                } else if (sizeCount > 0) {
+                    totalVariants = sizeCount;
+                    desc = `Sẽ tự động tạo <strong>${totalVariants} biến thể</strong> (${sizeCount} kích cỡ) với Barcode EAN-13 riêng biệt.`;
+                } else if (colorCount > 0) {
+                    totalVariants = colorCount;
+                    desc = `Sẽ tự động tạo <strong>${totalVariants} biến thể</strong> (${colorCount} màu sắc) với Barcode EAN-13 riêng biệt.`;
+                }
+
+                textEl.innerHTML = desc;
+                noticeEl.classList.remove('d-none');
+            }
+
+            function resetMatrixForm() {
+                selectedMatrixSizes = [];
+                const chips = document.querySelectorAll('#quickSizeChips .size-chip');
+                chips.forEach(c => {
+                    c.classList.remove('btn-danger', 'text-white');
+                    c.classList.add('btn-outline-secondary');
+                });
+                const colorInput = document.getElementById('matrixColorInput');
+                if (colorInput) colorInput.value = '';
+                const noticeEl = document.getElementById('matrixPreviewNotice');
+                if (noticeEl) noticeEl.classList.add('d-none');
             }
 
             // ================= HÀM TIỆN ÍCH AUTH & HEADERS =================
@@ -950,12 +1121,35 @@
                                     stockBadgeHtml = `<span class="biz-badge biz-badge-success"><i class="bi bi-check-circle-fill me-1"></i>Còn hàng (${stock})</span>`;
                                 }
 
+                                const hasMultipleVariants = p.variants && p.variants.length > 1;
+                                const distinctSizes = hasMultipleVariants
+                                    ? [...new Set(p.variants.map(v => v.size).filter(Boolean))]
+                                    : (p.size ? [p.size] : []);
+                                const distinctColors = hasMultipleVariants
+                                    ? [...new Set(p.variants.map(v => v.color).filter(Boolean))]
+                                    : (p.color ? [p.color] : []);
+
+                                const sizeBadgeHtml = distinctSizes.length > 0
+                                    ? distinctSizes.map(s => `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-1 py-0 me-1 fw-bold" style="font-size: 0.7rem;">${s}</span>`).join('')
+                                    : '<span class="text-muted small">—</span>';
+
+                                const colorBadgeHtml = distinctColors.length > 0
+                                    ? distinctColors.map(c => `<span class="badge bg-secondary bg-opacity-10 text-secondary border px-1 py-0 me-1" style="font-size: 0.7rem;">${c}</span>`).join('')
+                                    : '<span class="text-muted small">—</span>';
+
+                                const variantCountBadge = (p.variants && p.variants.length > 0)
+                                    ? `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle ms-1" style="font-size: 0.72rem; cursor: pointer;" onclick="openProductVariantsModal(${p.id}, '${safeName}', '${p.code || ''}')" title="Xem ${p.variants.length} phân loại"><i class="bi bi-stack me-1"></i>${p.variants.length} phân loại</span>`
+                                    : '';
+
                                 tr.innerHTML = `
                                     <td>
                                         <span class="badge bg-light text-dark border fw-medium" style="font-size: 0.82rem;">${p.code || ''}</span>
                                     </td>
                                     <td>
-                                        <div class="fw-semibold text-dark">${p.name || ''}</div>
+                                        <div class="fw-semibold text-dark d-flex align-items-center flex-wrap gap-1">
+                                            <span>${p.name || ''}</span>
+                                            ${variantCountBadge}
+                                        </div>
                                     </td>
                                     <td>
                                         <span class="biz-badge biz-badge-info">
@@ -963,10 +1157,10 @@
                                         </span>
                                     </td>
                                     <td class="text-center">
-                                        ${p.size ? `<span class="badge bg-secondary bg-opacity-10 text-dark border px-2 py-1 fw-bold">${p.size}</span>` : '<span class="text-muted small">—</span>'}
+                                        ${sizeBadgeHtml}
                                     </td>
                                     <td class="text-center">
-                                        ${p.color ? `<span class="badge bg-light text-secondary border px-2 py-1"><i class="bi bi-circle-fill me-1" style="font-size: 0.55rem; color: #e11d48;"></i>${p.color}</span>` : '<span class="text-muted small">—</span>'}
+                                        ${colorBadgeHtml}
                                     </td>
                                     <td class="text-end">
                                         <span class="fw-bold" style="color: var(--biz-primary);">${formatVND(p.price)}</span>
@@ -980,6 +1174,9 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Xem danh sách biến thể (Size/Màu/Barcode)" onclick="openProductVariantsModal(${p.id}, '${safeName}', '${p.code || ''}')">
+                                                <i class="bi bi-grid-3x3-gap text-secondary"></i>
+                                            </button>
                                             <button type="button" class="btn btn-biz-outline btn-sm px-2 py-1" title="Thẻ kho (Lịch sử biến động)" onclick="openStockLedgerModal(${p.id}, '${p.code || ''}', '${safeName}', ${stock})">
                                                 <i class="bi bi-clock-history text-info"></i>
                                             </button>
@@ -1306,6 +1503,11 @@
                 if (elSize) elSize.value = '';
                 if (elColor) elColor.value = '';
                 if (elMat) elMat.value = '';
+                
+                resetMatrixForm();
+                const matrixBox = document.getElementById('modalVariantMatrixBox');
+                if (matrixBox) matrixBox.classList.remove('d-none');
+
                 document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-danger me-2"></i>Thêm sản phẩm mới';
                 document.getElementById('btnSaveProduct').innerHTML = '<i class="bi bi-check-lg"></i><span>Thêm sản phẩm</span>';
                 
@@ -1337,6 +1539,9 @@
                         if (elColor) elColor.value = p.color || '';
                         if (elMat) elMat.value = p.material || '';
                         document.getElementById('modalProductDescription').value = p.description || '';
+
+                        const matrixBox = document.getElementById('modalVariantMatrixBox');
+                        if (matrixBox) matrixBox.classList.add('d-none');
 
                         document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-pencil-square text-danger me-2"></i>Chỉnh sửa sản phẩm';
                         document.getElementById('btnSaveProduct').innerHTML = '<i class="bi bi-check-lg"></i><span>Lưu thay đổi</span>';
@@ -1402,6 +1607,7 @@
 
                 if (hasError) return;
 
+                const isEdit = !!id;
                 const payload = {
                     code: code,
                     name: name,
@@ -1414,8 +1620,15 @@
                     description: description
                 };
 
-
-                const isEdit = !!id;
+                if (!isEdit) {
+                    const matrixColors = getMatrixColors();
+                    if (selectedMatrixSizes.length > 0) {
+                        payload.sizes = selectedMatrixSizes;
+                    }
+                    if (matrixColors.length > 0) {
+                        payload.colors = matrixColors;
+                    }
+                }
                 const url = isEdit ? `/api/products/${id}` : '/api/products';
                 const method = isEdit ? 'PUT' : 'POST';
 
@@ -1464,7 +1677,86 @@
                 }
             }
 
-            // ================= 7. CẬP NHẬT TỒN KHO THỦ CÔNG (PATCH /api/products/{id}/stock) =================
+            // ================= 7. XEM DANH SÁCH BIẾN THỂ (VARIANTS) CỦA SẢN PHẨM =================
+            async function openProductVariantsModal(productId, productName, productCode) {
+                const titleEl = document.getElementById('pvModalTitle');
+                const subEl = document.getElementById('pvModalSubtitle');
+                const tbody = document.getElementById('pvModalTableBody');
+                const loadingEl = document.getElementById('pvModalLoading');
+                const emptyEl = document.getElementById('pvModalEmptyState');
+                const tableWrap = document.getElementById('pvModalTableWrapper');
+
+                if (titleEl) titleEl.textContent = `Phân loại sản phẩm: ${productName || 'Chi tiết'}`;
+                if (subEl) subEl.textContent = productCode || '';
+                if (tbody) tbody.innerHTML = '';
+                if (loadingEl) loadingEl.classList.remove('d-none');
+                if (emptyEl) emptyEl.classList.add('d-none');
+                if (tableWrap) tableWrap.classList.remove('d-none');
+
+                const modal = getProductVariantsModal();
+                if (modal) modal.show();
+
+                try {
+                    const res = await fetch(`/api/products/${productId}/variants`, {
+                        headers: getAuthHeaders()
+                    });
+
+                    if (checkAuthError(res.status)) return;
+
+                    if (res.ok) {
+                        const variants = await res.json();
+                        if (tbody) tbody.innerHTML = '';
+
+                        if (!variants || variants.length === 0) {
+                            if (emptyEl) emptyEl.classList.remove('d-none');
+                            if (tableWrap) tableWrap.classList.add('d-none');
+                            return;
+                        }
+
+                        variants.forEach(v => {
+                            const stock = (v.stockQuantity !== null && v.stockQuantity !== undefined) ? v.stockQuantity : 0;
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td>
+                                    <span class="font-monospace fw-semibold text-dark small">${v.sku || '—'}</span>
+                                </td>
+                                <td>
+                                    ${v.barcode 
+                                        ? `<span class="badge bg-light text-dark border font-monospace px-2 py-1"><i class="bi bi-upc-scan me-1 text-primary"></i>${v.barcode}</span>` 
+                                        : '<span class="text-muted small">—</span>'}
+                                </td>
+                                <td class="text-center">
+                                    ${v.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-2 py-1 fw-bold">${v.size}</span>` : '<span class="text-muted small">—</span>'}
+                                </td>
+                                <td class="text-center">
+                                    ${v.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1">${v.color}</span>` : '<span class="text-muted small">—</span>'}
+                                </td>
+                                <td class="text-end fw-semibold text-dark">${formatVND(v.price)}</td>
+                                <td class="text-center">
+                                    <span class="badge ${stock > 0 ? 'bg-success bg-opacity-10 text-success border border-success-subtle' : 'bg-danger bg-opacity-10 text-danger border'} px-2 py-1">
+                                        ${stock}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1 small">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Đang bán
+                                    </span>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    } else {
+                        showToast('Lỗi', 'Không thể lấy thông tin biến thể!', false);
+                    }
+                } catch (e) {
+                    console.error('Lỗi nạp biến thể:', e);
+                    showToast('Lỗi kết nối', 'Không thể nạp danh sách biến thể!', false);
+                } finally {
+                    if (loadingEl) loadingEl.classList.add('d-none');
+                }
+            }
+
+            // ================= 8. CẬP NHẬT TỒN KHO THỦ CÔNG (PATCH /api/products/{id}/stock) =================
             function openStockModal(id, name, currentStock) {
                 const stockErr = document.getElementById('stockModalError');
                 if (stockErr) stockErr.style.display = 'none';

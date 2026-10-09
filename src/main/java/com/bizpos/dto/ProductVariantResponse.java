@@ -15,6 +15,8 @@ public class ProductVariantResponse {
 
     private Long id;
     private Long productId;
+    private String productName;
+    private String productCode;
     private String sku;
     private String barcode;
     private String size;
@@ -33,6 +35,8 @@ public class ProductVariantResponse {
         return ProductVariantResponse.builder()
                 .id(variant.getId())
                 .productId(variant.getProduct() != null ? variant.getProduct().getId() : null)
+                .productName(variant.getProduct() != null ? variant.getProduct().getName() : null)
+                .productCode(variant.getProduct() != null ? variant.getProduct().getCode() : null)
                 .sku(variant.getSku())
                 .barcode(variant.getBarcode())
                 .size(variant.getSize())

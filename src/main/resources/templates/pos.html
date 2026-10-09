@@ -38,8 +38,9 @@
                             <div class="position-relative">
                                 <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
                                 <input type="text" id="posSearchInput" class="biz-input ps-5" 
-                                       placeholder="Tìm theo tên hoặc mã sản phẩm... (Gõ để tìm ngay)" 
-                                       oninput="handleSearchInput()">
+                                       placeholder="Tìm kiếm hoặc quét mã vạch Barcode (Nhấn Enter để quét)..." 
+                                       oninput="handleSearchInput()"
+                                       onkeydown="if(event.key === 'Enter') handleBarcodeOrSearch(this.value)">
                                 <button type="button" id="btnClearSearch" class="btn position-absolute top-50 end-0 translate-middle-y me-2 text-muted p-1 d-none" 
                                         onclick="clearSearch()" title="Xóa tìm kiếm">
                                     <i class="bi bi-x-circle-fill"></i>
@@ -468,6 +469,7 @@
                                                     <div class="fw-bold text-dark fs-6" id="selectedExchangeName">Áo sơ mi Oxford Nam</div>
                                                     <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
                                                         <span class="font-monospace text-muted small" id="selectedExchangeCode">AO-SM-001</span>
+                                                        <span id="selectedExchangeModelBadge" class="badge bg-success bg-opacity-10 text-success border border-success-subtle" style="font-size: 0.7rem;">Cùng mẫu (Đổi size)</span>
                                                         <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" id="selectedExchangeSize">Size L</span>
                                                         <span class="badge bg-secondary bg-opacity-10 text-secondary border" id="selectedExchangeColor">Trắng</span>
                                                         <span class="text-primary fw-bold ms-1" id="selectedExchangePrice">250.000 đ</span>
@@ -508,6 +510,7 @@
                                     <thead class="table-light small">
                                         <tr>
                                             <th>Sản phẩm đổi mới</th>
+                                            <th class="text-center" style="width: 100px;">Quy cách</th>
                                             <th class="text-center" style="width: 70px;">Size</th>
                                             <th class="text-center" style="width: 80px;">Màu</th>
                                             <th class="text-end" style="width: 100px;">Đơn giá</th>
@@ -518,7 +521,7 @@
                                     </thead>
                                     <tbody id="exchangeItemsTableBody">
                                         <tr id="exchangeEmptyRow">
-                                            <td colspan="7" class="text-center text-muted small py-3">
+                                            <td colspan="8" class="text-center text-muted small py-3">
                                                 Chưa chọn món đổi mới nào (Khách chỉ trả hàng hoàn tiền)
                                             </td>
                                         </tr>
@@ -651,6 +654,33 @@
                         <button type="button" class="btn btn-biz-primary" onclick="window.print()">
                             <i class="bi bi-printer me-1"></i>In biên lai
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: CHỌN BIẾN THỂ (SIZE & MÀU) TRƯỚC KHI VÀO GIỎ ================= -->
+        <div class="modal fade" id="selectVariantModal" tabindex="-1" aria-labelledby="selectVariantModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-md">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-danger bg-opacity-10 py-3 px-4 border-bottom border-danger-subtle">
+                        <div>
+                            <h5 class="modal-title fw-bold text-dark mb-0" id="varModalProductName">Chọn kích cỡ & màu sắc</h5>
+                            <span class="small text-muted font-monospace" id="varModalProductCode">SP-001</span>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="text-muted small mb-3 fw-semibold d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-tags-fill me-1 text-danger"></i>Danh sách biến thể có sẵn:</span>
+                            <span class="text-secondary small">Nhấp để thêm nhanh</span>
+                        </div>
+                        <div id="varModalVariantsList" class="d-flex flex-column gap-2" style="max-height: 360px; overflow-y: auto;">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top py-2 px-4 bg-light bg-opacity-50">
+                        <button type="button" class="btn btn-biz-outline btn-sm" data-bs-dismiss="modal">Đóng</button>
                     </div>
                 </div>
             </div>
@@ -910,6 +940,7 @@
                     const isOutOfStock = stock <= 0;
                     const isLowStock = stock > 0 && stock <= 5;
 
+                    const hasMultipleVariants = p.variants && p.variants.length > 1;
                     let stockBadgeHtml = '';
                     if (isOutOfStock) {
                         stockBadgeHtml = `<span class="biz-badge biz-badge-danger" style="font-size: 0.72rem; padding: 2px 7px;"><i class="bi bi-x-circle-fill me-1"></i>Hết hàng (0)</span>`;
@@ -920,20 +951,31 @@
                     }
 
                     const cardClass = isOutOfStock ? 'pos-product-card out-of-stock shadow-sm' : 'pos-product-card shadow-sm';
-                    const actionButtonHtml = isOutOfStock
-                        ? `<button type="button" class="btn btn-sm btn-biz-outline rounded-circle d-flex align-items-center justify-content-center p-0" 
-                                   style="width: 30px; height: 30px; opacity: 0.5;" 
-                                   title="Hết hàng" disabled>
-                               <i class="bi bi-slash-circle"></i>
-                           </button>`
-                        : `<button type="button" class="btn btn-sm btn-biz-primary rounded-circle d-flex align-items-center justify-content-center p-0" 
-                                   style="width: 30px; height: 30px;" 
-                                   onclick="event.stopPropagation(); addToCart(${p.id})" title="Thêm vào giỏ">
-                               <i class="bi bi-plus-lg"></i>
-                           </button>`;
+                    let actionButtonHtml;
+                    if (isOutOfStock) {
+                        actionButtonHtml = `<button type="button" class="btn btn-sm btn-biz-outline rounded-circle d-flex align-items-center justify-content-center p-0" 
+                                                   style="width: 30px; height: 30px; opacity: 0.5;" 
+                                                   title="Hết hàng" disabled>
+                                               <i class="bi bi-slash-circle"></i>
+                                           </button>`;
+                    } else if (hasMultipleVariants) {
+                        actionButtonHtml = `<button type="button" class="btn btn-sm btn-biz-primary rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1 shadow-sm" 
+                                                   style="height: 30px;" 
+                                                   onclick="event.stopPropagation(); openVariantSelectModalById(${p.id})" title="Chọn size & màu">
+                                               <i class="bi bi-layers"></i>
+                                               <span style="font-size: 0.72rem; font-weight: 600;">Chọn size</span>
+                                           </button>`;
+                    } else {
+                        actionButtonHtml = `<button type="button" class="btn btn-sm btn-biz-primary rounded-circle d-flex align-items-center justify-content-center p-0" 
+                                                   style="width: 30px; height: 30px;" 
+                                                   onclick="event.stopPropagation(); addToCart(${p.id})" title="Thêm vào giỏ">
+                                               <i class="bi bi-plus-lg"></i>
+                                           </button>`;
+                    }
 
                     const sizeBadgeHtml = p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-1 py-0" style="font-size: 0.7rem; font-weight: 600;">Size: ${p.size}</span>` : '';
                     const colorBadgeHtml = p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border px-1 py-0" style="font-size: 0.7rem;">${p.color}</span>` : '';
+                    const variantsCountHtml = hasMultipleVariants ? `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-2 py-0" style="font-size: 0.68rem; font-weight: 600;"><i class="bi bi-stack me-1"></i>${p.variants.length} phân loại</span>` : '';
                     const materialHtml = p.material ? `<span class="text-muted small" style="font-size: 0.68rem;">(${p.material})</span>` : '';
 
                     col.innerHTML = `
@@ -952,6 +994,7 @@
                                     ${p.name}
                                 </h6>
                                 <div class="d-flex align-items-center gap-1 flex-wrap mb-2">
+                                    ${variantsCountHtml}
                                     ${sizeBadgeHtml}
                                     ${colorBadgeHtml}
                                     ${materialHtml}
@@ -967,7 +1010,7 @@
                 });
             }
 
-            // Tìm kiếm sản phẩm
+            // Tìm kiếm sản phẩm hoặc quét mã vạch
             function handleSearchInput() {
                 const input = document.getElementById('posSearchInput');
                 const btnClear = document.getElementById('btnClearSearch');
@@ -983,6 +1026,31 @@
                     searchKeyword = val;
                     loadProducts();
                 }, 300);
+            }
+
+            async function handleBarcodeOrSearch(val) {
+                const trimmed = (val || '').trim();
+                if (!trimmed) return;
+
+                // 1. Kiểm tra xem chuỗi có phải mã Barcode (hoặc SKU) của biến thể không
+                try {
+                    const res = await fetch(`/api/products/variants/barcode/${encodeURIComponent(trimmed)}`, {
+                        headers: getAuthHeaders()
+                    });
+                    if (res.ok) {
+                        const variant = await res.json();
+                        addVariantToCart(variant);
+                        const input = document.getElementById('posSearchInput');
+                        if (input) input.value = '';
+                        clearSearch();
+                        showToast('Quét mã vạch thành công', `Đã thêm [${variant.sku}] ${variant.productName || 'Sản phẩm'} (Size: ${variant.size || '—'}, Màu: ${variant.color || '—'}) vào giỏ!`, true);
+                        return;
+                    }
+                } catch (e) {}
+
+                // 2. Nếu không khớp Barcode chính xác, thực hiện tìm kiếm danh mục bình thường
+                searchKeyword = trimmed;
+                loadProducts();
             }
 
             function clearSearch() {
@@ -1009,7 +1077,6 @@
                         const select = document.getElementById('posCustomerSelect');
                         if (!select) return;
 
-                        // Giữ Khách vãng lai
                         select.innerHTML = '<option value="">Khách vãng lai (Mặc định)</option>';
 
                         customers.forEach(c => {
@@ -1025,11 +1092,27 @@
                 }
             }
 
-            // ================= 7. QUẢN LÝ GIỎ HÀNG (CART LOGIC) =================
+            // ================= 7. QUẢN LÝ GIỎ HÀNG (CART LOGIC CÓ BIẾN THỂ) =================
+            function getCartItemKey(item) {
+                return item.variant ? ('v_' + item.variant.id) : ('p_' + item.product.id);
+            }
+
             function addToCart(productId) {
                 const product = allProducts.find(p => p.id === productId);
                 if (!product) {
                     showToast('Lỗi', 'Không tìm thấy thông tin sản phẩm!', false);
+                    return;
+                }
+
+                // Nếu sản phẩm có nhiều biến thể -> Mở Modal chọn Size & Màu sắc
+                if (product.variants && product.variants.length > 1) {
+                    openVariantSelectModal(product);
+                    return;
+                }
+
+                // Nếu sản phẩm có đúng 1 biến thể
+                if (product.variants && product.variants.length === 1) {
+                    addVariantToCart(product.variants[0], product);
                     return;
                 }
 
@@ -1039,7 +1122,7 @@
                     return;
                 }
 
-                const existingItem = cart.find(item => item.product.id === productId);
+                const existingItem = cart.find(item => !item.variant && item.product.id === productId);
                 if (existingItem) {
                     if (existingItem.quantity + 1 > stock) {
                         showToast('Không đủ tồn kho', `Không thể thêm quá số lượng tồn kho hiện có (${stock}) của "${product.name}"!`, false);
@@ -1049,6 +1132,7 @@
                 } else {
                     cart.push({
                         product: product,
+                        variant: null,
                         quantity: 1
                     });
                 }
@@ -1060,28 +1144,127 @@
                 renderCart();
             }
 
-            function updateQuantity(productId, delta) {
-                const item = cart.find(i => i.product.id === productId);
+            function addVariantToCart(variant, parentProduct) {
+                if (!variant) return;
+                const prod = parentProduct || allProducts.find(p => p.id === variant.productId) || {
+                    id: variant.productId,
+                    name: variant.productName || 'Sản phẩm',
+                    code: variant.productCode || variant.sku,
+                    price: variant.price
+                };
+
+                const stock = (variant.stockQuantity !== null && variant.stockQuantity !== undefined) ? variant.stockQuantity : 0;
+                if (stock <= 0) {
+                    showToast('Hết hàng', `Biến thể "${prod.name}" (Size: ${variant.size || '—'}, Màu: ${variant.color || '—'}) đã hết hàng trong kho!`, false);
+                    return;
+                }
+
+                const existingItem = cart.find(item => item.variant && item.variant.id === variant.id);
+                if (existingItem) {
+                    if (existingItem.quantity + 1 > stock) {
+                        showToast('Không đủ tồn kho', `Không thể thêm quá số lượng tồn (${stock}) của biến thể này!`, false);
+                        return;
+                    }
+                    existingItem.quantity += 1;
+                } else {
+                    cart.push({
+                        product: prod,
+                        variant: variant,
+                        quantity: 1
+                    });
+                }
+
+                if (stock <= 5) {
+                    showToast('Cảnh báo tồn kho', `Biến thể "${prod.name} (Size: ${variant.size || ''})" sắp hết hàng (còn ${stock} món)!`, true);
+                }
+
+                renderCart();
+            }
+
+            function openVariantSelectModal(product) {
+                const nameEl = document.getElementById('varModalProductName');
+                const codeEl = document.getElementById('varModalProductCode');
+                const listEl = document.getElementById('varModalVariantsList');
+
+                if (nameEl) nameEl.textContent = product.name;
+                if (codeEl) codeEl.textContent = `Mã mẫu: ${product.code || '—'}`;
+
+                if (listEl) {
+                    listEl.innerHTML = '';
+                    (product.variants || []).forEach(v => {
+                        const stock = (v.stockQuantity !== null && v.stockQuantity !== undefined) ? v.stockQuantity : 0;
+                        const isOut = stock <= 0;
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = `p-3 rounded-3 border d-flex justify-content-between align-items-center transition-all ${isOut ? 'opacity-50 bg-light' : 'bg-white shadow-sm'}`;
+                        itemDiv.style.cursor = isOut ? 'not-allowed' : 'pointer';
+
+                        if (!isOut) {
+                            itemDiv.onmouseenter = () => itemDiv.classList.add('border-danger', 'bg-light');
+                            itemDiv.onmouseleave = () => itemDiv.classList.remove('border-danger', 'bg-light');
+                            itemDiv.onclick = () => {
+                                addVariantToCart(v, product);
+                                const modalEl = document.getElementById('selectVariantModal');
+                                const modal = bootstrap.Modal.getInstance(modalEl);
+                                if (modal) modal.hide();
+                            };
+                        }
+
+                        itemDiv.innerHTML = `
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-2 py-1 fw-bold fs-6">
+                                    Size: ${v.size || 'Mặc định'}
+                                </span>
+                                ${v.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1">${v.color}</span>` : ''}
+                                <span class="font-monospace text-muted small ms-1">${v.sku || ''}</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="fw-bold text-danger">${formatVND(v.price || product.price)}</span>
+                                ${isOut 
+                                    ? `<span class="badge bg-secondary">Hết hàng</span>`
+                                    : `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle">Kho: ${stock}</span>`
+                                }
+                            </div>
+                        `;
+                        listEl.appendChild(itemDiv);
+                    });
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('selectVariantModal'));
+                modal.show();
+            }
+
+            function openVariantSelectModalById(productId) {
+                const product = allProducts.find(p => p.id === productId);
+                if (product) openVariantSelectModal(product);
+            }
+
+            function updateQuantity(itemKey, delta) {
+                const item = cart.find(i => getCartItemKey(i) === itemKey);
                 if (!item) return;
 
-                const stock = (item.product.stockQuantity !== null && item.product.stockQuantity !== undefined) ? item.product.stockQuantity : 0;
+                const stock = item.variant 
+                    ? ((item.variant.stockQuantity !== null && item.variant.stockQuantity !== undefined) ? item.variant.stockQuantity : 0)
+                    : ((item.product.stockQuantity !== null && item.product.stockQuantity !== undefined) ? item.product.stockQuantity : 0);
+
                 const newQty = item.quantity + delta;
                 if (newQty <= 0) {
-                    removeFromCart(productId);
+                    removeFromCart(itemKey);
                 } else if (newQty > stock) {
-                    showToast('Không đủ tồn kho', `Không thể tăng số lượng vượt quá tồn kho hiện có (${stock}) của "${item.product.name}"!`, false);
+                    showToast('Không đủ tồn kho', `Không thể tăng số lượng vượt quá tồn kho hiện có (${stock})!`, false);
                 } else {
                     item.quantity = newQty;
                     renderCart();
                 }
             }
 
-            function setItemQuantity(productId, inputEl) {
+            function setItemQuantity(itemKey, inputEl) {
                 const val = parseInt(inputEl.value);
-                const item = cart.find(i => i.product.id === productId);
+                const item = cart.find(i => getCartItemKey(i) === itemKey);
                 if (!item) return;
 
-                const stock = (item.product.stockQuantity !== null && item.product.stockQuantity !== undefined) ? item.product.stockQuantity : 0;
+                const stock = item.variant 
+                    ? ((item.variant.stockQuantity !== null && item.variant.stockQuantity !== undefined) ? item.variant.stockQuantity : 0)
+                    : ((item.product.stockQuantity !== null && item.product.stockQuantity !== undefined) ? item.product.stockQuantity : 0);
 
                 if (isNaN(val) || val <= 0) {
                     inputEl.value = item.quantity;
@@ -1092,7 +1275,7 @@
                 if (val > stock) {
                     inputEl.value = stock;
                     item.quantity = stock;
-                    showToast('Không đủ tồn kho', `Đã tự động điều chỉnh về số lượng tồn tối đa (${stock}) của "${item.product.name}"!`, false);
+                    showToast('Không đủ tồn kho', `Đã tự động điều chỉnh về số lượng tồn tối đa (${stock})!`, false);
                     renderCart();
                     return;
                 }
@@ -1101,8 +1284,8 @@
                 renderCart();
             }
 
-            function removeFromCart(productId) {
-                cart = cart.filter(i => i.product.id !== productId);
+            function removeFromCart(itemKey) {
+                cart = cart.filter(i => getCartItemKey(i) !== itemKey);
                 renderCart();
             }
 
@@ -1135,7 +1318,7 @@
 
                 cart.forEach(item => {
                     totalQuantity += item.quantity;
-                    const price = Number(item.product.price) || 0;
+                    const price = item.variant ? (Number(item.variant.price) || Number(item.product.price) || 0) : (Number(item.product.price) || 0);
                     totalAmount += (price * item.quantity);
                 });
 
@@ -1170,8 +1353,16 @@
                     container.innerHTML = '';
                     cart.forEach(item => {
                         const p = item.product;
-                        const stock = (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0;
-                        const lineTotal = (Number(p.price) || 0) * item.quantity;
+                        const v = item.variant;
+                        const itemKey = getCartItemKey(item);
+                        const price = v ? (Number(v.price) || Number(p.price) || 0) : (Number(p.price) || 0);
+                        const stock = v 
+                            ? ((v.stockQuantity !== null && v.stockQuantity !== undefined) ? v.stockQuantity : 0)
+                            : ((p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0);
+                        const lineTotal = price * item.quantity;
+                        const size = v ? v.size : p.size;
+                        const color = v ? v.color : p.color;
+
                         const itemEl = document.createElement('div');
                         itemEl.className = 'pos-cart-item shadow-sm';
                         itemEl.innerHTML = `
@@ -1181,27 +1372,28 @@
                                         ${p.name}
                                     </h6>
                                     <div class="d-flex align-items-center gap-1 mb-1 flex-wrap">
-                                        ${p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger px-1 py-0" style="font-size: 0.68rem; font-weight: 600;">Size: ${p.size}</span>` : ''}
-                                        ${p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary px-1 py-0" style="font-size: 0.68rem;">${p.color}</span>` : ''}
+                                        ${size ? `<span class="badge bg-danger bg-opacity-10 text-danger px-1 py-0" style="font-size: 0.68rem; font-weight: 600;">Size: ${size}</span>` : ''}
+                                        ${color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary px-1 py-0" style="font-size: 0.68rem;">${color}</span>` : ''}
+                                        ${v && v.sku ? `<span class="font-monospace text-muted" style="font-size: 0.65rem;">${v.sku}</span>` : ''}
                                     </div>
                                     <div class="d-flex align-items-center gap-1">
-                                        <span class="text-muted small">${formatVND(p.price)}</span>
+                                        <span class="text-muted small">${formatVND(price)}</span>
                                         <span class="text-muted small">&bull;</span>
                                         <span class="small ${stock <= 5 ? 'text-warning fw-bold' : 'text-muted'}">Kho: ${stock}</span>
                                     </div>
                                 </div>
-                                <button type="button" class="btn btn-sm text-danger p-0 border-0" onclick="removeFromCart(${p.id})" title="Xóa món này">
+                                <button type="button" class="btn btn-sm text-danger p-0 border-0" onclick="removeFromCart('${itemKey}')" title="Xóa món này">
                                     <i class="bi bi-x-circle fs-6"></i>
                                 </button>
                             </div>
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top border-light">
                                 <div class="d-flex align-items-center gap-1">
-                                    <button type="button" class="pos-qty-btn" onclick="updateQuantity(${p.id}, -1)">
+                                    <button type="button" class="pos-qty-btn" onclick="updateQuantity('${itemKey}', -1)">
                                         <i class="bi bi-dash"></i>
                                     </button>
                                     <input type="number" class="pos-qty-input" min="1" max="${stock}" value="${item.quantity}" 
-                                           onchange="setItemQuantity(${p.id}, this)">
-                                    <button type="button" class="pos-qty-btn" ${item.quantity >= stock ? 'disabled title="Đã đạt số lượng tồn tối đa"' : ''} onclick="updateQuantity(${p.id}, 1)">
+                                           onchange="setItemQuantity('${itemKey}', this)">
+                                    <button type="button" class="pos-qty-btn" ${item.quantity >= stock ? 'disabled title="Đã đạt số lượng tồn tối đa"' : ''} onclick="updateQuantity('${itemKey}', 1)">
                                         <i class="bi bi-plus"></i>
                                     </button>
                                 </div>
@@ -1220,8 +1412,6 @@
                     return;
                 }
 
-                // Chuẩn bị payload chuẩn CreateOrderRequest
-                // Backend tự lấy giá từ DB, frontend chỉ gửi productId và quantity
                 const customerSelect = document.getElementById('posCustomerSelect');
                 const selectedCustVal = customerSelect ? customerSelect.value : '';
                 const customerId = selectedCustVal ? parseInt(selectedCustVal) : null;
@@ -1230,7 +1420,8 @@
                 const note = noteInput ? noteInput.value.trim() : null;
 
                 const orderItems = cart.map(i => ({
-                    productId: i.product.id,
+                    productId: i.product ? i.product.id : (i.variant ? i.variant.productId : null),
+                    variantId: i.variant ? i.variant.id : null,
                     quantity: i.quantity
                 }));
 
@@ -1462,6 +1653,44 @@
                 }
             }
 
+            function getProductVariantsList(products) {
+                const list = [];
+                (products || []).forEach(p => {
+                    if (p.variants && p.variants.length > 0) {
+                        p.variants.forEach(v => {
+                            list.push({
+                                id: v.id,
+                                productId: p.id,
+                                productName: p.name,
+                                productCode: p.code,
+                                sku: v.sku || p.code,
+                                barcode: v.barcode || null,
+                                size: v.size || null,
+                                color: v.color || null,
+                                price: (v.price !== null && v.price !== undefined) ? v.price : p.price,
+                                stockQuantity: (v.stockQuantity !== null && v.stockQuantity !== undefined) ? v.stockQuantity : (p.stockQuantity || 0),
+                                category: p.category
+                            });
+                        });
+                    } else {
+                        list.push({
+                            id: null,
+                            productId: p.id,
+                            productName: p.name,
+                            productCode: p.code,
+                            sku: p.code,
+                            barcode: null,
+                            size: p.size || null,
+                            color: p.color || null,
+                            price: p.price,
+                            stockQuantity: (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0,
+                            category: p.category
+                        });
+                    }
+                });
+                return list;
+            }
+
             async function searchExchangeProducts() {
                 const input = document.getElementById('exchangeSearchInput');
                 const catSel = document.getElementById('exchangeCategoryFilter');
@@ -1471,76 +1700,103 @@
                 const catId = catSel ? catSel.value : '';
                 const size = sizeSel ? sizeSel.value : '';
 
-                // 1. Lọc nhanh từ bộ nhớ allProducts có sẵn (phản hồi tức thì)
-                let localFiltered = allProducts.filter(p => {
+                // 1. Tìm nhanh từ danh sách biến thể trong bộ nhớ client
+                const allClientVariants = getProductVariantsList(allProducts);
+                let localFiltered = allClientVariants.filter(v => {
                     if (kw) {
-                        const nameMatch = (p.name || '').toLowerCase().includes(kw);
-                        const codeMatch = (p.code || '').toLowerCase().includes(kw);
-                        if (!nameMatch && !codeMatch) return false;
+                        const nameMatch = (v.productName || '').toLowerCase().includes(kw);
+                        const skuMatch = (v.sku || '').toLowerCase().includes(kw);
+                        const barcodeMatch = (v.barcode || '').toLowerCase().includes(kw);
+                        if (!nameMatch && !skuMatch && !barcodeMatch) return false;
                     }
-                    if (catId) {
-                        const pCatId = p.category ? p.category.id : null;
-                        if (String(pCatId) !== String(catId)) return false;
+                    if (catId && v.category) {
+                        if (String(v.category.id) !== String(catId)) return false;
                     }
                     if (size) {
-                        if ((p.size || '').toLowerCase() !== size.toLowerCase()) return false;
+                        if ((v.size || '').toLowerCase() !== size.toLowerCase()) return false;
                     }
                     return true;
                 });
 
                 renderExchangeSearchResults(localFiltered);
 
-                // 2. Tra cứu thêm từ API backend để hỗ trợ tìm kiếm trên toàn bộ dữ liệu kho
+                // 2. Tra cứu thêm API backend (hỗ trợ tìm kiếm theo Barcode / SKU / Tên toàn cơ sở dữ liệu)
                 try {
-                    const params = new URLSearchParams();
-                    params.append('page', 0);
-                    params.append('size', 50);
-                    if (kw) params.append('keyword', kw);
-                    if (catId) params.append('categoryId', catId);
-                    if (size) params.append('productSize', size);
+                    let serverVariants = [];
+                    if (kw) {
+                        const res = await fetch(`/api/products/variants/search?keyword=${encodeURIComponent(kw)}`, {
+                            headers: getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            serverVariants = await res.json();
+                        }
+                    } else {
+                        const params = new URLSearchParams({ page: 0, size: 50 });
+                        if (catId) params.append('categoryId', catId);
+                        if (size) params.append('productSize', size);
+                        const res = await fetch(`/api/products?${params.toString()}`, {
+                            headers: getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            serverVariants = getProductVariantsList(data.content || []);
+                        }
+                    }
 
-                    const response = await fetch(`/api/products?${params.toString()}`, {
-                        headers: getAuthHeaders()
-                    });
+                    if (serverVariants && serverVariants.length > 0) {
+                        const variantMap = new Map();
+                        localFiltered.forEach(v => {
+                            const key = v.id ? `v_${v.id}` : `p_${v.productId}_${v.sku}`;
+                            variantMap.set(key, v);
+                        });
+                        serverVariants.forEach(v => {
+                            const key = v.id ? `v_${v.id}` : `p_${v.productId}_${v.sku}`;
+                            variantMap.set(key, v);
+                        });
 
-                    if (response.ok) {
-                        const data = await response.json();
-                        const serverProducts = data.content || [];
-                        const productMap = new Map();
-                        localFiltered.forEach(p => productMap.set(p.id, p));
-                        serverProducts.forEach(p => productMap.set(p.id, p));
-                        renderExchangeSearchResults(Array.from(productMap.values()));
+                        let merged = Array.from(variantMap.values());
+                        if (catId) {
+                            merged = merged.filter(v => !v.category || String(v.category.id) === String(catId));
+                        }
+                        if (size) {
+                            merged = merged.filter(v => (v.size || '').toLowerCase() === size.toLowerCase());
+                        }
+                        renderExchangeSearchResults(merged);
                     }
                 } catch (e) {
-                    // Tiếp tục hiển thị kết quả local
+                    console.warn('Lỗi tìm kiếm biến thể backend:', e);
                 }
             }
 
-            function renderExchangeSearchResults(products) {
+            function renderExchangeSearchResults(variants) {
                 const listEl = document.getElementById('exchangeSearchResultsList');
                 const countEl = document.getElementById('exchangeSearchCountLabel');
                 if (!listEl) return;
 
-                lastExchangeSearchResults = products || [];
+                lastExchangeSearchResults = variants || [];
 
                 if (countEl) {
-                    countEl.innerHTML = `<i class="bi bi-box-seam me-1 text-primary"></i>Tìm thấy <strong>${lastExchangeSearchResults.length}</strong> sản phẩm phù hợp`;
+                    countEl.innerHTML = `<i class="bi bi-box-seam me-1 text-primary"></i>Tìm thấy <strong>${lastExchangeSearchResults.length}</strong> phân loại / sản phẩm phù hợp`;
                 }
 
-                if (!products || products.length === 0) {
+                if (!variants || variants.length === 0) {
                     listEl.innerHTML = `
                         <div class="text-center py-3 text-muted small">
-                            <i class="bi bi-search me-1"></i>Không tìm thấy sản phẩm nào phù hợp với điều kiện tìm kiếm.
+                            <i class="bi bi-search me-1"></i>Không tìm thấy biến thể hoặc sản phẩm nào phù hợp.
                         </div>
                     `;
                     return;
                 }
 
+                const returnedProductIds = Object.values(selectedReturnItems).map(it => Number(it.productId));
+
                 listEl.innerHTML = '';
-                const displayList = products.slice(0, 30);
-                displayList.forEach(p => {
-                    const stock = (p.stockQuantity !== null && p.stockQuantity !== undefined) ? p.stockQuantity : 0;
+                const displayList = variants.slice(0, 40);
+                displayList.forEach(v => {
+                    const stock = (v.stockQuantity !== null && v.stockQuantity !== undefined) ? v.stockQuantity : 0;
                     const isOutOfStock = stock <= 0;
+                    const isSameModel = returnedProductIds.includes(Number(v.productId));
+
                     const itemEl = document.createElement('div');
                     itemEl.className = `p-2 rounded-2 border border-light bg-light bg-opacity-50 d-flex justify-content-between align-items-center transition-all ${isOutOfStock ? 'opacity-50' : ''}`;
                     itemEl.style.cursor = isOutOfStock ? 'not-allowed' : 'pointer';
@@ -1548,23 +1804,29 @@
                     if (!isOutOfStock) {
                         itemEl.onmouseenter = () => { itemEl.classList.add('bg-white', 'shadow-sm', 'border-primary'); };
                         itemEl.onmouseleave = () => { itemEl.classList.remove('bg-white', 'shadow-sm', 'border-primary'); };
-                        itemEl.onclick = () => selectExchangeProduct(p.id);
+                        itemEl.onclick = () => selectExchangeProductVariant(v);
                     }
+
+                    const modelBadgeHtml = isSameModel
+                        ? `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle" style="font-size: 0.68rem; font-weight: 600;"><i class="bi bi-arrow-repeat me-1"></i>Cùng mẫu (Đổi size)</span>`
+                        : `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle" style="font-size: 0.68rem; font-weight: 600;"><i class="bi bi-shuffle me-1"></i>Khác mẫu</span>`;
 
                     itemEl.innerHTML = `
                         <div class="d-flex flex-column gap-1 text-truncate pe-2">
-                            <div class="fw-semibold text-dark small text-truncate" title="${p.name}">${p.name}</div>
+                            <div class="fw-semibold text-dark small text-truncate" title="${v.productName}">${v.productName}</div>
                             <div class="d-flex align-items-center gap-1 flex-wrap">
-                                <span class="font-monospace text-muted small" style="font-size: 0.72rem;">${p.code || ''}</span>
-                                ${p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" style="font-size: 0.68rem; font-weight: 600;">Size: ${p.size}</span>` : ''}
-                                ${p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size: 0.68rem;">${p.color}</span>` : ''}
-                                <span class="text-primary fw-bold ms-1" style="font-size: 0.78rem;">${formatVND(p.price)}</span>
+                                <span class="font-monospace text-muted small" style="font-size: 0.72rem;">${v.sku || v.productCode || ''}</span>
+                                ${v.barcode ? `<span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.68rem;"><i class="bi bi-upc-scan me-1"></i>${v.barcode}</span>` : ''}
+                                ${v.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle" style="font-size: 0.68rem; font-weight: 600;">Size: ${v.size}</span>` : ''}
+                                ${v.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size: 0.68rem;">${v.color}</span>` : ''}
+                                <span class="text-primary fw-bold ms-1" style="font-size: 0.78rem;">${formatVND(v.price)}</span>
+                                ${modelBadgeHtml}
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2 flex-shrink-0">
                             ${!isOutOfStock
                                 ? `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle small px-2 py-1">Kho: ${stock}</span>
-                                   <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 small d-inline-flex align-items-center gap-1" onclick="event.stopPropagation(); selectExchangeProduct(${p.id})">
+                                   <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 small d-inline-flex align-items-center gap-1" onclick="event.stopPropagation(); selectExchangeProductVariant(${JSON.stringify(v).replace(/"/g, '&quot;')})">
                                        <i class="bi bi-check2"></i><span class="d-none d-sm-inline">Chọn</span>
                                    </button>`
                                 : `<span class="badge bg-secondary bg-opacity-10 text-muted border small px-2 py-1">Hết hàng</span>`
@@ -1575,42 +1837,48 @@
                 });
             }
 
-            function selectExchangeProduct(productId) {
-                let product = allProducts.find(p => p.id === productId);
-                if (!product && lastExchangeSearchResults) {
-                    product = lastExchangeSearchResults.find(p => p.id === productId);
-                }
-                if (!product) return;
-
-                currentSelectedExchangeProduct = product;
-
-                // Sync legacy select for compatibility
-                const sel = document.getElementById('exchangeProductSelect');
-                if (sel) sel.value = productId;
+            function selectExchangeProductVariant(variant) {
+                if (!variant) return;
+                currentSelectedExchangeProduct = variant;
 
                 const card = document.getElementById('exchangeSelectedItemCard');
                 const prompt = document.getElementById('exchangeNoSelectionPrompt');
                 const nameEl = document.getElementById('selectedExchangeName');
                 const codeEl = document.getElementById('selectedExchangeCode');
+                const modelBadgeEl = document.getElementById('selectedExchangeModelBadge');
                 const sizeEl = document.getElementById('selectedExchangeSize');
                 const colorEl = document.getElementById('selectedExchangeColor');
                 const priceEl = document.getElementById('selectedExchangePrice');
                 const stockEl = document.getElementById('selectedExchangeStock');
                 const qtyInput = document.getElementById('exchangeProductQty');
 
-                if (nameEl) nameEl.textContent = product.name;
-                if (codeEl) codeEl.textContent = product.code || '—';
+                const returnedProductIds = Object.values(selectedReturnItems).map(it => Number(it.productId));
+                const isSameModel = returnedProductIds.includes(Number(variant.productId));
+
+                if (nameEl) nameEl.textContent = variant.productName;
+                if (codeEl) codeEl.textContent = `${variant.sku || variant.productCode || '—'}${variant.barcode ? ` (${variant.barcode})` : ''}`;
+
+                if (modelBadgeEl) {
+                    if (isSameModel) {
+                        modelBadgeEl.className = 'badge bg-success bg-opacity-10 text-success border border-success-subtle';
+                        modelBadgeEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Cùng mẫu (Đổi size)';
+                    } else {
+                        modelBadgeEl.className = 'badge bg-primary bg-opacity-10 text-primary border border-primary-subtle';
+                        modelBadgeEl.innerHTML = '<i class="bi bi-shuffle me-1"></i>Khác mẫu';
+                    }
+                }
+
                 if (sizeEl) {
-                    sizeEl.textContent = product.size ? `Size: ${product.size}` : 'Không size';
-                    sizeEl.className = product.size ? 'badge bg-danger bg-opacity-10 text-danger border border-danger-subtle' : 'badge bg-light text-muted border';
+                    sizeEl.textContent = variant.size ? `Size: ${variant.size}` : 'Không size';
+                    sizeEl.className = variant.size ? 'badge bg-danger bg-opacity-10 text-danger border border-danger-subtle' : 'badge bg-light text-muted border';
                 }
                 if (colorEl) {
-                    colorEl.textContent = product.color || '—';
-                    colorEl.className = product.color ? 'badge bg-secondary bg-opacity-10 text-secondary border' : 'd-none';
+                    colorEl.textContent = variant.color || '—';
+                    colorEl.className = variant.color ? 'badge bg-secondary bg-opacity-10 text-secondary border' : 'd-none';
                 }
-                if (priceEl) priceEl.textContent = formatVND(product.price);
+                if (priceEl) priceEl.textContent = formatVND(variant.price);
                 if (stockEl) {
-                    const stock = (product.stockQuantity !== null && product.stockQuantity !== undefined) ? product.stockQuantity : 0;
+                    const stock = (variant.stockQuantity !== null && variant.stockQuantity !== undefined) ? variant.stockQuantity : 0;
                     stockEl.textContent = `Kho: ${stock}`;
                     stockEl.className = stock > 0 ? 'badge bg-success bg-opacity-10 text-success border border-success-subtle' : 'badge bg-danger bg-opacity-10 text-danger border';
                 }
@@ -1618,6 +1886,14 @@
 
                 if (card) card.classList.remove('d-none');
                 if (prompt) prompt.classList.add('d-none');
+            }
+
+            function selectExchangeProduct(productId) {
+                // Hỗ trợ hàm cũ nếu có gọi theo ID
+                const variant = lastExchangeSearchResults.find(v => v.productId === productId || v.id === productId);
+                if (variant) {
+                    selectExchangeProductVariant(variant);
+                }
             }
 
             function cancelSelectedExchangeProduct() {
@@ -1756,6 +2032,10 @@
                 }
             }
 
+            function getReturnItemKey(item) {
+                return item.variantId ? `var_${item.variantId}` : `prod_${item.productId}`;
+            }
+
             function renderReturnItemsTable(items) {
                 const tbody = document.getElementById('returnItemsTableBody');
                 if (!tbody) return;
@@ -1767,20 +2047,24 @@
                 }
 
                 items.forEach(it => {
+                    const itemKey = getReturnItemKey(it);
                     const remainQty = (it.remainingQuantity !== undefined) ? it.remainingQuantity : (it.remainingReturnableQuantity || 0);
                     const boughtQty = (it.purchasedQuantity !== undefined) ? it.purchasedQuantity : (it.originalQuantity || 0);
                     const canReturn = (it.canReturn !== undefined) ? it.canReturn : (remainQty > 0);
                     const tr = document.createElement('tr');
-                    tr.id = `returnRow_${it.productId}`;
+                    tr.id = `returnRow_${itemKey}`;
                     tr.innerHTML = `
                         <td class="text-center">
-                            <input type="checkbox" class="form-check-input" id="chk_ret_${it.productId}" 
+                            <input type="checkbox" class="form-check-input" id="chk_ret_${itemKey}" 
                                    ${canReturn ? '' : 'disabled title="Đã đổi/trả hết số lượng"'}
-                                   onchange="toggleReturnItem(${it.productId})">
+                                   onchange="toggleReturnItem('${itemKey}')">
                         </td>
                         <td>
                             <div class="fw-bold text-dark">${it.productName || 'Sản phẩm'}</div>
-                            <div class="font-monospace text-muted small">${it.productCode || ''}</div>
+                            <div class="d-flex align-items-center gap-1 font-monospace text-muted small" style="font-size: 0.72rem;">
+                                <span>${it.variantSku || it.productCode || ''}</span>
+                                ${it.variantBarcode ? `<span class="badge bg-light text-secondary border"><i class="bi bi-upc-scan me-1"></i>${it.variantBarcode}</span>` : ''}
+                            </div>
                         </td>
                         <td class="text-center">
                             ${it.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">${it.size}</span>` : '—'}
@@ -1792,13 +2076,13 @@
                         <td class="text-center">${boughtQty}</td>
                         <td class="text-center fw-bold ${canReturn ? 'text-success' : 'text-muted'}">${remainQty}</td>
                         <td>
-                            <input type="number" class="biz-input py-1 px-2 text-center" id="qty_ret_${it.productId}" 
+                            <input type="number" class="biz-input py-1 px-2 text-center" id="qty_ret_${itemKey}" 
                                    min="1" max="${remainQty}" value="1" disabled
-                                   onchange="onReturnQtyChange(${it.productId}, this.value)">
+                                   onchange="onReturnQtyChange('${itemKey}', this.value)">
                         </td>
                         <td>
-                            <select class="biz-input py-1 px-2 small" id="reason_ret_${it.productId}" disabled
-                                    onchange="onReturnReasonChange(${it.productId}, this.value)">
+                            <select class="biz-input py-1 px-2 small" id="reason_ret_${itemKey}" disabled
+                                    onchange="onReturnReasonChange('${itemKey}', this.value)">
                                 <option value="WRONG_SIZE">Size không vừa</option>
                                 <option value="DEFECTIVE">Lỗi may / Lỗi vải</option>
                                 <option value="COLOR_MISMATCH">Không hợp màu</option>
@@ -1806,30 +2090,32 @@
                                 <option value="OTHER">Lý do khác</option>
                             </select>
                         </td>
-                        <td class="text-end fw-bold text-danger" id="refund_ret_${it.productId}">0 đ</td>
+                        <td class="text-end fw-bold text-danger" id="refund_ret_${itemKey}">0 đ</td>
                     `;
                     tbody.appendChild(tr);
                 });
             }
 
-            function toggleReturnItem(productId) {
-                if (!returnOrderData) return;
-                const item = returnOrderData.items.find(i => i.productId === productId);
+            function toggleReturnItem(itemKey) {
+                if (!returnOrderData || !returnOrderData.items) return;
+                const item = returnOrderData.items.find(i => getReturnItemKey(i) === itemKey);
                 if (!item) return;
 
-                const chk = document.getElementById(`chk_ret_${productId}`);
-                const qtyInput = document.getElementById(`qty_ret_${productId}`);
-                const reasonSel = document.getElementById(`reason_ret_${productId}`);
-                const refundEl = document.getElementById(`refund_ret_${productId}`);
+                const chk = document.getElementById(`chk_ret_${itemKey}`);
+                const qtyInput = document.getElementById(`qty_ret_${itemKey}`);
+                const reasonSel = document.getElementById(`reason_ret_${itemKey}`);
+                const refundEl = document.getElementById(`refund_ret_${itemKey}`);
 
                 const remainQty = (item.remainingQuantity !== undefined) ? item.remainingQuantity : (item.remainingReturnableQuantity || 1);
 
                 if (chk && chk.checked) {
                     qtyInput.disabled = false;
                     reasonSel.disabled = false;
-                    const maxQty = remainQty || 1;
                     qtyInput.value = 1;
-                    selectedReturnItems[productId] = {
+                    selectedReturnItems[itemKey] = {
+                        productId: item.productId,
+                        variantId: item.variantId || null,
+                        unitPrice: item.unitPrice,
                         quantity: 1,
                         reason: reasonSel.value || 'WRONG_SIZE',
                         note: ''
@@ -1840,15 +2126,16 @@
                     if (qtyInput) qtyInput.disabled = true;
                     if (reasonSel) reasonSel.disabled = true;
                     if (refundEl) refundEl.textContent = '0 đ';
-                    delete selectedReturnItems[productId];
+                    delete selectedReturnItems[itemKey];
                 }
 
                 calculateReturnTotals();
+                recalculateExchangeSameModelStatus();
             }
 
-            function onReturnQtyChange(productId, val) {
-                if (!returnOrderData || !selectedReturnItems[productId]) return;
-                const item = returnOrderData.items.find(i => i.productId === productId);
+            function onReturnQtyChange(itemKey, val) {
+                if (!returnOrderData || !selectedReturnItems[itemKey]) return;
+                const item = returnOrderData.items.find(i => getReturnItemKey(i) === itemKey);
                 if (!item) return;
 
                 const remainQty = (item.remainingQuantity !== undefined) ? item.remainingQuantity : (item.remainingReturnableQuantity || 1);
@@ -1860,34 +2147,52 @@
                     showToast('Cảnh báo', `Số lượng trả không thể vượt quá ${maxQty}!`, false);
                 }
 
-                const qtyInput = document.getElementById(`qty_ret_${productId}`);
+                const qtyInput = document.getElementById(`qty_ret_${itemKey}`);
                 if (qtyInput) qtyInput.value = qty;
 
-                selectedReturnItems[productId].quantity = qty;
+                selectedReturnItems[itemKey].quantity = qty;
                 const lineRefund = Number(item.unitPrice) * qty;
-                const refundEl = document.getElementById(`refund_ret_${productId}`);
+                const refundEl = document.getElementById(`refund_ret_${itemKey}`);
                 if (refundEl) refundEl.textContent = formatVND(lineRefund);
 
                 calculateReturnTotals();
             }
 
-            function onReturnReasonChange(productId, reason) {
-                if (selectedReturnItems[productId]) {
-                    selectedReturnItems[productId].reason = reason;
+            function onReturnReasonChange(itemKey, reason) {
+                if (selectedReturnItems[itemKey]) {
+                    selectedReturnItems[itemKey].reason = reason;
+                }
+            }
+
+            function recalculateExchangeSameModelStatus() {
+                const returnedProductIds = Object.values(selectedReturnItems).map(it => Number(it.productId));
+                selectedExchangeItems.forEach(it => {
+                    it.isSameModel = returnedProductIds.includes(Number(it.productId));
+                });
+                renderExchangeItemsTable();
+
+                if (currentSelectedExchangeProduct) {
+                    const modelBadgeEl = document.getElementById('selectedExchangeModelBadge');
+                    const isSame = returnedProductIds.includes(Number(currentSelectedExchangeProduct.productId));
+                    if (modelBadgeEl) {
+                        if (isSame) {
+                            modelBadgeEl.className = 'badge bg-success bg-opacity-10 text-success border border-success-subtle';
+                            modelBadgeEl.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Cùng mẫu (Đổi size)';
+                        } else {
+                            modelBadgeEl.className = 'badge bg-primary bg-opacity-10 text-primary border border-primary-subtle';
+                            modelBadgeEl.innerHTML = '<i class="bi bi-shuffle me-1"></i>Khác mẫu';
+                        }
+                    }
+                }
+
+                if (lastExchangeSearchResults && lastExchangeSearchResults.length > 0) {
+                    renderExchangeSearchResults(lastExchangeSearchResults);
                 }
             }
 
             function addExchangeItem() {
-                let product = currentSelectedExchangeProduct;
-                if (!product) {
-                    const sel = document.getElementById('exchangeProductSelect');
-                    const prodId = sel ? parseInt(sel.value) : null;
-                    if (prodId) {
-                        product = allProducts.find(p => p.id === prodId) || (lastExchangeSearchResults && lastExchangeSearchResults.find(p => p.id === prodId));
-                    }
-                }
-
-                if (!product) {
+                const variant = currentSelectedExchangeProduct;
+                if (!variant) {
                     showToast('Chưa chọn sản phẩm', 'Vui lòng nhấp chọn một sản phẩm trong danh sách gợi ý ở trên!', false);
                     return;
                 }
@@ -1896,33 +2201,45 @@
                 let qty = qtyInput ? parseInt(qtyInput.value) : 1;
                 if (isNaN(qty) || qty < 1) qty = 1;
 
-                const stock = (product.stockQuantity !== null && product.stockQuantity !== undefined) ? product.stockQuantity : 0;
-                const existing = selectedExchangeItems.find(i => i.product.id === product.id);
+                const stock = (variant.stockQuantity !== null && variant.stockQuantity !== undefined) ? variant.stockQuantity : 0;
+                const existing = selectedExchangeItems.find(i => (i.variantId && variant.id && i.variantId === variant.id) || (!i.variantId && !variant.id && i.productId === variant.productId));
                 const currentQty = existing ? existing.quantity : 0;
 
                 if (currentQty + qty > stock) {
-                    showToast('Không đủ tồn kho', `Sản phẩm "${product.name}" chỉ còn ${stock} món trong kho!`, false);
+                    showToast('Không đủ tồn kho', `Sản phẩm "${variant.productName}" chỉ còn ${stock} món trong kho!`, false);
                     return;
                 }
+
+                const returnedProductIds = Object.values(selectedReturnItems).map(it => Number(it.productId));
+                const isSameModel = returnedProductIds.includes(Number(variant.productId));
 
                 if (existing) {
                     existing.quantity += qty;
                 } else {
                     selectedExchangeItems.push({
-                        product: product,
-                        quantity: qty
+                        variantId: variant.id || null,
+                        productId: variant.productId,
+                        productName: variant.productName,
+                        productCode: variant.productCode || variant.sku,
+                        sku: variant.sku || variant.productCode,
+                        barcode: variant.barcode || '',
+                        size: variant.size || '',
+                        color: variant.color || '',
+                        price: Number(variant.price) || 0,
+                        stockQuantity: stock,
+                        quantity: qty,
+                        isSameModel: isSameModel
                     });
                 }
 
                 cancelSelectedExchangeProduct();
-
                 renderExchangeItemsTable();
                 calculateReturnTotals();
-                showToast('Thành công', `Đã thêm ${qty} x "${product.name}" vào danh sách đổi mới!`, true);
+                showToast('Thành công', `Đã thêm ${qty} x "${variant.productName}" vào danh sách đổi mới!`, true);
             }
 
-            function removeExchangeItem(productId) {
-                selectedExchangeItems = selectedExchangeItems.filter(i => i.product.id !== productId);
+            function removeExchangeItem(index) {
+                selectedExchangeItems.splice(index, 1);
                 renderExchangeItemsTable();
                 calculateReturnTotals();
             }
@@ -1934,7 +2251,7 @@
                 if (selectedExchangeItems.length === 0) {
                     tbody.innerHTML = `
                         <tr id="exchangeEmptyRow">
-                            <td colspan="7" class="text-center text-muted small py-3">
+                            <td colspan="8" class="text-center text-muted small py-3">
                                 Chưa chọn món đổi mới nào (Khách chỉ trả hàng hoàn tiền)
                             </td>
                         </tr>
@@ -1943,26 +2260,33 @@
                 }
 
                 tbody.innerHTML = '';
-                selectedExchangeItems.forEach(it => {
-                    const p = it.product;
-                    const lineTotal = (Number(p.price) || 0) * it.quantity;
+                selectedExchangeItems.forEach((it, idx) => {
+                    const lineTotal = (Number(it.price) || 0) * it.quantity;
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>
-                            <div class="fw-semibold text-dark">${p.name}</div>
-                            <div class="font-monospace text-muted small">${p.code || ''}</div>
+                            <div class="fw-semibold text-dark">${it.productName || 'Sản phẩm'}</div>
+                            <div class="d-flex align-items-center gap-1 font-monospace text-muted small" style="font-size: 0.72rem;">
+                                <span>${it.sku || it.productCode || ''}</span>
+                                ${it.barcode ? `<span class="badge bg-light text-secondary border"><i class="bi bi-upc-scan me-1"></i>${it.barcode}</span>` : ''}
+                            </div>
                         </td>
                         <td class="text-center">
-                            ${p.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">${p.size}</span>` : '—'}
+                            ${it.isSameModel 
+                                ? `<span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1 small"><i class="bi bi-arrow-repeat me-1"></i>Cùng mẫu</span>` 
+                                : `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-2 py-1 small"><i class="bi bi-shuffle me-1"></i>Khác mẫu</span>`}
                         </td>
                         <td class="text-center">
-                            ${p.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border">${p.color}</span>` : '—'}
+                            ${it.size ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">${it.size}</span>` : '—'}
                         </td>
-                        <td class="text-end">${formatVND(p.price)}</td>
+                        <td class="text-center">
+                            ${it.color ? `<span class="badge bg-secondary bg-opacity-10 text-secondary border">${it.color}</span>` : '—'}
+                        </td>
+                        <td class="text-end">${formatVND(it.price)}</td>
                         <td class="text-center fw-bold">${it.quantity}</td>
                         <td class="text-end fw-bold text-primary">${formatVND(lineTotal)}</td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm text-danger p-0 border-0" onclick="removeExchangeItem(${p.id})" title="Xóa món đổi này">
+                            <button type="button" class="btn btn-sm text-danger p-0 border-0" onclick="removeExchangeItem(${idx})" title="Xóa món đổi này">
                                 <i class="bi bi-trash3"></i>
                             </button>
                         </td>
@@ -1973,21 +2297,18 @@
 
             function calculateReturnTotals() {
                 let totalRefund = 0;
-                if (returnOrderData && returnOrderData.items) {
-                    Object.keys(selectedReturnItems).forEach(pId => {
-                        const item = returnOrderData.items.find(i => i.productId === Number(pId));
-                        if (item) {
-                            const q = selectedReturnItems[pId].quantity || 0;
-                            totalRefund += (Number(item.unitPrice) || 0) * q;
-                        }
-                    });
-                }
+                Object.keys(selectedReturnItems).forEach(k => {
+                    const item = selectedReturnItems[k];
+                    if (item) {
+                        const q = item.quantity || 0;
+                        totalRefund += (Number(item.unitPrice) || 0) * q;
+                    }
+                });
 
                 let totalExchange = 0;
                 selectedExchangeItems.forEach(it => {
-                    const p = it.product;
                     const q = it.quantity || 0;
-                    totalExchange += (Number(p.price) || 0) * q;
+                    totalExchange += (Number(it.price) || 0) * q;
                 });
 
                 const netAmount = totalExchange - totalRefund;
@@ -2055,15 +2376,17 @@
                 const isExchange = selectedExchangeItems.length > 0;
                 const returnType = isExchange ? 'EXCHANGE' : 'RETURN_ONLY';
 
-                const returnItemsPayload = returnKeys.map(pId => ({
-                    productId: Number(pId),
-                    quantity: selectedReturnItems[pId].quantity,
-                    reason: selectedReturnItems[pId].reason || mainReason,
-                    note: selectedReturnItems[pId].note || null
+                const returnItemsPayload = returnKeys.map(k => ({
+                    productId: Number(selectedReturnItems[k].productId),
+                    variantId: selectedReturnItems[k].variantId ? Number(selectedReturnItems[k].variantId) : null,
+                    quantity: selectedReturnItems[k].quantity,
+                    reason: selectedReturnItems[k].reason || mainReason,
+                    note: selectedReturnItems[k].note || null
                 }));
 
                 const exchangeItemsPayload = selectedExchangeItems.map(it => ({
-                    productId: it.product.id,
+                    productId: Number(it.productId),
+                    variantId: it.variantId ? Number(it.variantId) : null,
                     quantity: it.quantity
                 }));
 
