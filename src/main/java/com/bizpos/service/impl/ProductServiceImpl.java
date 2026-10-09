@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -31,6 +32,7 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final OrderItemRepository orderItemRepository;
     private final com.bizpos.service.StockMovementService stockMovementService;
+    private final com.bizpos.repository.ProductVariantRepository productVariantRepository;
 
     @Override
     public PageResponse<ProductResponse> getProducts(int page, int size, String keyword, Long categoryId, String productSize) {
@@ -89,6 +91,72 @@ public class ProductServiceImpl implements ProductService {
                 .build();
 
         Product saved = productRepository.save(product);
+
+        // Khởi tạo các biến thể (ProductVariants) tương ứng
+        if (request.getVariants() != null && !request.getVariants().isEmpty()) {
+            for (com.bizpos.dto.ProductVariantRequest vReq : request.getVariants()) {
+                String size = vReq.getSize() != null && !vReq.getSize().trim().isEmpty() ? vReq.getSize().trim() : saved.getSize();
+                String color = vReq.getColor() != null && !vReq.getColor().trim().isEmpty() ? vReq.getColor().trim() : saved.getColor();
+                String sku = (vReq.getSku() != null && !vReq.getSku().isBlank())
+                        ? vReq.getSku().trim()
+                        : generateVariantSku(saved.getCode(), size, color);
+                String barcode = (vReq.getBarcode() != null && !vReq.getBarcode().isBlank())
+                        ? vReq.getBarcode().trim()
+                        : generateUniqueBarcode();
+                BigDecimal price = vReq.getPrice() != null ? vReq.getPrice() : saved.getPrice();
+                int stock = vReq.getStockQuantity() != null ? vReq.getStockQuantity() : 0;
+
+                com.bizpos.entity.ProductVariant variant = com.bizpos.entity.ProductVariant.builder()
+                        .product(saved)
+                        .sku(sku)
+                        .barcode(barcode)
+                        .size(size)
+                        .color(color)
+                        .price(price)
+                        .costPrice(vReq.getCostPrice())
+                        .stockQuantity(stock)
+                        .isActive(vReq.getIsActive() != null ? vReq.getIsActive() : true)
+                        .build();
+
+                productVariantRepository.save(variant);
+            }
+        } else if ((request.getSizes() != null && !request.getSizes().isEmpty()) || (request.getColors() != null && !request.getColors().isEmpty())) {
+            java.util.List<String> sizes = (request.getSizes() != null && !request.getSizes().isEmpty())
+                    ? request.getSizes() : java.util.List.of(saved.getSize() != null ? saved.getSize() : "Freesize");
+            java.util.List<String> colors = (request.getColors() != null && !request.getColors().isEmpty())
+                    ? request.getColors() : java.util.List.of(saved.getColor() != null ? saved.getColor() : "Mặc định");
+
+            for (String size : sizes) {
+                for (String color : colors) {
+                    String sku = generateVariantSku(saved.getCode(), size, color);
+                    String barcode = generateUniqueBarcode();
+                    com.bizpos.entity.ProductVariant variant = com.bizpos.entity.ProductVariant.builder()
+                            .product(saved)
+                            .sku(sku)
+                            .barcode(barcode)
+                            .size(size != null ? size.trim() : null)
+                            .color(color != null ? color.trim() : null)
+                            .price(saved.getPrice())
+                            .stockQuantity(saved.getStockQuantity() != null ? saved.getStockQuantity() : 0)
+                            .isActive(true)
+                            .build();
+                    productVariantRepository.save(variant);
+                }
+            }
+        } else {
+            // Tạo 1 biến thể mặc định
+            com.bizpos.entity.ProductVariant defaultVariant = com.bizpos.entity.ProductVariant.builder()
+                    .product(saved)
+                    .sku(saved.getCode())
+                    .barcode(saved.getCode())
+                    .size(saved.getSize())
+                    .color(saved.getColor())
+                    .price(saved.getPrice())
+                    .stockQuantity(saved.getStockQuantity() != null ? saved.getStockQuantity() : 0)
+                    .isActive(true)
+                    .build();
+            productVariantRepository.save(defaultVariant);
+        }
 
         // Ghi nhận nhập kho ban đầu nếu stockQuantity > 0
         if (saved.getStockQuantity() != null && saved.getStockQuantity() > 0) {
@@ -226,5 +294,96 @@ public class ProductServiceImpl implements ProductService {
         if (request.getCategoryId() == null) {
             throw new IllegalArgumentException("Vui lòng chọn danh mục cho sản phẩm!");
         }
+    }
+
+    @Override
+    @Transactional
+    public com.bizpos.entity.ProductVariant addVariant(Long productId, com.bizpos.dto.ProductVariantRequest request) {
+        Product product = getProductById(productId);
+        if (request == null) {
+            throw new IllegalArgumentException("Dữ liệu biến thể không được để trống!");
+        }
+
+        String size = request.getSize() != null && !request.getSize().trim().isEmpty() ? request.getSize().trim() : null;
+        String color = request.getColor() != null && !request.getColor().trim().isEmpty() ? request.getColor().trim() : null;
+
+        String sku = (request.getSku() != null && !request.getSku().isBlank())
+                ? request.getSku().trim()
+                : generateVariantSku(product.getCode(), size, color);
+
+        if (productVariantRepository.existsBySku(sku)) {
+            throw new DuplicateResourceException("Mã SKU '" + sku + "' đã tồn tại!");
+        }
+
+        String barcode = (request.getBarcode() != null && !request.getBarcode().isBlank())
+                ? request.getBarcode().trim()
+                : generateUniqueBarcode();
+
+        if (productVariantRepository.existsByBarcode(barcode)) {
+            throw new DuplicateResourceException("Mã Barcode '" + barcode + "' đã tồn tại!");
+        }
+
+        BigDecimal price = request.getPrice() != null ? request.getPrice() : product.getPrice();
+        int stock = request.getStockQuantity() != null ? request.getStockQuantity() : 0;
+
+        com.bizpos.entity.ProductVariant variant = com.bizpos.entity.ProductVariant.builder()
+                .product(product)
+                .sku(sku)
+                .barcode(barcode)
+                .size(size)
+                .color(color)
+                .price(price)
+                .costPrice(request.getCostPrice())
+                .stockQuantity(stock)
+                .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+                .build();
+
+        return productVariantRepository.save(variant);
+    }
+
+    @Override
+    public List<com.bizpos.entity.ProductVariant> getVariantsByProductId(Long productId) {
+        if (!productRepository.existsById(productId)) {
+            throw new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + productId);
+        }
+        return productVariantRepository.findByProductId(productId);
+    }
+
+    @Override
+    public com.bizpos.entity.ProductVariant getVariantById(Long variantId) {
+        return productVariantRepository.findById(variantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với ID: " + variantId));
+    }
+
+    @Override
+    public com.bizpos.entity.ProductVariant getVariantByBarcode(String barcode) {
+        if (barcode == null || barcode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Mã barcode không được để trống!");
+        }
+        return productVariantRepository.findByBarcodeWithProduct(barcode.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với mã Barcode: " + barcode));
+    }
+
+    @Override
+    public List<com.bizpos.entity.ProductVariant> searchVariants(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return productVariantRepository.searchActiveVariants(keyword.trim());
+    }
+
+    private String generateVariantSku(String baseCode, String size, String color) {
+        String s = (size != null && !size.isBlank()) ? size.replaceAll("\\s+", "").toUpperCase() : "DEF";
+        String c = (color != null && !color.isBlank()) ? color.replaceAll("\\s+", "").toUpperCase() : "DEF";
+        return baseCode + "-" + c + "-" + s;
+    }
+
+    private String generateUniqueBarcode() {
+        String barcode;
+        do {
+            long rnd = Math.abs(System.nanoTime() + java.util.concurrent.ThreadLocalRandom.current().nextLong(1000000));
+            barcode = "893" + String.format("%09d", rnd % 1000000000L);
+        } while (productVariantRepository.existsByBarcode(barcode));
+        return barcode;
     }
 }

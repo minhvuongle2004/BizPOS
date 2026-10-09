@@ -142,4 +142,61 @@ public class ProductController {
         ProductImportResultResponse result = productExcelService.importProductsFromExcel(file);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * 10. Lấy danh sách tất cả biến thể của một sản phẩm
+     * GET /api/products/{id}/variants
+     */
+    @GetMapping("/{id}/variants")
+    public ResponseEntity<List<com.bizpos.dto.ProductVariantResponse>> getVariantsByProductId(@PathVariable Long id) {
+        List<com.bizpos.dto.ProductVariantResponse> responses = productService.getVariantsByProductId(id).stream()
+                .map(com.bizpos.dto.ProductVariantResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 11. Thêm biến thể mới cho một sản phẩm (Size, Màu, Barcode, Giá, Tồn kho)
+     * POST /api/products/{id}/variants
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/variants")
+    public ResponseEntity<com.bizpos.dto.ProductVariantResponse> addVariant(
+            @PathVariable Long id,
+            @jakarta.validation.Valid @RequestBody com.bizpos.dto.ProductVariantRequest request) {
+        com.bizpos.entity.ProductVariant variant = productService.addVariant(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(com.bizpos.dto.ProductVariantResponse.fromEntity(variant));
+    }
+
+    /**
+     * 12. Lấy thông tin biến thể theo ID
+     * GET /api/products/variants/{variantId}
+     */
+    @GetMapping("/variants/{variantId}")
+    public ResponseEntity<com.bizpos.dto.ProductVariantResponse> getVariantById(@PathVariable Long variantId) {
+        com.bizpos.entity.ProductVariant variant = productService.getVariantById(variantId);
+        return ResponseEntity.ok(com.bizpos.dto.ProductVariantResponse.fromEntity(variant));
+    }
+
+    /**
+     * 13. Tra cứu biến thể theo mã Barcode (dành cho máy quét mã vạch POS / Đổi trả)
+     * GET /api/products/variants/barcode/{barcode}
+     */
+    @GetMapping("/variants/barcode/{barcode}")
+    public ResponseEntity<com.bizpos.dto.ProductVariantResponse> getVariantByBarcode(@PathVariable String barcode) {
+        com.bizpos.entity.ProductVariant variant = productService.getVariantByBarcode(barcode);
+        return ResponseEntity.ok(com.bizpos.dto.ProductVariantResponse.fromEntity(variant));
+    }
+
+    /**
+     * 14. Tìm kiếm biến thể theo từ khóa (Mã SKU, Barcode, Tên sản phẩm, Mã sản phẩm)
+     * GET /api/products/variants/search?keyword=...
+     */
+    @GetMapping("/variants/search")
+    public ResponseEntity<List<com.bizpos.dto.ProductVariantResponse>> searchVariants(@RequestParam(required = false) String keyword) {
+        List<com.bizpos.dto.ProductVariantResponse> responses = productService.searchVariants(keyword).stream()
+                .map(com.bizpos.dto.ProductVariantResponse::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
+    }
 }

@@ -11,6 +11,9 @@ import java.math.BigDecimal;
 @Builder
 public class EligibleReturnItemResponse {
     private Long productId;
+    private Long variantId;
+    private String variantSku;
+    private String variantBarcode;
     private String productCode;
     private String productName;
     private String size;

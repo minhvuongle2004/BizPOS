@@ -15,8 +15,15 @@ import lombok.Setter;
 @Builder
 public class OrderItemRequest {
 
-    @NotNull(message = "Vui lòng cung cấp productId cho từng mục hàng!")
+    /**
+     * ID sản phẩm (Dùng khi mua sản phẩm đơn hoặc client cũ gửi lên để tương thích ngược)
+     */
     private Long productId;
+
+    /**
+     * ID biến thể cụ thể (Size, Color, SKU)
+     */
+    private Long variantId;
 
     @NotNull(message = "Số lượng mua không được để trống!")
     @Min(value = 1, message = "Số lượng mua cho từng sản phẩm phải lớn hơn 0!")

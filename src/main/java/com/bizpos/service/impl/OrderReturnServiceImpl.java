@@ -43,6 +43,7 @@ public class OrderReturnServiceImpl implements OrderReturnService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final StockMovementService stockMovementService;
+    private final com.bizpos.repository.ProductVariantRepository productVariantRepository;
 
     @Override
     @Transactional
@@ -72,37 +73,67 @@ public class OrderReturnServiceImpl implements OrderReturnService {
             throw new IllegalArgumentException("Vui lòng chọn ít nhất 1 sản phẩm cần trả lại!");
         }
 
-        // Map danh sách OrderItem gốc theo productId để tra cứu giá mua và số lượng đã mua
-        Map<Long, OrderItem> orderItemMap = order.getItems().stream()
-                .collect(Collectors.toMap(item -> item.getProduct().getId(), item -> item, (item1, item2) -> item1));
-
         // 2. Tạo mã phiếu đổi trả duy nhất
         String returnCode = generateUniqueReturnCode();
         String currentUser = getCurrentUsername();
 
-        // 3. Gom tất cả productIds (cả return và exchange) rồi sắp xếp tăng dần để PESSIMISTIC LOCK phòng chống DEADLOCK
+        // 3. Gom tất cả productIds và variantIds rồi sắp xếp tăng dần để PESSIMISTIC LOCK phòng chống DEADLOCK
         Set<Long> allProductIds = new TreeSet<>();
+        Set<Long> allVariantIds = new TreeSet<>();
+
         for (ReturnItemRequest ri : request.getReturnItems()) {
-            if (ri.getProductId() == null || ri.getQuantity() == null || ri.getQuantity() <= 0) {
+            if ((ri.getProductId() == null && ri.getVariantId() == null) || ri.getQuantity() == null || ri.getQuantity() <= 0) {
                 throw new IllegalArgumentException("Thông tin sản phẩm trả lại không hợp lệ!");
             }
-            allProductIds.add(ri.getProductId());
-        }
-        if (request.getExchangeItems() != null) {
-            for (ExchangeItemRequest ei : request.getExchangeItems()) {
-                if (ei.getProductId() == null || ei.getQuantity() == null || ei.getQuantity() <= 0) {
-                    throw new IllegalArgumentException("Thông tin sản phẩm đổi lấy mới không hợp lệ!");
-                }
-                allProductIds.add(ei.getProductId());
+            OrderItem match = null;
+            if (ri.getVariantId() != null) {
+                match = order.getItems().stream()
+                        .filter(item -> item.getVariant() != null && item.getVariant().getId().equals(ri.getVariantId()))
+                        .findFirst().orElse(null);
+            }
+            if (match == null && ri.getProductId() != null) {
+                match = order.getItems().stream()
+                        .filter(item -> item.getProduct().getId().equals(ri.getProductId()))
+                        .findFirst().orElse(null);
+            }
+            if (match == null) {
+                throw new IllegalArgumentException("Sản phẩm yêu cầu trả lại không có trong đơn hàng gốc " + orderCode + "!");
+            }
+            allProductIds.add(match.getProduct().getId());
+            if (match.getVariant() != null) {
+                allVariantIds.add(match.getVariant().getId());
             }
         }
 
-        // Lock tất cả sản phẩm liên quan
+        if (request.getExchangeItems() != null) {
+            for (ExchangeItemRequest ei : request.getExchangeItems()) {
+                if ((ei.getProductId() == null && ei.getVariantId() == null) || ei.getQuantity() == null || ei.getQuantity() <= 0) {
+                    throw new IllegalArgumentException("Thông tin sản phẩm đổi lấy mới không hợp lệ!");
+                }
+                if (ei.getVariantId() != null) {
+                    allVariantIds.add(ei.getVariantId());
+                    ProductVariant v = productVariantRepository.findById(ei.getVariantId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với ID: " + ei.getVariantId()));
+                    allProductIds.add(v.getProduct().getId());
+                } else {
+                    allProductIds.add(ei.getProductId());
+                }
+            }
+        }
+
+        // Lock tất cả sản phẩm & biến thể liên quan theo thứ tự ID tăng dần
         Map<Long, Product> lockedProductMap = new HashMap<>();
         for (Long pid : allProductIds) {
             Product p = productRepository.findByIdWithLock(pid)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + pid));
             lockedProductMap.put(pid, p);
+        }
+
+        Map<Long, ProductVariant> lockedVariantMap = new HashMap<>();
+        for (Long vid : allVariantIds) {
+            ProductVariant pv = productVariantRepository.findByIdWithLock(vid)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với ID: " + vid));
+            lockedVariantMap.put(vid, pv);
         }
 
         // 4. Khởi tạo đối tượng OrderReturn
@@ -123,13 +154,28 @@ public class OrderReturnServiceImpl implements OrderReturnService {
 
         // 5. Xử lý các món trả lại (RETURN ITEMS)
         for (ReturnItemRequest ri : request.getReturnItems()) {
-            OrderItem originalItem = orderItemMap.get(ri.getProductId());
+            OrderItem originalItem = null;
+            if (ri.getVariantId() != null) {
+                originalItem = order.getItems().stream()
+                        .filter(item -> item.getVariant() != null && item.getVariant().getId().equals(ri.getVariantId()))
+                        .findFirst().orElse(null);
+            }
+            if (originalItem == null && ri.getProductId() != null) {
+                originalItem = order.getItems().stream()
+                        .filter(item -> item.getProduct().getId().equals(ri.getProductId()))
+                        .findFirst().orElse(null);
+            }
             if (originalItem == null) {
-                throw new IllegalArgumentException("Sản phẩm ID " + ri.getProductId() + " không có trong đơn hàng gốc " + orderCode + "!");
+                throw new IllegalArgumentException("Sản phẩm ID " + (ri.getVariantId() != null ? ri.getVariantId() : ri.getProductId()) + " không có trong đơn hàng gốc " + orderCode + "!");
             }
 
             int purchasedQty = originalItem.getQuantity();
-            int alreadyReturnedQty = orderReturnRepository.countReturnedQuantityByOrderAndProduct(order.getId(), ri.getProductId());
+            int alreadyReturnedQty;
+            if (originalItem.getVariant() != null) {
+                alreadyReturnedQty = orderReturnRepository.countReturnedQuantityByOrderAndVariant(order.getId(), originalItem.getVariant().getId());
+            } else {
+                alreadyReturnedQty = orderReturnRepository.countReturnedQuantityByOrderAndProduct(order.getId(), originalItem.getProduct().getId());
+            }
             int remainingAllowedQty = purchasedQty - alreadyReturnedQty;
 
             if (ri.getQuantity() > remainingAllowedQty) {
@@ -138,28 +184,59 @@ public class OrderReturnServiceImpl implements OrderReturnService {
                         ", đã trả trước đó: " + alreadyReturnedQty + "), yêu cầu trả: " + ri.getQuantity() + "!");
             }
 
-            Product product = lockedProductMap.get(ri.getProductId());
-            int oldStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+            Product product = lockedProductMap.get(originalItem.getProduct().getId());
+            ProductVariant variant = originalItem.getVariant() != null ? lockedVariantMap.get(originalItem.getVariant().getId()) : null;
             int returnQty = ri.getQuantity();
-            int newStock = oldStock + returnQty;
-
-            // Tăng tồn kho
-            product.setStockQuantity(newStock);
-            productRepository.save(product);
 
             ReturnReason itemReason = ri.getReason() != null ? ri.getReason() : request.getReason();
 
-            // Ghi nhật ký kho loại RETURN
-            stockMovementService.recordMovement(
-                    product,
-                    MovementType.RETURN,
-                    returnQty,
-                    oldStock,
-                    newStock,
-                    returnCode,
-                    "Khách trả hàng [Đơn: " + orderCode + "] - Lý do: " + itemReason.getDescription(),
-                    currentUser
-            );
+            // Tăng tồn kho
+            if (variant != null) {
+                int oldVarStock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+                int newVarStock = oldVarStock + returnQty;
+                variant.setStockQuantity(newVarStock);
+                productVariantRepository.save(variant);
+
+                int oldProdStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                int newProdStock = oldProdStock + returnQty;
+                product.setStockQuantity(newProdStock);
+                productRepository.save(product);
+
+                stockMovementService.recordMovement(
+                        product,
+                        variant,
+                        MovementType.RETURN,
+                        returnQty,
+                        oldVarStock,
+                        newVarStock,
+                        returnCode,
+                        "Khách trả hàng biến thể [" + variant.getSku() + "] [Đơn: " + orderCode + "] - Lý do: " + itemReason.getDescription(),
+                        currentUser
+                );
+            } else {
+                int oldStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                int newStock = oldStock + returnQty;
+                product.setStockQuantity(newStock);
+                productRepository.save(product);
+
+                List<ProductVariant> vars = productVariantRepository.findByProductId(product.getId());
+                if (!vars.isEmpty()) {
+                    ProductVariant firstVar = vars.get(0);
+                    firstVar.setStockQuantity((firstVar.getStockQuantity() != null ? firstVar.getStockQuantity() : 0) + returnQty);
+                    productVariantRepository.save(firstVar);
+                }
+
+                stockMovementService.recordMovement(
+                        product,
+                        MovementType.RETURN,
+                        returnQty,
+                        oldStock,
+                        newStock,
+                        returnCode,
+                        "Khách trả hàng [Đơn: " + orderCode + "] - Lý do: " + itemReason.getDescription(),
+                        currentUser
+                );
+            }
 
             BigDecimal unitPrice = originalItem.getUnitPrice();
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(returnQty));
@@ -167,10 +244,11 @@ public class OrderReturnServiceImpl implements OrderReturnService {
 
             OrderReturnItem returnItem = OrderReturnItem.builder()
                     .product(product)
+                    .variant(variant)
                     .productCode(product.getCode())
                     .productName(product.getName())
-                    .size(product.getSize())
-                    .color(product.getColor())
+                    .size(variant != null && variant.getSize() != null ? variant.getSize() : product.getSize())
+                    .color(variant != null && variant.getColor() != null ? variant.getColor() : product.getColor())
                     .quantity(returnQty)
                     .unitPrice(unitPrice)
                     .lineTotal(lineTotal)
@@ -185,41 +263,89 @@ public class OrderReturnServiceImpl implements OrderReturnService {
         BigDecimal totalExchangeAmount = BigDecimal.ZERO;
         if (hasExchangeItems) {
             for (ExchangeItemRequest ei : request.getExchangeItems()) {
-                Product product = lockedProductMap.get(ei.getProductId());
-                int oldStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
                 int requestedQty = ei.getQuantity();
+                Product product;
+                ProductVariant variant = null;
+                BigDecimal unitPrice;
 
-                if (requestedQty > oldStock) {
-                    throw new InsufficientStockException("Sản phẩm đổi mới '" + product.getName() + 
-                            "' (Mã: " + product.getCode() + ") không đủ tồn kho (Hiện có: " + oldStock + ", yêu cầu: " + requestedQty + ")!");
+                if (ei.getVariantId() != null) {
+                    variant = lockedVariantMap.get(ei.getVariantId());
+                    product = lockedProductMap.get(variant.getProduct().getId());
+
+                    int oldStock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+                    if (requestedQty > oldStock) {
+                        throw new InsufficientStockException("Biến thể '" + product.getName() + 
+                                "' (SKU: " + variant.getSku() + ", Size: " + variant.getSize() + ", Màu: " + variant.getColor() + 
+                                ") không đủ tồn kho (Hiện có: " + oldStock + ", yêu cầu: " + requestedQty + ")!");
+                    }
+
+                    int newStock = oldStock - requestedQty;
+                    variant.setStockQuantity(newStock);
+                    productVariantRepository.save(variant);
+
+                    if (product.getStockQuantity() != null && product.getStockQuantity() >= requestedQty) {
+                        product.setStockQuantity(product.getStockQuantity() - requestedQty);
+                        productRepository.save(product);
+                    }
+
+                    stockMovementService.recordMovement(
+                            product,
+                            variant,
+                            MovementType.SALE,
+                            requestedQty,
+                            oldStock,
+                            newStock,
+                            returnCode,
+                            "Khách đổi lấy biến thể mới [" + variant.getSku() + "] theo phiếu " + returnCode + " (Đơn gốc: " + orderCode + ")",
+                            currentUser
+                    );
+
+                    unitPrice = variant.getPrice() != null ? variant.getPrice() : product.getPrice();
+                } else {
+                    product = lockedProductMap.get(ei.getProductId());
+                    int oldStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                    if (requestedQty > oldStock) {
+                        throw new InsufficientStockException("Sản phẩm đổi mới '" + product.getName() + 
+                                "' (Mã: " + product.getCode() + ") không đủ tồn kho (Hiện có: " + oldStock + ", yêu cầu: " + requestedQty + ")!");
+                    }
+
+                    int newStock = oldStock - requestedQty;
+                    product.setStockQuantity(newStock);
+                    productRepository.save(product);
+
+                    List<ProductVariant> vars = productVariantRepository.findByProductId(product.getId());
+                    if (!vars.isEmpty()) {
+                        variant = vars.get(0);
+                        if (variant.getStockQuantity() != null && variant.getStockQuantity() >= requestedQty) {
+                            variant.setStockQuantity(variant.getStockQuantity() - requestedQty);
+                            productVariantRepository.save(variant);
+                        }
+                    }
+
+                    stockMovementService.recordMovement(
+                            product,
+                            MovementType.SALE,
+                            requestedQty,
+                            oldStock,
+                            newStock,
+                            returnCode,
+                            "Khách đổi lấy món mới theo phiếu " + returnCode + " (Đơn gốc: " + orderCode + ")",
+                            currentUser
+                    );
+
+                    unitPrice = product.getPrice();
                 }
 
-                int newStock = oldStock - requestedQty;
-                product.setStockQuantity(newStock);
-                productRepository.save(product);
-
-                // Ghi nhật ký kho loại SALE
-                stockMovementService.recordMovement(
-                        product,
-                        MovementType.SALE,
-                        requestedQty,
-                        oldStock,
-                        newStock,
-                        returnCode,
-                        "Khách đổi lấy món mới theo phiếu " + returnCode + " (Đơn gốc: " + orderCode + ")",
-                        currentUser
-                );
-
-                BigDecimal unitPrice = product.getPrice();
                 BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(requestedQty));
                 totalExchangeAmount = totalExchangeAmount.add(lineTotal);
 
                 OrderExchangeItem exchangeItem = OrderExchangeItem.builder()
                         .product(product)
+                        .variant(variant)
                         .productCode(product.getCode())
                         .productName(product.getName())
-                        .size(product.getSize())
-                        .color(product.getColor())
+                        .size(variant != null && variant.getSize() != null ? variant.getSize() : product.getSize())
+                        .color(variant != null && variant.getColor() != null ? variant.getColor() : product.getColor())
                         .quantity(requestedQty)
                         .unitPrice(unitPrice)
                         .lineTotal(lineTotal)
@@ -271,16 +397,22 @@ public class OrderReturnServiceImpl implements OrderReturnService {
         if (order.getItems() != null) {
             for (OrderItem oi : order.getItems()) {
                 Product p = oi.getProduct();
+                ProductVariant v = oi.getVariant();
                 int purchasedQty = oi.getQuantity();
-                int alreadyReturned = orderReturnRepository.countReturnedQuantityByOrderAndProduct(order.getId(), p.getId());
+                int alreadyReturned = (v != null)
+                        ? orderReturnRepository.countReturnedQuantityByOrderAndVariant(order.getId(), v.getId())
+                        : orderReturnRepository.countReturnedQuantityByOrderAndProduct(order.getId(), p.getId());
                 int remaining = Math.max(0, purchasedQty - alreadyReturned);
 
                 itemResponses.add(EligibleReturnItemResponse.builder()
                         .productId(p.getId())
+                        .variantId(v != null ? v.getId() : null)
+                        .variantSku(v != null ? v.getSku() : null)
+                        .variantBarcode(v != null ? v.getBarcode() : null)
                         .productCode(p.getCode())
                         .productName(oi.getProductName())
-                        .size(p.getSize())
-                        .color(p.getColor())
+                        .size(v != null && v.getSize() != null ? v.getSize() : p.getSize())
+                        .color(v != null && v.getColor() != null ? v.getColor() : p.getColor())
                         .unitPrice(oi.getUnitPrice())
                         .purchasedQuantity(purchasedQty)
                         .alreadyReturnedQuantity(alreadyReturned)

@@ -46,6 +46,9 @@ public class ProductServiceTest {
     @Mock
     private StockMovementService stockMovementService;
 
+    @Mock
+    private com.bizpos.repository.ProductVariantRepository productVariantRepository;
+
     @InjectMocks
     private ProductServiceImpl productService;
 
@@ -54,6 +57,8 @@ public class ProductServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(productVariantRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
         sampleCategory = Category.builder()
                 .id(1L)
                 .name("Đồ uống")

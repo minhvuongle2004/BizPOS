@@ -38,6 +38,25 @@ public class StockMovementServiceImpl implements StockMovementService {
             String referenceCode,
             String reason,
             String createdBy) {
+        return recordMovement(product, null, type, quantity, previousStock, currentStock, referenceCode, reason, createdBy);
+    }
+
+    @Override
+    @Transactional
+    public StockMovement recordMovement(
+            Product product,
+            com.bizpos.entity.ProductVariant variant,
+            MovementType type,
+            int quantity,
+            int previousStock,
+            int currentStock,
+            String referenceCode,
+            String reason,
+            String createdBy) {
+
+        if (product == null && variant != null) {
+            product = variant.getProduct();
+        }
 
         if (product == null) {
             throw new IllegalArgumentException("Sản phẩm không được để trống khi ghi nhật ký kho!");
@@ -53,6 +72,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         StockMovement movement = StockMovement.builder()
                 .product(product)
+                .variant(variant)
                 .type(type)
                 .quantity(quantity)
                 .previousStock(previousStock)

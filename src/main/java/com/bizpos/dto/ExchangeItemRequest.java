@@ -12,8 +12,15 @@ import lombok.*;
 @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public class ExchangeItemRequest {
 
-    @NotNull(message = "Vui lòng chọn sản phẩm muốn đổi lấy mới")
+    /**
+     * ID sản phẩm mẫu (dùng cho client cũ hoặc tương thích ngược)
+     */
     private Long productId;
+
+    /**
+     * ID biến thể cụ thể muốn đổi lấy (Size, Màu, SKU)
+     */
+    private Long variantId;
 
     @NotNull(message = "Vui lòng nhập số lượng đổi lấy mới")
     @Min(value = 1, message = "Số lượng đổi lấy mới phải lớn hơn hoặc bằng 1")

@@ -39,4 +39,19 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     @Query("SELECT COUNT(pv) FROM ProductVariant pv WHERE pv.stockQuantity <= :threshold AND pv.isActive = true")
     long countLowStockVariants(@Param("threshold") Integer threshold);
+
+    @Query("SELECT pv FROM ProductVariant pv " +
+           "JOIN FETCH pv.product p " +
+           "WHERE pv.barcode = :barcode")
+    Optional<ProductVariant> findByBarcodeWithProduct(@Param("barcode") String barcode);
+
+    @Query("SELECT pv FROM ProductVariant pv " +
+           "JOIN FETCH pv.product p " +
+           "WHERE pv.isActive = true AND (" +
+           "LOWER(pv.sku) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(pv.barcode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+           ") ORDER BY p.name ASC, pv.size ASC")
+    List<ProductVariant> searchActiveVariants(@Param("keyword") String keyword);
 }

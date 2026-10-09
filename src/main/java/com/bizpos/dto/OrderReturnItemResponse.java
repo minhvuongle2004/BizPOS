@@ -14,6 +14,9 @@ import java.math.BigDecimal;
 public class OrderReturnItemResponse {
     private Long id;
     private Long productId;
+    private Long variantId;
+    private String variantSku;
+    private String variantBarcode;
     private String productCode;
     private String productName;
     private String size;
@@ -30,6 +33,9 @@ public class OrderReturnItemResponse {
         return OrderReturnItemResponse.builder()
                 .id(item.getId())
                 .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                .variantId(item.getVariant() != null ? item.getVariant().getId() : null)
+                .variantSku(item.getVariant() != null ? item.getVariant().getSku() : null)
+                .variantBarcode(item.getVariant() != null ? item.getVariant().getBarcode() : null)
                 .productCode(item.getProductCode())
                 .productName(item.getProductName())
                 .size(item.getSize())

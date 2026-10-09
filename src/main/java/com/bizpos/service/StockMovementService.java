@@ -26,6 +26,20 @@ public interface StockMovementService {
             String createdBy);
 
     /**
+     * Ghi nhận một biến động kho chi tiết tới từng biến thể (ProductVariant)
+     */
+    StockMovement recordMovement(
+            Product product,
+            com.bizpos.entity.ProductVariant variant,
+            MovementType type,
+            int quantity,
+            int previousStock,
+            int currentStock,
+            String referenceCode,
+            String reason,
+            String createdBy);
+
+    /**
      * Lấy toàn bộ lịch sử biến động kho của 1 sản phẩm
      */
     List<StockMovementResponse> getMovementsByProductId(Long productId);

@@ -49,6 +49,9 @@ public class OrderServiceTest {
     @Mock
     private StockMovementService stockMovementService;
 
+    @Mock
+    private com.bizpos.repository.ProductVariantRepository productVariantRepository;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 

@@ -30,6 +30,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
     private final com.bizpos.service.StockMovementService stockMovementService;
+    private final com.bizpos.repository.ProductVariantRepository productVariantRepository;
 
     /**
      * Tạo đơn hàng mới kết hợp Customer, Product, Order và OrderItem
@@ -60,51 +61,103 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal totalAmount = BigDecimal.ZERO;
 
-        // Sắp xếp items theo productId tăng dần để phòng chống triệt để nguy cơ DEADLOCK giữa các transaction đồng thời
+        // Sắp xếp items theo identifier tăng dần để phòng chống triệt để nguy cơ DEADLOCK giữa các transaction đồng thời
         List<OrderItemRequest> sortedItems = request.getItems().stream()
-                .sorted(java.util.Comparator.comparing(OrderItemRequest::getProductId))
+                .sorted(java.util.Comparator.comparing(i -> i.getVariantId() != null ? i.getVariantId() : (i.getProductId() != null ? i.getProductId() : 0L)))
                 .toList();
 
         for (OrderItemRequest itemReq : sortedItems) {
-            if (itemReq.getProductId() == null) {
-                throw new IllegalArgumentException("Vui lòng cung cấp productId cho từng mục hàng!");
+            if (itemReq.getProductId() == null && itemReq.getVariantId() == null) {
+                throw new IllegalArgumentException("Vui lòng cung cấp productId hoặc variantId cho từng mục hàng!");
             }
             if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
                 throw new IllegalArgumentException("Số lượng mua cho từng sản phẩm phải lớn hơn 0!");
             }
 
-            // 2. Lấy từng Product theo productId với Pessimistic Lock (SELECT ... FOR UPDATE)
-            Product product = productRepository.findByIdWithLock(itemReq.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
-
-            // KIỂM TRA VÀ TRỪ TỒN KHO:
-            int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
             int requestedQty = itemReq.getQuantity();
+            Product product;
+            com.bizpos.entity.ProductVariant variant = null;
+            BigDecimal unitPrice;
+            int currentStock;
+            int newStock;
 
-            if (requestedQty > currentStock) {
-                throw new com.bizpos.exception.InsufficientStockException(
-                        "Sản phẩm '" + product.getName() + "' (Mã: " + product.getCode() + 
-                        ") không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
+            // 2. Ưu tiên xử lý theo Variant nếu có variantId
+            if (itemReq.getVariantId() != null) {
+                variant = productVariantRepository.findByIdWithLock(itemReq.getVariantId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể sản phẩm với ID: " + itemReq.getVariantId()));
+                product = variant.getProduct();
+
+                currentStock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+                if (requestedQty > currentStock) {
+                    throw new com.bizpos.exception.InsufficientStockException(
+                            "Biến thể '" + product.getName() + " (Size: " + variant.getSize() + ", Màu: " + variant.getColor() + ")' không đủ tồn kho (Hiện có: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
+                }
+
+                newStock = currentStock - requestedQty;
+                variant.setStockQuantity(newStock);
+                productVariantRepository.save(variant);
+
+                // Đồng bộ tồn kho trên Product cha nếu cần
+                if (product.getStockQuantity() != null && product.getStockQuantity() >= requestedQty) {
+                    product.setStockQuantity(product.getStockQuantity() - requestedQty);
+                    productRepository.save(product);
+                }
+
+                unitPrice = variant.getPrice() != null ? variant.getPrice() : product.getPrice();
+
+                // Ghi nhật ký kho với Variant
+                stockMovementService.recordMovement(
+                        product,
+                        variant,
+                        com.bizpos.entity.MovementType.SALE,
+                        requestedQty,
+                        currentStock,
+                        newStock,
+                        orderCode,
+                        "Xuất kho bán hàng biến thể [" + variant.getSku() + "] theo đơn " + orderCode,
+                        getCurrentUsername()
+                );
+            } else {
+                // Fallback theo productId để tương thích ngược
+                product = productRepository.findByIdWithLock(itemReq.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
+
+                currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                if (requestedQty > currentStock) {
+                    throw new com.bizpos.exception.InsufficientStockException(
+                            "Sản phẩm '" + product.getName() + "' (Mã: " + product.getCode() + 
+                            ") không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
+                }
+
+                newStock = currentStock - requestedQty;
+                product.setStockQuantity(newStock);
+                productRepository.save(product);
+
+                // Tìm variant liên kết để đồng bộ
+                java.util.List<com.bizpos.entity.ProductVariant> vars = productVariantRepository.findByProductId(product.getId());
+                if (!vars.isEmpty()) {
+                    variant = vars.get(0);
+                    if (variant.getStockQuantity() != null && variant.getStockQuantity() >= requestedQty) {
+                        variant.setStockQuantity(variant.getStockQuantity() - requestedQty);
+                        productVariantRepository.save(variant);
+                    }
+                }
+
+                unitPrice = product.getPrice();
+
+                // Ghi nhật ký kho
+                stockMovementService.recordMovement(
+                        product,
+                        variant,
+                        com.bizpos.entity.MovementType.SALE,
+                        requestedQty,
+                        currentStock,
+                        newStock,
+                        orderCode,
+                        "Xuất kho bán hàng theo đơn " + orderCode,
+                        getCurrentUsername()
+                );
             }
-
-            int newStock = currentStock - requestedQty;
-            product.setStockQuantity(newStock);
-            productRepository.save(product);
-
-            // Ghi nhật ký kho (Stock Movement Ledger)
-            stockMovementService.recordMovement(
-                    product,
-                    com.bizpos.entity.MovementType.SALE,
-                    requestedQty,
-                    currentStock,
-                    newStock,
-                    orderCode,
-                    "Xuất kho bán hàng theo đơn " + orderCode,
-                    getCurrentUsername()
-            );
-
-            // 3. Lấy giá từ product.price; tuyệt đối không lấy giá từ request
-            BigDecimal unitPrice = product.getPrice();
 
             // 4. Tạo từng OrderItem gồm tên sản phẩm, đơn giá, số lượng và thành tiền
             int quantity = itemReq.getQuantity();
@@ -112,6 +165,7 @@ public class OrderServiceImpl implements OrderService {
 
             OrderItem orderItem = OrderItem.builder()
                     .product(product)
+                    .variant(variant)
                     .productName(product.getName())
                     .unitPrice(unitPrice)
                     .quantity(quantity)

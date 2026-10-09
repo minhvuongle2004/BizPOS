@@ -48,4 +48,19 @@ public class ProductRequest {
 
     @NotNull(message = "Vui lòng chọn danh mục cho sản phẩm!")
     private Long categoryId;
+
+    /**
+     * Danh sách biến thể chi tiết (nếu người dùng cấu hình thủ công từng SKU)
+     */
+    private java.util.List<ProductVariantRequest> variants;
+
+    /**
+     * Danh sách kích cỡ để sinh ma trận tự động (VD: ["S", "M", "L"])
+     */
+    private java.util.List<String> sizes;
+
+    /**
+     * Danh sách màu sắc để sinh ma trận tự động (VD: ["Đen", "Trắng"])
+     */
+    private java.util.List<String> colors;
 }

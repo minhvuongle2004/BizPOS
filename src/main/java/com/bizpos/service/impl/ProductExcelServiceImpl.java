@@ -30,6 +30,7 @@ public class ProductExcelServiceImpl implements ProductExcelService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final com.bizpos.service.StockMovementService stockMovementService;
+    private final com.bizpos.repository.ProductVariantRepository productVariantRepository;
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
@@ -349,9 +350,25 @@ public class ProductExcelServiceImpl implements ProductExcelService {
             if (!productsToSave.isEmpty()) {
                 List<Product> savedProducts = productRepository.saveAll(productsToSave);
                 for (Product sp : savedProducts) {
+                    // Tự động tạo ProductVariant tương ứng cho sản phẩm import
+                    String sku = generateVariantSku(sp.getCode(), sp.getSize(), sp.getColor());
+                    String barcode = generateUniqueBarcode();
+                    com.bizpos.entity.ProductVariant variant = com.bizpos.entity.ProductVariant.builder()
+                            .product(sp)
+                            .sku(sku)
+                            .barcode(barcode)
+                            .size(sp.getSize())
+                            .color(sp.getColor())
+                            .price(sp.getPrice())
+                            .stockQuantity(sp.getStockQuantity() != null ? sp.getStockQuantity() : 0)
+                            .isActive(true)
+                            .build();
+                    variant = productVariantRepository.save(variant);
+
                     if (sp.getStockQuantity() != null && sp.getStockQuantity() > 0) {
                         stockMovementService.recordMovement(
                                 sp,
+                                variant,
                                 com.bizpos.entity.MovementType.IMPORT,
                                 sp.getStockQuantity(),
                                 0,
@@ -362,7 +379,7 @@ public class ProductExcelServiceImpl implements ProductExcelService {
                         );
                     }
                 }
-                log.info("Import thành công {} sản phẩm từ Excel", productsToSave.size());
+                log.info("Import thành công {} sản phẩm từ Excel (kèm biến thể tương ứng)", productsToSave.size());
             }
 
         } catch (IOException e) {
@@ -483,5 +500,20 @@ public class ProductExcelServiceImpl implements ProductExcelService {
             default:
                 return null;
         }
+    }
+
+    private String generateVariantSku(String baseCode, String size, String color) {
+        String s = (size != null && !size.isBlank()) ? size.replaceAll("\\s+", "").toUpperCase() : "DEF";
+        String c = (color != null && !color.isBlank()) ? color.replaceAll("\\s+", "").toUpperCase() : "DEF";
+        return baseCode + "-" + c + "-" + s;
+    }
+
+    private String generateUniqueBarcode() {
+        String barcode;
+        do {
+            long rnd = Math.abs(System.nanoTime() + java.util.concurrent.ThreadLocalRandom.current().nextLong(1000000));
+            barcode = "893" + String.format("%09d", rnd % 1000000000L);
+        } while (productVariantRepository.existsByBarcode(barcode));
+        return barcode;
     }
 }

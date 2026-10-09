@@ -49,6 +49,23 @@ public class OrderReturnResponse {
             custPhone = entity.getOrder().getCustomer().getPhone();
         }
 
+        java.util.Set<Long> returnedProductIds = entity.getReturnItems() != null ?
+                entity.getReturnItems().stream()
+                        .map(ri -> ri.getProduct() != null ? ri.getProduct().getId() : null)
+                        .filter(java.util.Objects::nonNull)
+                        .collect(Collectors.toSet()) :
+                java.util.Collections.emptySet();
+
+        List<OrderExchangeItemResponse> exchangeResponses = entity.getExchangeItems() != null ?
+                entity.getExchangeItems().stream().map(ei -> {
+                    OrderExchangeItemResponse resp = OrderExchangeItemResponse.fromEntity(ei);
+                    if (resp != null && ei.getProduct() != null) {
+                        resp.setIsSameModel(returnedProductIds.contains(ei.getProduct().getId()));
+                    }
+                    return resp;
+                }).collect(Collectors.toList()) :
+                List.of();
+
         return OrderReturnResponse.builder()
                 .id(entity.getId())
                 .returnCode(entity.getReturnCode())
@@ -72,9 +89,7 @@ public class OrderReturnResponse {
                 .returnItems(entity.getReturnItems() != null ?
                         entity.getReturnItems().stream().map(OrderReturnItemResponse::fromEntity).collect(Collectors.toList()) :
                         List.of())
-                .exchangeItems(entity.getExchangeItems() != null ?
-                        entity.getExchangeItems().stream().map(OrderExchangeItemResponse::fromEntity).collect(Collectors.toList()) :
-                        List.of())
+                .exchangeItems(exchangeResponses)
                 .build();
     }
 }

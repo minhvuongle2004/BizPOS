@@ -57,4 +57,29 @@ public interface ProductService {
      * Cập nhật số lượng tồn kho của sản phẩm
      */
     Product updateStock(Long id, Integer quantity);
+
+    /**
+     * Thêm một biến thể mới cho sản phẩm có sẵn
+     */
+    com.bizpos.entity.ProductVariant addVariant(Long productId, com.bizpos.dto.ProductVariantRequest request);
+
+    /**
+     * Lấy toàn bộ biến thể của một sản phẩm
+     */
+    List<com.bizpos.entity.ProductVariant> getVariantsByProductId(Long productId);
+
+    /**
+     * Lấy chi tiết biến thể theo ID
+     */
+    com.bizpos.entity.ProductVariant getVariantById(Long variantId);
+
+    /**
+     * Tìm kiếm biến thể theo Barcode
+     */
+    com.bizpos.entity.ProductVariant getVariantByBarcode(String barcode);
+
+    /**
+     * Tìm kiếm biến thể hoạt động theo từ khóa (Mã SKU, Barcode, Tên sản phẩm, Mã sản phẩm)
+     */
+    List<com.bizpos.entity.ProductVariant> searchVariants(String keyword);
 }

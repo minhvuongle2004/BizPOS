@@ -13,6 +13,9 @@ import java.math.BigDecimal;
 public class OrderExchangeItemResponse {
     private Long id;
     private Long productId;
+    private Long variantId;
+    private String variantSku;
+    private String variantBarcode;
     private String productCode;
     private String productName;
     private String size;
@@ -20,12 +23,16 @@ public class OrderExchangeItemResponse {
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal lineTotal;
+    private Boolean isSameModel;
 
     public static OrderExchangeItemResponse fromEntity(OrderExchangeItem item) {
         if (item == null) return null;
         return OrderExchangeItemResponse.builder()
                 .id(item.getId())
                 .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                .variantId(item.getVariant() != null ? item.getVariant().getId() : null)
+                .variantSku(item.getVariant() != null ? item.getVariant().getSku() : null)
+                .variantBarcode(item.getVariant() != null ? item.getVariant().getBarcode() : null)
                 .productCode(item.getProductCode())
                 .productName(item.getProductName())
                 .size(item.getSize())
