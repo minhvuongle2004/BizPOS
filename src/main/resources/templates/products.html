@@ -187,48 +187,42 @@
                                 <div id="nameError" class="small text-danger mt-1" style="display: none;"></div>
                             </div>
 
-                            <!-- Thuộc tính thời trang: Kích cỡ, Màu sắc, Chất liệu -->
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-4">
-                                    <label class="biz-label" for="modalProductSize">Kích cỡ / Size</label>
-                                    <input type="text" id="modalProductSize" class="biz-input" placeholder="VD: M, L, 30, 41" list="modalSizeOptions" maxlength="30">
-                                    <datalist id="modalSizeOptions">
-                                        <option value="S">
-                                        <option value="M">
-                                        <option value="L">
-                                        <option value="XL">
-                                        <option value="XXL">
-                                        <option value="29">
-                                        <option value="30">
-                                        <option value="31">
-                                        <option value="32">
-                                        <option value="39">
-                                        <option value="40">
-                                        <option value="41">
-                                        <option value="42">
-                                        <option value="Freesize">
-                                    </datalist>
+                            <!-- Ẩn size và color cũ (bảo toàn tương thích cho sửa sản phẩm cũ nếu có) -->
+                            <input type="hidden" id="modalProductSize">
+                            <input type="hidden" id="modalProductColor">
+
+                            <!-- Chất liệu sản phẩm (thuộc tính của Mẫu cha) -->
+                            <div class="mb-3">
+                                <label class="biz-label" for="modalProductMaterial">Chất liệu vải / vật liệu</label>
+                                <input type="text" id="modalProductMaterial" class="biz-input" placeholder="Ví dụ: Cotton 100%, Denim, Lụa tơ tằm, Kaki..." maxlength="100">
+                            </div>
+
+                            <!-- Switch kích hoạt tạo ma trận biến thể Size & Màu sắc -->
+                            <div id="modalVariantToggleWrapper" class="mb-3 p-3 rounded-3 bg-light border d-flex align-items-center justify-content-between">
+                                <div class="me-3">
+                                    <div class="fw-bold text-dark small d-flex align-items-center gap-2 mb-1">
+                                        <i class="bi bi-layers-fill text-danger"></i>
+                                        <span>Sản phẩm có nhiều phiên bản (Size &amp; Màu sắc)</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.8rem; line-height: 1.35;">
+                                        Bật tùy chọn này nếu mẫu có nhiều kích cỡ hoặc màu sắc (Áo, Quần, Giày...). Hệ thống sẽ tự động tạo ma trận biến thể và mã vạch Barcode EAN-13 riêng biệt.
+                                    </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="biz-label" for="modalProductColor">Màu sắc</label>
-                                    <input type="text" id="modalProductColor" class="biz-input" placeholder="VD: Đen, Trắng, Be..." maxlength="50">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="biz-label" for="modalProductMaterial">Chất liệu</label>
-                                    <input type="text" id="modalProductMaterial" class="biz-input" placeholder="VD: Cotton, Denim..." maxlength="100">
+                                <div class="form-check form-switch m-0 flex-shrink-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="toggleVariantMatrix" style="cursor: pointer; width: 2.8em; height: 1.4em;" onchange="handleToggleVariantMatrix(this.checked)">
                                 </div>
                             </div>
 
-                            <!-- Khối sinh ma trận biến thể (Size x Màu) khi thêm mới sản phẩm -->
-                            <div id="modalVariantMatrixBox" class="p-3 mb-3 bg-light rounded-3 border">
+                            <!-- Khối sinh ma trận biến thể (Size x Màu) - Mặc định ẩn, hiện khi switch bật -->
+                            <div id="modalVariantMatrixBox" class="p-3 mb-3 bg-light rounded-3 border d-none">
                                 <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-1">
                                     <label class="biz-label mb-0 fw-bold text-dark d-flex align-items-center gap-1">
                                         <i class="bi bi-grid-3x3-gap-fill text-danger"></i>
-                                        <span>Tạo nhanh ma trận biến thể (Size × Màu sắc)</span>
+                                        <span>Thiết lập ma trận biến thể</span>
                                     </label>
-                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle small px-2 py-1">Tự sinh Barcode EAN-13 & SKU</span>
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle small px-2 py-1">Tự sinh Barcode EAN-13 &amp; SKU</span>
                                 </div>
-                                <div class="small text-muted mb-2">Chọn nhanh các kích cỡ và nhập màu sắc, hệ thống sẽ tự sinh các biến thể SKU & mã vạch riêng biệt:</div>
+                                <div class="small text-muted mb-2">Chọn nhanh các kích cỡ và nhập màu sắc, hệ thống sẽ tự sinh các biến thể SKU &amp; mã vạch riêng biệt:</div>
                                 
                                 <div class="mb-2">
                                     <label class="form-label small text-secondary mb-1 fw-semibold">Kích cỡ (nhấp để chọn / bỏ chọn):</label>
@@ -920,6 +914,17 @@
                 if (noticeEl) noticeEl.classList.add('d-none');
             }
 
+            function handleToggleVariantMatrix(isChecked) {
+                const box = document.getElementById('modalVariantMatrixBox');
+                if (!box) return;
+                if (isChecked) {
+                    box.classList.remove('d-none');
+                } else {
+                    box.classList.add('d-none');
+                    resetMatrixForm();
+                }
+            }
+
             // ================= HÀM TIỆN ÍCH AUTH & HEADERS =================
             function getAuthHeaders() {
                 const token = localStorage.getItem('bizpos_token');
@@ -1505,8 +1510,12 @@
                 if (elMat) elMat.value = '';
                 
                 resetMatrixForm();
+                const toggleSwitch = document.getElementById('toggleVariantMatrix');
+                if (toggleSwitch) toggleSwitch.checked = false;
+                const toggleWrapper = document.getElementById('modalVariantToggleWrapper');
+                if (toggleWrapper) toggleWrapper.classList.remove('d-none');
                 const matrixBox = document.getElementById('modalVariantMatrixBox');
-                if (matrixBox) matrixBox.classList.remove('d-none');
+                if (matrixBox) matrixBox.classList.add('d-none');
 
                 document.getElementById('productModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-danger me-2"></i>Thêm sản phẩm mới';
                 document.getElementById('btnSaveProduct').innerHTML = '<i class="bi bi-check-lg"></i><span>Thêm sản phẩm</span>';
@@ -1540,6 +1549,8 @@
                         if (elMat) elMat.value = p.material || '';
                         document.getElementById('modalProductDescription').value = p.description || '';
 
+                        const toggleWrapper = document.getElementById('modalVariantToggleWrapper');
+                        if (toggleWrapper) toggleWrapper.classList.add('d-none');
                         const matrixBox = document.getElementById('modalVariantMatrixBox');
                         if (matrixBox) matrixBox.classList.add('d-none');
 
@@ -1621,12 +1632,15 @@
                 };
 
                 if (!isEdit) {
-                    const matrixColors = getMatrixColors();
-                    if (selectedMatrixSizes.length > 0) {
-                        payload.sizes = selectedMatrixSizes;
-                    }
-                    if (matrixColors.length > 0) {
-                        payload.colors = matrixColors;
+                    const toggleSwitch = document.getElementById('toggleVariantMatrix');
+                    if (toggleSwitch && toggleSwitch.checked) {
+                        const matrixColors = getMatrixColors();
+                        if (selectedMatrixSizes.length > 0) {
+                            payload.sizes = selectedMatrixSizes;
+                        }
+                        if (matrixColors.length > 0) {
+                            payload.colors = matrixColors;
+                        }
                     }
                 }
                 const url = isEdit ? `/api/products/${id}` : '/api/products';
@@ -2294,6 +2308,9 @@
             window.handleSaveProduct = handleSaveProduct;
             window.openDeleteModal = openDeleteModal;
             window.executeDeleteProduct = executeDeleteProduct;
+            window.handleToggleVariantMatrix = handleToggleVariantMatrix;
+            window.toggleSizeChip = toggleSizeChip;
+            window.updateMatrixPreview = updateMatrixPreview;
             window.goToPage = goToPage;
             window.hideToast = hideToast;
 
