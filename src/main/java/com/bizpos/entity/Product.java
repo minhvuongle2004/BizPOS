@@ -47,4 +47,9 @@ public class Product extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
+
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("product")
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private java.util.List<ProductVariant> variants = new java.util.ArrayList<>();
 }

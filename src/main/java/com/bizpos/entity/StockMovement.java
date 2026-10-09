@@ -25,6 +25,11 @@ public class StockMovement extends BaseEntity {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "variant_id")
+    private ProductVariant variant;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "movement_type", length = 30, nullable = false)
     private MovementType type;
