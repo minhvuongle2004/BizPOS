@@ -299,4 +299,104 @@ public class OrderReturnIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].returnCode").value(created.getReturnCode()));
     }
+
+    @Test
+    @DisplayName("7. Race condition (Đua lệnh): Hai thu ngân cùng xử lý trả cho một hóa đơn đồng thời -> Chỉ 1 người thành công, không bị trả gấp đôi")
+    void processReturn_raceCondition_twoCashiersReturningSameOrder_shouldPreventDoubleReturn() throws Exception {
+        Category category = categoryRepository.findByName("Áo Thời Trang")
+                .orElseGet(() -> categoryRepository.save(Category.builder().name("Áo Thời Trang").build()));
+
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(6);
+
+        // Tạo 1 sản phẩm có 10 cái trong kho
+        Product raceProd = productRepository.save(Product.builder()
+                .code("RACE_PROD_" + suffix)
+                .name("Sản phẩm Test Concurrency " + suffix)
+                .price(new BigDecimal("150000.00"))
+                .stockQuantity(10)
+                .category(category)
+                .build());
+
+        // Khách hàng mua đúng 1 cái
+        Order raceOrder = orderService.createOrder(CreateOrderRequest.builder()
+                .items(List.of(
+                        OrderItemRequest.builder()
+                                .productId(raceProd.getId())
+                                .quantity(1)
+                                .build()
+                ))
+                .note("Đơn test concurrency race condition")
+                .build());
+
+        String raceOrderCode = raceOrder.getOrderCode();
+        int initialStockAfterSale = productRepository.findById(raceProd.getId()).orElseThrow().getStockQuantity(); // 9
+
+        // 2 Thu ngân cùng gửi request trả lại đúng 1 sản phẩm này tại cùng một thời điểm
+        int threadCount = 2;
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+        java.util.concurrent.CountDownLatch readyLatch = new java.util.concurrent.CountDownLatch(threadCount);
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+
+        java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger failCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        List<Throwable> exceptions = Collections.synchronizedList(new java.util.ArrayList<>());
+
+        for (int i = 0; i < threadCount; i++) {
+            final String cashierName = "cashier_" + (i + 1);
+            executor.submit(() -> {
+                readyLatch.countDown();
+                try {
+                    startLatch.await(); // Chờ phát súng xuất phát cùng lúc
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken(cashierName, null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_STAFF")))
+                    );
+
+                    OrderReturnRequest req = OrderReturnRequest.builder()
+                            .orderCode(raceOrderCode)
+                            .reason(ReturnReason.DEFECTIVE)
+                            .returnItems(List.of(
+                                    ReturnItemRequest.builder()
+                                            .productId(raceProd.getId())
+                                            .quantity(1)
+                                            .build()
+                            ))
+                            .build();
+
+                    orderReturnService.processReturn(req);
+                    successCount.incrementAndGet();
+                } catch (Throwable t) {
+                    failCount.incrementAndGet();
+                    exceptions.add(t);
+                }
+            });
+        }
+
+        readyLatch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        startLatch.countDown(); // Kích hoạt cả 2 luồng đua lệnh cùng 1 tích tắc
+        executor.shutdown();
+        boolean finished = executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(finished, "Tất cả các luồng phải hoàn thành trong thời gian quy định!");
+
+        // 1. Kiểm tra kết quả: Đúng 1 thu ngân thành công, đúng 1 thu ngân thất bại
+        assertEquals(1, successCount.get(), "Chỉ duy nhất 1 thu ngân được phép trả hàng thành công!");
+        assertEquals(1, failCount.get(), "Thu ngân còn lại phải bị chặn lại với lỗi không còn đủ số lượng được trả!");
+
+        // 2. Thu ngân thất bại phải nhận được IllegalArgumentException về số lượng cho phép trả
+        Throwable failure = exceptions.get(0);
+        while (failure.getCause() != null && !(failure instanceof IllegalArgumentException)) {
+            failure = failure.getCause();
+        }
+        assertTrue(failure instanceof IllegalArgumentException, "Lỗi phải là IllegalArgumentException");
+        assertTrue(failure.getMessage().contains("chỉ còn được trả tối đa 0 món") || failure.getMessage().contains("đã trả trước đó: 1"),
+                "Thông báo lỗi phải chỉ rõ số lượng đã trả trước đó: " + failure.getMessage());
+
+        // 3. Kiểm tra DB: Số lượng đã trả thực tế chỉ đúng bằng 1
+        int returnedInDb = orderReturnRepository.countReturnedQuantityByOrderAndProduct(raceOrder.getId(), raceProd.getId());
+        assertEquals(1, returnedInDb, "Số lượng đã trả trong DB phải chính xác là 1, không được gấp đôi!");
+
+        // 4. Tồn kho sản phẩm chỉ được hoàn lại +1 (từ 9 lên 10, không phải 11)
+        Product finalProd = productRepository.findById(raceProd.getId()).orElseThrow();
+        assertEquals(initialStockAfterSale + 1, finalProd.getStockQuantity(), "Tồn kho chỉ được tăng +1 cho món hàng trả hợp lệ!");
+    }
 }

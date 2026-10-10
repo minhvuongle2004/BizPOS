@@ -321,15 +321,15 @@ erDiagram
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (178 Automated Tests - 100% Pass)
+## 🧪 Hệ thống Kiểm thử Tự động (179 Automated Tests - 100% Pass)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 178, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 179, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
-Total time:  24.120 s
+Total time:  19.393 s
 ```
 
 ### 1. Integration Tests Mô hình SPU — SKU (`ProductVariantIntegrationTest`) — 6 tests
@@ -340,13 +340,14 @@ Total time:  24.120 s
 * **`exchangeWithVariant_sameModelVsDifferentModel_shouldDetectCorrectly`**: Đổi hàng theo biến thể, tự động xác định chính xác cờ `isSameModel = true` (khi đổi size cùng mẫu) và `isSameModel = false` (khi đổi mẫu khác).
 * **`pessimisticLocking_onProductAndVariants_shouldPreventOverselling`**: Khóa bi quan chống bán vượt tồn kho đồng thời trên các biến thể cùng mẫu.
 
-### 2. Integration Tests Module Đổi - Trả hàng Thời trang (`OrderReturnIntegrationTest`) — 6 tests
+### 2. Integration Tests Module Đổi - Trả hàng Thời trang (`OrderReturnIntegrationTest`) — 7 tests
 * **`getEligibleReturnInfo_shouldReturnCorrectQuantities`**: Tra cứu đơn hàng mới mua trong hạn 7 ngày, tính toán chính xác số lượng đã mua, đã trả và số lượng còn được phép trả theo từng biến thể.
 * **`processReturn_returnOnly_shouldIncreaseStockAndRecordMovement`**: Xử lý trả hàng hoàn tiền (`RETURN_ONLY`), tăng tồn kho chính xác, ghi nhận thẻ kho `RETURN`, tính đúng tiền hoàn.
 * **`processReturn_exchange_shouldUpdateBothStocksAndCalculateNet`**: Xử lý đổi hàng lấy mẫu mới (`EXCHANGE`), tồn kho món trả tăng 1 (`RETURN`), tồn kho món mới giảm 1 (`SALE`), tính đúng tiền bù trừ chênh lệch ($\Delta = \text{Đổi mới} - \text{Hoàn trả}$).
 * **`processReturn_shouldFail_whenReturningMoreThanRemaining`**: Chống gian lận: Chặn đứng yêu cầu trả vượt quá số lượng đã mua (trả về HTTP 400 Bad Request).
 * **`getEligibleReturnInfo_shouldBeIneligible_whenExpired`**: Kiểm tra vi phạm chính sách: Đơn hàng mua quá hạn 7 ngày bị đánh dấu `eligible = false` và chặn tạo phiếu đổi trả.
 * **`processReturn_shouldFail_whenProductNotInOrder`**: Chặn yêu cầu trả sản phẩm không tồn tại trong hóa đơn gốc.
+* **`processReturn_raceCondition_twoCashiersReturningSameOrder_shouldPreventDoubleReturn`**: **Kiểm thử đua lệnh (Concurrency / Race Condition)**: Hai thu ngân cùng xử lý trả cho một hóa đơn tại cùng một thời điểm. Hệ thống khóa bi quan `PESSIMISTIC_WRITE` trên hóa đơn gốc ngay khi bắt đầu giao dịch, đảm bảo tuần tự hóa tuyệt đối, chỉ đúng 1 thu ngân thành công, chặn đứng nguy cơ hoàn tiền gấp đôi.
 
 ### 3. Bộ Unit & Integration Tests Cốt lõi — 166 tests
 * **`AuditLogServiceTest` & `AuditLogIntegrationTest` (8 tests)**: Bắt vết Spring AOP khi sửa giá, sửa đơn, hủy đơn, chặn STAFF (403), cấp quyền ADMIN.

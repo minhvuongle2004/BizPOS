@@ -58,7 +58,8 @@ public class OrderReturnServiceImpl implements OrderReturnService {
             throw new IllegalArgumentException("Vui lòng cung cấp mã đơn hàng gốc!");
         }
 
-        Order order = orderRepository.findByOrderCode(orderCode.trim())
+        // 0. PESSIMISTIC LOCK (SELECT FOR UPDATE) trên đơn hàng gốc để tuần tự hóa và chống Race Condition khi nhiều thu ngân cùng xử lý đổi/trả cho một hóa đơn
+        Order order = orderRepository.findByOrderCodeWithLock(orderCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
 
         // 1. Kiểm tra chính sách hạn đổi trả (7 ngày)
