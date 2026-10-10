@@ -180,6 +180,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setTotalAmount(totalAmount);
+        applyPaymentDetails(order, request, totalAmount);
 
         // Lưu Order cùng các OrderItem (CascadeType.ALL sẽ tự động lưu các OrderItem)
         return orderRepository.save(order);
@@ -311,6 +312,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setTotalAmount(totalAmount);
+        applyPaymentDetails(order, request, totalAmount);
 
         // 7. Lưu trong @Transactional
         return orderRepository.save(order);
@@ -370,5 +372,37 @@ public class OrderServiceImpl implements OrderService {
         } while (orderRepository.existsByOrderCode(orderCode));
 
         return orderCode;
+    }
+
+    /**
+     * Áp dụng thông tin thanh toán (Tiền mặt / Chuyển khoản) cho đơn hàng
+     */
+    private void applyPaymentDetails(Order order, CreateOrderRequest request, BigDecimal totalAmount) {
+        com.bizpos.enums.PaymentMethod method = request.getPaymentMethod() != null
+                ? request.getPaymentMethod()
+                : (order.getPaymentMethod() != null ? order.getPaymentMethod() : com.bizpos.enums.PaymentMethod.CASH);
+        order.setPaymentMethod(method);
+        order.setPaymentStatus(com.bizpos.enums.PaymentStatus.COMPLETED);
+        if (request.getPaymentNote() != null) {
+            order.setPaymentNote(request.getPaymentNote().trim());
+        }
+
+        if (method == com.bizpos.enums.PaymentMethod.BANK_TRANSFER) {
+            order.setAmountPaid(totalAmount);
+            order.setChangeAmount(BigDecimal.ZERO);
+        } else {
+            // Tiền mặt (CASH)
+            BigDecimal amountPaid = request.getAmountPaid();
+            if (amountPaid == null) {
+                // Tương thích ngược: Nếu client không truyền amountPaid, mặc định khách đưa đủ
+                amountPaid = totalAmount;
+            } else if (amountPaid.compareTo(totalAmount) < 0) {
+                throw new IllegalArgumentException(
+                        "Số tiền khách đưa (" + amountPaid + ") không đủ thanh toán tổng đơn (" + totalAmount + ")!"
+                );
+            }
+            order.setAmountPaid(amountPaid);
+            order.setChangeAmount(amountPaid.subtract(totalAmount));
+        }
     }
 }

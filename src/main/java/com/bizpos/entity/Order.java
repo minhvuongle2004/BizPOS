@@ -39,6 +39,27 @@ public class Order extends BaseEntity {
     @Column(name = "note", length = 500)
     private String note;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 30, nullable = false)
+    @Builder.Default
+    private com.bizpos.enums.PaymentMethod paymentMethod = com.bizpos.enums.PaymentMethod.CASH;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 30, nullable = false)
+    @Builder.Default
+    private com.bizpos.enums.PaymentStatus paymentStatus = com.bizpos.enums.PaymentStatus.COMPLETED;
+
+    @Column(name = "amount_paid", precision = 15, scale = 2, nullable = false)
+    @Builder.Default
+    private BigDecimal amountPaid = BigDecimal.ZERO;
+
+    @Column(name = "change_amount", precision = 15, scale = 2, nullable = false)
+    @Builder.Default
+    private BigDecimal changeAmount = BigDecimal.ZERO;
+
+    @Column(name = "payment_note", length = 255)
+    private String paymentNote;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();

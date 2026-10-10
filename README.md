@@ -323,15 +323,15 @@ erDiagram
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (180 Automated Tests - 100% Pass)
+## 🧪 Hệ thống Kiểm thử Tự động (185 Automated Tests - 100% Pass)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 180, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 185, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
-Total time:  18.345 s
+Total time:  18.408 s
 ```
 
 ### 1. Integration Tests Mô hình SPU — SKU (`ProductVariantIntegrationTest`) — 6 tests
@@ -352,7 +352,14 @@ Total time:  18.345 s
 * **`processReturn_raceCondition_twoCashiersReturningSameOrder_shouldPreventDoubleReturn`**: **Kiểm thử đua lệnh (Concurrency / Race Condition)**: Hai thu ngân cùng xử lý trả cho một hóa đơn tại cùng một thời điểm. Hệ thống khóa bi quan `PESSIMISTIC_WRITE` trên hóa đơn gốc ngay khi bắt đầu giao dịch, đảm bảo tuần tự hóa tuyệt đối, chỉ đúng 1 thu ngân thành công, chặn đứng nguy cơ hoàn tiền gấp đôi.
 * **`processReturn_withSameProductAtDifferentPrices_shouldAccuratelyTrackOrderItemAndRefundExactPrice`**: **Định danh chính xác dòng hóa đơn (`order_item_id`)**: Khi đơn hàng có cùng sản phẩm ở 2 dòng với 2 mức giá khác nhau (ví dụ: dòng giá sale 200k và dòng giá gốc 300k), việc đổi trả định danh chính xác dòng được trả qua `order_item_id`, hoàn tiền đúng từng đồng theo đơn giá của dòng đó và bảo toàn độc lập hạn mức đổi trả cho dòng còn lại.
 
-### 3. Bộ Unit & Integration Tests Cốt lõi — 166 tests
+### 3. Integration Tests Module Thanh toán POS (Tiền mặt & Chuyển khoản VietQR) — 5 tests
+* **`createOrder_withCashPayment_exactAmount_shouldCalculateZeroChange`**: Thanh toán tiền mặt đưa đúng số tiền, xác nhận `amountPaid = totalAmount` và `changeAmount = 0`.
+* **`createOrder_withCashPayment_greaterAmount_shouldCalculateCorrectChange`**: Thanh toán tiền mặt đưa thừa tiền, tự động tính chính xác tiền thừa trả khách (`changeAmount = amountPaid - totalAmount`).
+* **`createOrder_withCashPayment_insufficientAmount_shouldThrowException`**: Khách đưa thiếu tiền mặt, chặn đứng tạo đơn và trả lỗi HTTP 400 Bad Request kèm thông điệp cảnh báo rõ ràng.
+* **`createOrder_withBankTransfer_shouldSetAmountPaidEqualTotal`**: Thanh toán chuyển khoản ngân hàng (VietQR Napas247), lưu vết mã tham chiếu chuyển khoản `paymentNote`, khớp đúng doanh thu.
+* **`getPaymentConfig_shouldReturnConfiguredBankDetails`**: API lấy cấu hình tài khoản ngân hàng thụ hưởng (VietinBank / Napas247) phục vụ render mã QR động trên POS.
+
+### 4. Bộ Unit & Integration Tests Cốt lõi — 166 tests
 * **`AuditLogServiceTest` & `AuditLogIntegrationTest` (8 tests)**: Bắt vết Spring AOP khi sửa giá, sửa đơn, hủy đơn, chặn STAFF (403), cấp quyền ADMIN.
 * **`StockMovementServiceTest` & `StockMovementIntegrationTest` (10 tests)**: Tính toàn vẹn thẻ kho cho các sự kiện `SALE`, `IMPORT`, `RETURN`, `ADJUSTMENT`.
 * **`OrderConcurrencyIntegrationTest` (2 tests)**: Kiểm thử đua lệnh 20 threads đồng thời tranh mua tồn kho và chống Deadlock đa sản phẩm bằng thuật toán sắp xếp khóa ID tăng dần.

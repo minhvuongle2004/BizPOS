@@ -26,6 +26,11 @@ public class OrderResponse {
     private LocalDateTime orderDate;
     private BigDecimal totalAmount;
     private String note;
+    private com.bizpos.enums.PaymentMethod paymentMethod;
+    private com.bizpos.enums.PaymentStatus paymentStatus;
+    private BigDecimal amountPaid;
+    private BigDecimal changeAmount;
+    private String paymentNote;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -50,6 +55,11 @@ public class OrderResponse {
                 .orderDate(order.getOrderDate())
                 .totalAmount(order.getTotalAmount())
                 .note(order.getNote())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentStatus(order.getPaymentStatus())
+                .amountPaid(order.getAmountPaid())
+                .changeAmount(order.getChangeAmount())
+                .paymentNote(order.getPaymentNote())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .items(itemResponses)

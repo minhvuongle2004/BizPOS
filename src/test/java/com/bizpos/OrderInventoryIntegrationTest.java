@@ -243,4 +243,126 @@ public class OrderInventoryIntegrationTest {
         // Kiểm tra Order đã bị xóa khỏi MySQL
         assertTrue(orderRepository.findById(order.getId()).isEmpty(), "Order phải bị xóa khỏi MySQL");
     }
+
+    @Test
+    @DisplayName("Thanh toán Tiền mặt đủ tiền -> Tính đúng tiền thừa = 0")
+    void createOrder_withCashPayment_exactAmount_shouldCalculateZeroChange() {
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(7);
+        Product p = Product.builder()
+                .code("CASH_EXACT_" + suffix)
+                .name("Sản phẩm Cash Exact " + suffix)
+                .price(new BigDecimal("100000.00"))
+                .stockQuantity(10)
+                .category(testCategory)
+                .build();
+        p = productRepository.save(p);
+
+        CreateOrderRequest req = CreateOrderRequest.builder()
+                .paymentMethod(com.bizpos.enums.PaymentMethod.CASH)
+                .amountPaid(new BigDecimal("100000.00"))
+                .items(List.of(OrderItemRequest.builder().productId(p.getId()).quantity(1).build()))
+                .build();
+
+        Order order = orderService.createOrder(req);
+
+        assertEquals(com.bizpos.enums.PaymentMethod.CASH, order.getPaymentMethod());
+        assertEquals(com.bizpos.enums.PaymentStatus.COMPLETED, order.getPaymentStatus());
+        assertEquals(new BigDecimal("100000.00"), order.getTotalAmount());
+        assertEquals(new BigDecimal("100000.00"), order.getAmountPaid());
+        assertEquals(new BigDecimal("0.00"), order.getChangeAmount());
+    }
+
+    @Test
+    @DisplayName("Thanh toán Tiền mặt thừa tiền -> Tính chính xác tiền thừa trả khách")
+    void createOrder_withCashPayment_greaterAmount_shouldCalculateCorrectChange() {
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(7);
+        Product p = Product.builder()
+                .code("CASH_CHANGE_" + suffix)
+                .name("Sản phẩm Cash Change " + suffix)
+                .price(new BigDecimal("120000.00"))
+                .stockQuantity(10)
+                .category(testCategory)
+                .build();
+        p = productRepository.save(p);
+
+        CreateOrderRequest req = CreateOrderRequest.builder()
+                .paymentMethod(com.bizpos.enums.PaymentMethod.CASH)
+                .amountPaid(new BigDecimal("200000.00"))
+                .items(List.of(OrderItemRequest.builder().productId(p.getId()).quantity(1).build()))
+                .build();
+
+        Order order = orderService.createOrder(req);
+
+        assertEquals(com.bizpos.enums.PaymentMethod.CASH, order.getPaymentMethod());
+        assertEquals(new BigDecimal("120000.00"), order.getTotalAmount());
+        assertEquals(new BigDecimal("200000.00"), order.getAmountPaid());
+        assertEquals(new BigDecimal("80000.00"), order.getChangeAmount());
+    }
+
+    @Test
+    @DisplayName("Thanh toán Tiền mặt thiếu tiền -> Chặn tạo đơn, ném ngoại lệ IllegalArgumentException")
+    void createOrder_withCashPayment_insufficientAmount_shouldThrowException() {
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(7);
+        Product p = Product.builder()
+                .code("CASH_INSUF_" + suffix)
+                .name("Sản phẩm Cash Insufficient " + suffix)
+                .price(new BigDecimal("200000.00"))
+                .stockQuantity(10)
+                .category(testCategory)
+                .build();
+        p = productRepository.save(p);
+
+        CreateOrderRequest req = CreateOrderRequest.builder()
+                .paymentMethod(com.bizpos.enums.PaymentMethod.CASH)
+                .amountPaid(new BigDecimal("150000.00")) // Thiếu 50.000đ
+                .items(List.of(OrderItemRequest.builder().productId(p.getId()).quantity(1).build()))
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> orderService.createOrder(req));
+        assertTrue(ex.getMessage().contains("không đủ thanh toán"), "Phải báo lỗi tiền khách đưa không đủ!");
+    }
+
+    @Test
+    @DisplayName("Thanh toán Chuyển khoản VietQR -> Khớp amountPaid bằng totalAmount và tiền thừa = 0")
+    void createOrder_withBankTransfer_shouldSetAmountPaidEqualTotal() {
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(7);
+        Product p = Product.builder()
+                .code("BANK_QR_" + suffix)
+                .name("Sản phẩm Bank QR " + suffix)
+                .price(new BigDecimal("350000.00"))
+                .stockQuantity(10)
+                .category(testCategory)
+                .build();
+        p = productRepository.save(p);
+
+        CreateOrderRequest req = CreateOrderRequest.builder()
+                .paymentMethod(com.bizpos.enums.PaymentMethod.BANK_TRANSFER)
+                .paymentNote("ORD-QR-TEST1234")
+                .items(List.of(OrderItemRequest.builder().productId(p.getId()).quantity(1).build()))
+                .build();
+
+        Order order = orderService.createOrder(req);
+
+        assertEquals(com.bizpos.enums.PaymentMethod.BANK_TRANSFER, order.getPaymentMethod());
+        assertEquals(com.bizpos.enums.PaymentStatus.COMPLETED, order.getPaymentStatus());
+        assertEquals(new BigDecimal("350000.00"), order.getTotalAmount());
+        assertEquals(new BigDecimal("350000.00"), order.getAmountPaid());
+        assertEquals(BigDecimal.ZERO, order.getChangeAmount());
+        assertEquals("ORD-QR-TEST1234", order.getPaymentNote());
+    }
+
+    @Test
+    @DisplayName("API GET /api/payment/config -> Trả về cấu hình VietinBank chính xác")
+    void getPaymentConfig_shouldReturnConfiguredBankDetails() throws Exception {
+        MvcResult result = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/payment/config")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertEquals("VietinBank", json.get("bankId").asText());
+        assertEquals("000000000000", json.get("accountNo").asText());
+        assertEquals("BIZPOS STORE", json.get("accountName").asText());
+    }
 }

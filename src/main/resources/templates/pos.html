@@ -203,6 +203,163 @@
             </div>
         </div>
 
+        <!-- ================= MODAL: THANH TOÁN ĐƠN HÀNG (CHECKOUT MODAL) ================= -->
+        <div class="modal fade" id="checkoutPaymentModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-biz-primary text-white py-3 px-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-credit-card-2-front-fill fs-4"></i>
+                            <div>
+                                <h5 class="modal-title fw-bold text-white mb-0">Thanh toán đơn hàng</h5>
+                                <span class="small text-white-50">Chọn phương thức thanh toán cho khách hàng</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <!-- Tổng tiền cần thanh toán -->
+                        <div class="d-flex justify-content-between align-items-center p-3 mb-4 rounded-3 border" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                            <div>
+                                <span class="text-muted small text-uppercase fw-bold d-block">Tổng tiền cần thanh toán</span>
+                                <span class="small text-secondary" id="checkoutItemCountText">Giỏ hàng: 0 món sản phẩm</span>
+                            </div>
+                            <div class="text-end">
+                                <span class="fs-2 fw-bold text-danger" id="checkoutTotalAmountDisplay">0 đ</span>
+                            </div>
+                        </div>
+
+                        <!-- Lựa chọn phương thức thanh toán -->
+                        <div class="row g-2 mb-4">
+                            <div class="col-6">
+                                <button type="button" class="btn w-100 p-3 rounded-3 d-flex flex-column align-items-center justify-content-center border-2 border-primary bg-primary bg-opacity-10 text-primary fw-bold" id="btnMethodCash" onclick="selectPaymentMethod('CASH')">
+                                    <i class="bi bi-cash-stack fs-2 mb-1"></i>
+                                    <span>TIỀN MẶT (CASH)</span>
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button type="button" class="btn w-100 p-3 rounded-3 d-flex flex-column align-items-center justify-content-center border-2 border-secondary-subtle bg-light text-secondary fw-semibold" id="btnMethodBank" onclick="selectPaymentMethod('BANK_TRANSFER')">
+                                    <i class="bi bi-qr-code-scan fs-2 mb-1"></i>
+                                    <span>CHUYỂN KHOẢN (VIETQR)</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- KHUNG 1: NỘI DUNG THANH TOÁN TIỀN MẶT -->
+                        <div id="cashPaymentSection" class="p-3 border rounded-3 bg-light">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-dark mb-1">
+                                    <i class="bi bi-wallet2 text-success me-1"></i>Tiền khách đưa (VNĐ):
+                                </label>
+                                <div class="input-group input-group-lg">
+                                    <input type="text" id="cashAmountInput" class="form-control fw-bold text-end fs-4 text-primary" 
+                                           placeholder="0" oninput="handleCashInputChanged(this.value)" autocomplete="off">
+                                    <span class="input-group-text fw-bold">đ</span>
+                                </div>
+                            </div>
+
+                            <!-- Hàng nút gợi ý tiền nhanh -->
+                            <div class="mb-3">
+                                <span class="small text-muted d-block mb-2 fw-semibold">Gợi ý tiền nhanh:</span>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="setCashExact()">
+                                        <i class="bi bi-check2 me-1"></i>Đủ tiền
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCashAmount(10000)">+10.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCashAmount(20000)">+20.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCashAmount(50000)">+50.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCashAmount(100000)">+100.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addCashAmount(500000)">+500.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="setCashFixed(100000)">100.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="setCashFixed(200000)">200.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="setCashFixed(500000)">500.000</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="setCashFixed(1000000)">1.000.000</button>
+                                </div>
+                            </div>
+
+                            <!-- Tiền thừa thối lại -->
+                            <div class="p-3 rounded-3 border d-flex justify-content-between align-items-center" id="cashChangeBox" style="background-color: #ffffff;">
+                                <span class="fw-bold" id="cashChangeLabel">Tiền thừa trả khách:</span>
+                                <span class="fs-4 fw-bold text-success" id="cashChangeAmountDisplay">0 đ</span>
+                            </div>
+                        </div>
+
+                        <!-- KHUNG 2: NỘI DUNG CHUYỂN KHOẢN VIETQR (Mặc định ẩn) -->
+                        <div id="bankPaymentSection" class="p-3 border rounded-3 bg-light d-none">
+                            <div class="row align-items-center g-3">
+                                <div class="col-md-5 text-center">
+                                    <div class="p-2 bg-white rounded-3 border shadow-sm d-inline-block position-relative">
+                                        <img id="vietQrImage" src="" alt="VietQR" class="img-fluid rounded" style="max-height: 230px; object-fit: contain;">
+                                        <div id="vietQrLoading" class="position-absolute top-50 start-50 translate-middle d-none">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                        </div>
+                                    </div>
+                                    <div class="small text-muted mt-2">
+                                        <i class="bi bi-phone me-1"></i>Quét bằng mọi App Ngân hàng / Ví
+                                    </div>
+                                </div>
+                                <div class="col-md-7">
+                                    <div class="p-3 bg-white rounded-3 border">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                            <span class="text-muted small">Ngân hàng:</span>
+                                            <span class="badge bg-primary fs-6" id="qrBankNameDisplay">VietinBank</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                            <span class="text-muted small">Chủ tài khoản:</span>
+                                            <strong class="text-dark small text-uppercase" id="qrAccountNameDisplay">BIZPOS STORE</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                            <span class="text-muted small">Số tài khoản:</span>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <strong class="text-primary fs-5" id="qrAccountNoDisplay">000000000000</strong>
+                                                <button type="button" class="btn btn-sm btn-link p-0 text-secondary" onclick="copyQrField('qrAccountNoDisplay', 'Số tài khoản')">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                            <span class="text-muted small">Số tiền chuyển:</span>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <strong class="text-danger fs-5" id="qrAmountDisplay">0 đ</strong>
+                                                <button type="button" class="btn btn-sm btn-link p-0 text-secondary" onclick="copyQrField('qrAmountDisplay', 'Số tiền')">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted small">Nội dung CK:</span>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <code class="fw-bold fs-6 text-dark" id="qrMemoDisplay">ORD-...</code>
+                                                <button type="button" class="btn btn-sm btn-link p-0 text-secondary" onclick="copyQrField('qrMemoDisplay', 'Nội dung chuyển khoản')">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="alert alert-info py-2 px-3 mt-3 mb-0 small d-flex align-items-center gap-2">
+                                        <i class="bi bi-info-circle-fill fs-5 text-info"></i>
+                                        <div>Thu ngân vui lòng kiểm tra thông báo nhận tiền trên điện thoại/loa trước khi bấm hoàn tất.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50 justify-content-between">
+                        <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">
+                            <i class="bi bi-arrow-left me-1"></i>Quay lại
+                        </button>
+                        <button type="button" id="btnConfirmPayment" class="btn btn-success fw-bold px-4 py-2 d-flex align-items-center gap-2" onclick="confirmExecuteOrder()">
+                            <i class="bi bi-check2-circle fs-5"></i>
+                            <span id="btnConfirmPaymentText">XÁC NHẬN THANH TOÁN (TIỀN MẶT)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ================= MODAL: TẠO ĐƠN HÀNG THÀNH CÔNG (RECEIPT) ================= -->
         <div class="modal fade" id="orderSuccessModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
@@ -254,9 +411,25 @@
                         </div>
 
                         <!-- Tổng tiền thanh toán -->
-                        <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border">
+                        <div class="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border mb-3">
                             <span class="fw-bold text-dark">Tổng tiền thanh toán:</span>
                             <span class="fs-4 fw-bold text-danger" id="successTotalAmount">0 đ</span>
+                        </div>
+
+                        <!-- Chi tiết thanh toán -->
+                        <div class="p-3 bg-light rounded-3 border">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted small">Hình thức thanh toán:</span>
+                                <span class="badge bg-secondary" id="successPaymentMethod">Tiền mặt</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1" id="successAmountPaidRow">
+                                <span class="text-muted small">Tiền khách đưa:</span>
+                                <span class="fw-semibold text-dark" id="successAmountPaid">0 đ</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center" id="successChangeAmountRow">
+                                <span class="text-muted small">Tiền thừa trả khách:</span>
+                                <span class="fw-bold text-success" id="successChangeAmount">0 đ</span>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50 justify-content-between">
@@ -710,8 +883,35 @@
             // Modal instances
             let clearCartModalInstance = null;
             let orderSuccessModalInstance = null;
+            let checkoutPaymentModalInstance = null;
             let returnModalInstance = null;
             let returnSuccessModalInstance = null;
+
+            // State thanh toán đơn hàng
+            let currentPaymentMethod = 'CASH'; // 'CASH' hoặc 'BANK_TRANSFER'
+            let currentCheckoutTotal = 0;
+            let currentCheckoutCashPaid = 0;
+            let currentTempOrderCode = '';
+            let paymentConfig = {
+                bankId: 'VietinBank',
+                accountNo: '000000000000',
+                accountName: 'BIZPOS STORE',
+                template: 'compact2'
+            };
+
+            async function loadPaymentConfig() {
+                try {
+                    const res = await fetch('/api/payment/config', { credentials: 'same-origin', headers: getAuthHeaders() });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.bankId) {
+                            paymentConfig = data;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Không thể nạp config ngân hàng VietQR, dùng mặc định:', e);
+                }
+            }
 
             function getClearCartModal() {
                 if (!clearCartModalInstance) {
@@ -719,6 +919,18 @@
                     if (el && window.bootstrap) clearCartModalInstance = new bootstrap.Modal(el);
                 }
                 return clearCartModalInstance;
+            }
+
+            function getCheckoutPaymentModal() {
+                if (!checkoutPaymentModalInstance) {
+                    const el = document.getElementById('checkoutPaymentModal');
+                    if (el && window.bootstrap) {
+                        checkoutPaymentModalInstance = (bootstrap.Modal.getOrCreateInstance) 
+                            ? bootstrap.Modal.getOrCreateInstance(el) 
+                            : new bootstrap.Modal(el);
+                    }
+                }
+                return checkoutPaymentModalInstance;
             }
 
             function getOrderSuccessModal() {
@@ -1405,11 +1617,227 @@
                 }
             }
 
-            // ================= 8. TẠO ĐƠN HÀNG (CHECKOUT / POST /api/orders) =================
-            async function handleCheckout() {
+            function generateTempOrderCode() {
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const ymd = '' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate());
+                const his = '' + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
+                const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+                return 'ORD-' + ymd + his + '-' + rand;
+            }
+
+            // ================= 8. TẠO ĐƠN HÀNG (CHECKOUT / MODAL THANH TOÁN) =================
+            function handleCheckout() {
                 if (cart.length === 0) {
                     showToast('Giỏ hàng trống', 'Vui lòng chọn ít nhất 1 sản phẩm trước khi thanh toán!', false);
                     return;
+                }
+
+                // Tính tổng tiền giỏ hàng
+                currentCheckoutTotal = cart.reduce((sum, it) => {
+                    const p = it.variant ? (it.variant.price != null ? it.variant.price : (it.product ? it.product.price : 0)) : (it.product ? it.product.price : 0);
+                    return sum + (p * it.quantity);
+                }, 0);
+
+                const totalQty = cart.reduce((sum, it) => sum + it.quantity, 0);
+                currentTempOrderCode = generateTempOrderCode();
+
+                // Cập nhật hiển thị trong modal thanh toán
+                const countTextEl = document.getElementById('checkoutItemCountText');
+                if (countTextEl) countTextEl.textContent = `Giỏ hàng: ${totalQty} món sản phẩm`;
+
+                const totalDisplayEl = document.getElementById('checkoutTotalAmountDisplay');
+                if (totalDisplayEl) totalDisplayEl.textContent = formatVND(currentCheckoutTotal);
+
+                // Mặc định chọn TIỀN MẶT, điền số tiền khách đưa bằng tổng tiền
+                currentPaymentMethod = 'CASH';
+                currentCheckoutCashPaid = currentCheckoutTotal;
+                const cashInput = document.getElementById('cashAmountInput');
+                if (cashInput) {
+                    cashInput.value = formatNumberWithCommas(currentCheckoutTotal);
+                }
+                updateCashChangeDisplay();
+                updatePaymentMethodUI();
+
+                // Chuẩn bị nội dung VietQR nếu chuyển sang tab QR
+                updateVietQrDisplay();
+
+                const modal = getCheckoutPaymentModal();
+                if (modal) {
+                    modal.show();
+                    setTimeout(() => {
+                        if (cashInput) cashInput.focus();
+                    }, 350);
+                }
+            }
+
+            function selectPaymentMethod(method) {
+                currentPaymentMethod = method;
+                updatePaymentMethodUI();
+                if (method === 'BANK_TRANSFER') {
+                    updateVietQrDisplay();
+                } else {
+                    const cashInput = document.getElementById('cashAmountInput');
+                    if (cashInput) cashInput.focus();
+                }
+            }
+
+            function updatePaymentMethodUI() {
+                const btnCash = document.getElementById('btnMethodCash');
+                const btnBank = document.getElementById('btnMethodBank');
+                const secCash = document.getElementById('cashPaymentSection');
+                const secBank = document.getElementById('bankPaymentSection');
+                const btnConfirmText = document.getElementById('btnConfirmPaymentText');
+
+                if (currentPaymentMethod === 'CASH') {
+                    if (btnCash) {
+                        btnCash.className = 'btn w-100 p-3 rounded-3 d-flex flex-column align-items-center justify-content-center border-2 border-primary bg-primary bg-opacity-10 text-primary fw-bold';
+                    }
+                    if (btnBank) {
+                        btnBank.className = 'btn w-100 p-3 rounded-3 d-flex flex-column align-items-center justify-content-center border-2 border-secondary-subtle bg-light text-secondary fw-semibold';
+                    }
+                    if (secCash) secCash.classList.remove('d-none');
+                    if (secBank) secBank.classList.add('d-none');
+                    if (btnConfirmText) btnConfirmText.textContent = 'XÁC NHẬN THANH TOÁN (TIỀN MẶT)';
+                    updateCashChangeDisplay();
+                } else {
+                    if (btnCash) {
+                        btnCash.className = 'btn w-100 p-3 rounded-3 d-flex flex-column align-items-center justify-content-center border-2 border-secondary-subtle bg-light text-secondary fw-semibold';
+                    }
+                    if (btnBank) {
+                        btnBank.className = 'btn w-100 p-3 rounded-3 d-flex flex-column align-items-center justify-content-center border-2 border-primary bg-primary bg-opacity-10 text-primary fw-bold';
+                    }
+                    if (secCash) secCash.classList.add('d-none');
+                    if (secBank) secBank.classList.remove('d-none');
+                    if (btnConfirmText) btnConfirmText.textContent = 'XÁC NHẬN ĐÃ NHẬN CHUYỂN KHOẢN';
+
+                    const btnConfirm = document.getElementById('btnConfirmPayment');
+                    if (btnConfirm) btnConfirm.disabled = false;
+                }
+            }
+
+            function formatNumberWithCommas(n) {
+                return (n || 0).toLocaleString('en-US');
+            }
+
+            function parseNumberFromCommas(str) {
+                if (!str) return 0;
+                const clean = String(str).replace(/[^\d]/g, '');
+                return parseInt(clean, 10) || 0;
+            }
+
+            function handleCashInputChanged(rawVal) {
+                const num = parseNumberFromCommas(rawVal);
+                currentCheckoutCashPaid = num;
+                const input = document.getElementById('cashAmountInput');
+                if (input && rawVal !== '') {
+                    input.value = formatNumberWithCommas(num);
+                }
+                updateCashChangeDisplay();
+            }
+
+            function setCashExact() {
+                currentCheckoutCashPaid = currentCheckoutTotal;
+                const input = document.getElementById('cashAmountInput');
+                if (input) input.value = formatNumberWithCommas(currentCheckoutTotal);
+                updateCashChangeDisplay();
+            }
+
+            function addCashAmount(extra) {
+                currentCheckoutCashPaid = (currentCheckoutCashPaid || 0) + extra;
+                const input = document.getElementById('cashAmountInput');
+                if (input) input.value = formatNumberWithCommas(currentCheckoutCashPaid);
+                updateCashChangeDisplay();
+            }
+
+            function setCashFixed(fixed) {
+                currentCheckoutCashPaid = fixed;
+                const input = document.getElementById('cashAmountInput');
+                if (input) input.value = formatNumberWithCommas(fixed);
+                updateCashChangeDisplay();
+            }
+
+            function updateCashChangeDisplay() {
+                const changeAmount = (currentCheckoutCashPaid || 0) - currentCheckoutTotal;
+                const labelEl = document.getElementById('cashChangeLabel');
+                const displayEl = document.getElementById('cashChangeAmountDisplay');
+                const btnConfirm = document.getElementById('btnConfirmPayment');
+
+                if (changeAmount >= 0) {
+                    if (labelEl) {
+                        labelEl.textContent = 'Tiền thừa trả khách:';
+                        labelEl.className = 'fw-bold text-dark';
+                    }
+                    if (displayEl) {
+                        displayEl.textContent = formatVND(changeAmount);
+                        displayEl.className = 'fs-4 fw-bold text-success';
+                    }
+                    if (btnConfirm) btnConfirm.disabled = false;
+                } else {
+                    const missing = Math.abs(changeAmount);
+                    if (labelEl) {
+                        labelEl.textContent = 'Khách đưa thiếu:';
+                        labelEl.className = 'fw-bold text-danger';
+                    }
+                    if (displayEl) {
+                        displayEl.textContent = '- ' + formatVND(missing);
+                        displayEl.className = 'fs-4 fw-bold text-danger';
+                    }
+                    if (btnConfirm) btnConfirm.disabled = true;
+                }
+            }
+
+            function updateVietQrDisplay() {
+                const qrImg = document.getElementById('vietQrImage');
+                const bankEl = document.getElementById('qrBankNameDisplay');
+                const accNoEl = document.getElementById('qrAccountNoDisplay');
+                const accNameEl = document.getElementById('qrAccountNameDisplay');
+                const amountEl = document.getElementById('qrAmountDisplay');
+                const memoEl = document.getElementById('qrMemoDisplay');
+
+                const bankId = paymentConfig.bankId || 'VietinBank';
+                const accountNo = paymentConfig.accountNo || '000000000000';
+                const accountName = paymentConfig.accountName || 'BIZPOS STORE';
+                const template = paymentConfig.template || 'compact2';
+
+                if (bankEl) bankEl.textContent = bankId;
+                if (accNoEl) accNoEl.textContent = accountNo;
+                if (accNameEl) accNameEl.textContent = accountName;
+                if (amountEl) amountEl.textContent = formatVND(currentCheckoutTotal);
+                if (memoEl) memoEl.textContent = currentTempOrderCode;
+
+                const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${currentCheckoutTotal}&addInfo=${encodeURIComponent(currentTempOrderCode)}&accountName=${encodeURIComponent(accountName)}`;
+                if (qrImg) {
+                    qrImg.src = qrUrl;
+                }
+            }
+
+            function copyQrField(elementId, fieldName) {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+                const text = el.textContent ? el.textContent.replace(/[^\d\w\s-]/g, '').trim() : '';
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast('Đã sao chép', `Đã chép ${fieldName} vào bộ nhớ tạm!`, true);
+                    }).catch(() => {
+                        showToast('Sao chép', text, true);
+                    });
+                } else {
+                    showToast('Sao chép', text, true);
+                }
+            }
+
+            async function confirmExecuteOrder() {
+                if (cart.length === 0) {
+                    showToast('Giỏ hàng trống', 'Vui lòng chọn ít nhất 1 sản phẩm!', false);
+                    return;
+                }
+
+                if (currentPaymentMethod === 'CASH') {
+                    if (currentCheckoutCashPaid < currentCheckoutTotal) {
+                        showToast('Tiền không đủ', 'Số tiền khách đưa chưa đủ để thanh toán!', false);
+                        return;
+                    }
                 }
 
                 const customerSelect = document.getElementById('posCustomerSelect');
@@ -1428,14 +1856,17 @@
                 const payload = {
                     customerId: customerId,
                     note: note || null,
+                    paymentMethod: currentPaymentMethod,
+                    amountPaid: (currentPaymentMethod === 'BANK_TRANSFER') ? currentCheckoutTotal : currentCheckoutCashPaid,
+                    paymentNote: (currentPaymentMethod === 'BANK_TRANSFER') ? currentTempOrderCode : null,
                     items: orderItems
                 };
 
-                const btnCheckout = document.getElementById('btnCheckout');
-                const btnCheckoutText = document.getElementById('btnCheckoutText');
-                if (btnCheckout) {
-                    btnCheckout.disabled = true;
-                    if (btnCheckoutText) btnCheckoutText.textContent = 'ĐANG XỬ LÝ...';
+                const btnConfirm = document.getElementById('btnConfirmPayment');
+                const btnConfirmText = document.getElementById('btnConfirmPaymentText');
+                if (btnConfirm) {
+                    btnConfirm.disabled = true;
+                    if (btnConfirmText) btnConfirmText.textContent = 'ĐANG TẠO ĐƠN...';
                 }
 
                 try {
@@ -1446,35 +1877,34 @@
                     });
 
                     if (checkAuthError(response.status)) {
-                        if (btnCheckout) btnCheckout.disabled = false;
-                        if (btnCheckoutText) btnCheckoutText.textContent = 'THANH TOÁN (TẠO ĐƠN)';
+                        if (btnConfirm) btnConfirm.disabled = false;
                         return;
                     }
 
                     const data = await response.json();
 
                     if (response.status === 201 || response.ok) {
-                        // Thành công: Xóa giỏ hàng & hiển thị popup Hóa đơn
-                        showOrderSuccessModal(data);
-                        showToast('Thành công', `Đơn hàng [${data.orderCode}] đã được tạo thành công!`, true);
+                        // Đóng modal thanh toán
+                        const checkoutModal = getCheckoutPaymentModal();
+                        if (checkoutModal) checkoutModal.hide();
 
-                        // Reset giỏ và input ghi chú
+                        // Hiển thị modal hóa đơn
+                        showOrderSuccessModal(data);
+                        showToast('Thành công', `Đơn hàng [${data.orderCode}] đã thanh toán thành công!`, true);
+
+                        // Reset giỏ hàng
                         cart = [];
                         renderCart();
                         if (noteInput) noteInput.value = '';
                         if (customerSelect) customerSelect.value = '';
 
-                        // Cập nhật lại tồn kho ngay lập tức trên POS
+                        // Tải lại sản phẩm
                         await loadProducts();
                     } else if (response.status === 400) {
-                        showToast('Lỗi tồn kho (400)', data.message || 'Số lượng trong kho không đủ để thực hiện đơn hàng!', false);
-                        // Tải lại để cập nhật số tồn thực tế
+                        showToast('Lỗi dữ liệu (400)', data.message || 'Số lượng trong kho không đủ hoặc tiền không hợp lệ!', false);
                         await loadProducts();
                     } else if (response.status === 404) {
                         showToast('Không tìm thấy (404)', data.message || 'Sản phẩm hoặc khách hàng không tồn tại!', false);
-                    } else if (response.status === 409) {
-                        showToast('Xung đột (409)', data.message || 'Xung đột khi tạo đơn hàng!', false);
-                        await loadProducts();
                     } else {
                         showToast('Lỗi máy chủ (500)', data.message || 'Không thể tạo đơn hàng!', false);
                     }
@@ -1482,9 +1912,13 @@
                     console.error('Lỗi khi checkout:', err);
                     showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
                 } finally {
-                    if (btnCheckout) {
-                        btnCheckout.disabled = cart.length === 0;
-                        if (btnCheckoutText) btnCheckoutText.textContent = 'THANH TOÁN (TẠO ĐƠN)';
+                    if (btnConfirm) {
+                        btnConfirm.disabled = false;
+                        if (btnConfirmText) {
+                            btnConfirmText.textContent = (currentPaymentMethod === 'BANK_TRANSFER') 
+                                ? 'XÁC NHẬN ĐÃ NHẬN CHUYỂN KHOẢN' 
+                                : 'XÁC NHẬN THANH TOÁN (TIỀN MẶT)';
+                        }
                     }
                 }
             }
@@ -1499,9 +1933,28 @@
                 const noteEl = document.getElementById('successOrderNote');
                 const tbody = document.getElementById('successOrderItemsBody');
 
+                const pmEl = document.getElementById('successPaymentMethod');
+                const apEl = document.getElementById('successAmountPaid');
+                const caEl = document.getElementById('successChangeAmount');
+                const caRow = document.getElementById('successChangeAmountRow');
+
                 if (codeEl) codeEl.textContent = orderData.orderCode || '—';
                 if (custEl) custEl.textContent = (orderData.customer && orderData.customer.fullName) ? orderData.customer.fullName : 'Khách vãng lai';
                 if (totalEl) totalEl.textContent = formatVND(orderData.totalAmount);
+
+                if (pmEl) {
+                    pmEl.textContent = (orderData.paymentMethod === 'BANK_TRANSFER') ? 'Chuyển khoản (VietQR)' : 'Tiền mặt';
+                    pmEl.className = (orderData.paymentMethod === 'BANK_TRANSFER') ? 'badge bg-primary' : 'badge bg-success';
+                }
+                if (apEl) {
+                    apEl.textContent = formatVND(orderData.amountPaid || orderData.totalAmount);
+                }
+                if (caEl) {
+                    caEl.textContent = formatVND(orderData.changeAmount || 0);
+                }
+                if (caRow) {
+                    caRow.style.display = (orderData.paymentMethod === 'BANK_TRANSFER') ? 'none' : 'flex';
+                }
 
                 if (dateEl) {
                     const d = orderData.orderDate ? new Date(orderData.orderDate) : new Date();
@@ -2551,12 +3004,22 @@
             window.cancelSelectedExchangeProduct = cancelSelectedExchangeProduct;
             window.adjustExchangeQty = adjustExchangeQty;
 
+            // Nghiệp vụ Thanh toán đơn hàng
+            window.selectPaymentMethod = selectPaymentMethod;
+            window.handleCashInputChanged = handleCashInputChanged;
+            window.setCashExact = setCashExact;
+            window.addCashAmount = addCashAmount;
+            window.setCashFixed = setCashFixed;
+            window.copyQrField = copyQrField;
+            window.confirmExecuteOrder = confirmExecuteOrder;
+
             // Khởi chạy khi tải trang
             async function initPos() {
                 await Promise.all([
                     loadCategories(),
                     loadProducts(),
-                    loadCustomers()
+                    loadCustomers(),
+                    loadPaymentConfig()
                 ]);
             }
 
