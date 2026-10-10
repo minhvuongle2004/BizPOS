@@ -33,3 +33,11 @@ build/
 
 ### Log & Temp ###
 *.log
+
+### Environment & Local Secret Configuration ###
+.env
+.env.*
+*.env
+application-local.properties
+**/application-local.properties
+

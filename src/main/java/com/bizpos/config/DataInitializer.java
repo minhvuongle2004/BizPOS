@@ -25,6 +25,7 @@ import java.util.Optional;
 
 @Slf4j
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "bizpos.init-data.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
@@ -68,7 +69,7 @@ public class DataInitializer implements CommandLineRunner {
                     .role(Role.ADMIN)
                     .build();
             userRepository.save(admin);
-            log.info(">> [TẠO TÀI KHOẢN] admin (Role: ADMIN, Mật khẩu: admin123)");
+            log.info(">> [TẠO TÀI KHOẢN] admin (Role: ADMIN)");
 
             User staff = User.builder()
                     .username("staff")
@@ -76,7 +77,7 @@ public class DataInitializer implements CommandLineRunner {
                     .role(Role.STAFF)
                     .build();
             userRepository.save(staff);
-            log.info(">> [TẠO TÀI KHOẢN] staff (Role: STAFF, Mật khẩu: staff123)");
+            log.info(">> [TẠO TÀI KHOẢN] staff (Role: STAFF)");
         }
     }
 
