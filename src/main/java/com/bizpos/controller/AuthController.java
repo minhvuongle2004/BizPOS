@@ -39,4 +39,17 @@ public class AuthController {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * 3. Thay đổi quyền người dùng (Chỉ ADMIN)
+     * PUT /api/auth/users/{userId}/role
+     */
+    @org.springframework.web.bind.annotation.PutMapping("/users/{userId}/role")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<com.bizpos.entity.User> updateUserRole(
+            @org.springframework.web.bind.annotation.PathVariable Long userId,
+            @Valid @RequestBody com.bizpos.dto.UpdateUserRoleRequest request) {
+        com.bizpos.entity.User updated = authService.updateUserRole(userId, request.getRole());
+        return ResponseEntity.ok(updated);
+    }
 }

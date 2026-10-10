@@ -211,6 +211,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @com.bizpos.aspect.Auditable(action = "ADJUST_STOCK", entity = "Product")
     public Product updateStock(Long id, Integer quantity) {
         if (quantity == null || quantity < 0) {
             throw new IllegalArgumentException("Số lượng tồn kho phải là số nguyên không âm (>= 0)!");

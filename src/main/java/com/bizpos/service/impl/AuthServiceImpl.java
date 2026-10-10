@@ -6,16 +6,26 @@ import com.bizpos.dto.RegisterRequest;
 import com.bizpos.entity.Role;
 import com.bizpos.entity.User;
 import com.bizpos.exception.DuplicateResourceException;
+import com.bizpos.exception.ResourceNotFoundException;
 import com.bizpos.repository.UserRepository;
 import com.bizpos.security.JwtTokenProvider;
+import com.bizpos.service.AuditLogService;
 import com.bizpos.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -24,13 +34,26 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         String trimmedUsername = request.getUsername().trim();
+        String ip = getClientIp();
 
         if (userRepository.existsByUsername(trimmedUsername)) {
+            auditLogService.recordLog(
+                    "User",
+                    trimmedUsername,
+                    "REGISTER_USER_FAILED",
+                    "Đăng ký người dùng thất bại",
+                    null,
+                    null,
+                    "Tài khoản '" + trimmedUsername + "' đã tồn tại trong hệ thống",
+                    getCurrentUsername(),
+                    ip
+            );
             throw new DuplicateResourceException("Username '" + trimmedUsername + "' đã tồn tại!");
         }
 
@@ -42,7 +65,20 @@ public class AuthServiceImpl implements AuthService {
                 .role(assignedRole)
                 .build();
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        auditLogService.recordLog(
+                "User",
+                String.valueOf(savedUser.getId()),
+                "REGISTER_USER",
+                "Đăng ký người dùng mới",
+                null,
+                "Quyền: " + assignedRole.name(),
+                String.format("Tạo mới tài khoản '%s' (ID: %d) với quyền %s",
+                        savedUser.getUsername(), savedUser.getId(), assignedRole.name()),
+                getCurrentUsername(),
+                ip
+        );
 
         String token = jwtTokenProvider.generateToken(user.getUsername(), user.getRole().name());
 
@@ -57,14 +93,44 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request) {
         String trimmedUsername = request.getUsername().trim();
+        String ip = getClientIp();
 
-        // Xác thực username và password thông qua Spring Security AuthenticationManager
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(trimmedUsername, request.getPassword())
-        );
+        try {
+            // Xác thực username và password thông qua Spring Security AuthenticationManager
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(trimmedUsername, request.getPassword())
+            );
+        } catch (AuthenticationException ex) {
+            log.warn("Đăng nhập thất bại cho user '{}' từ IP: {}. Lỗi: {}", trimmedUsername, ip, ex.getMessage());
+            auditLogService.recordLog(
+                    "User",
+                    trimmedUsername,
+                    "LOGIN_FAILED",
+                    "Đăng nhập thất bại",
+                    null,
+                    null,
+                    "Đăng nhập thất bại cho tài khoản '" + trimmedUsername + "': " + ex.getMessage(),
+                    trimmedUsername,
+                    ip
+            );
+            throw ex;
+        }
 
         User user = userRepository.findByUsername(trimmedUsername)
                 .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại!"));
+
+        auditLogService.recordLog(
+                "User",
+                String.valueOf(user.getId()),
+                "LOGIN_SUCCESS",
+                "Đăng nhập thành công",
+                null,
+                null,
+                String.format("Tài khoản '%s' (Quyền: %s) đăng nhập thành công vào hệ thống",
+                        user.getUsername(), user.getRole().name()),
+                user.getUsername(),
+                ip
+        );
 
         String token = jwtTokenProvider.generateToken(user.getUsername(), user.getRole().name());
 
@@ -74,5 +140,66 @@ public class AuthServiceImpl implements AuthService {
                 .username(user.getUsername())
                 .role(user.getRole().name())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public User updateUserRole(Long userId, Role newRole) {
+        if (newRole == null) {
+            throw new IllegalArgumentException("Quyền (Role) không được để trống!");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
+
+        Role oldRole = user.getRole();
+        if (oldRole == newRole) {
+            return user;
+        }
+
+        user.setRole(newRole);
+        User saved = userRepository.save(user);
+
+        String ip = getClientIp();
+        String currentActor = getCurrentUsername();
+        String details = String.format("Thay đổi quyền tài khoản '%s' (ID: %d) từ %s sang %s",
+                user.getUsername(), user.getId(), oldRole != null ? oldRole.name() : "NONE", newRole.name());
+
+        auditLogService.recordLog(
+                "User",
+                String.valueOf(user.getId()),
+                "CHANGE_ROLE",
+                "Thay đổi quyền người dùng",
+                oldRole != null ? oldRole.name() : "NONE",
+                newRole.name(),
+                details,
+                currentActor,
+                ip
+        );
+
+        return saved;
+    }
+
+    private String getClientIp() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest req = attributes.getRequest();
+                String xf = req.getHeader("X-Forwarded-For");
+                if (xf != null && !xf.isBlank()) {
+                    return xf.split(",")[0].trim();
+                }
+                return req.getRemoteAddr();
+            }
+        } catch (Exception ignored) {}
+        return "127.0.0.1";
+    }
+
+    private String getCurrentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            return auth.getName();
+        }
+        return "SYSTEM";
     }
 }

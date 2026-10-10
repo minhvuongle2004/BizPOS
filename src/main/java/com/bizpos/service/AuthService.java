@@ -15,4 +15,9 @@ public interface AuthService {
      * Đăng nhập hệ thống và trả về JWT token
      */
     AuthResponse login(LoginRequest request);
+
+    /**
+     * Cập nhật vai trò / phân quyền người dùng (Dành cho Admin)
+     */
+    com.bizpos.entity.User updateUserRole(Long userId, com.bizpos.entity.Role newRole);
 }

@@ -66,6 +66,9 @@ public class AuditLogIntegrationTest {
     @Autowired
     private AuditLogRepository auditLogRepository;
 
+    @Autowired
+    private com.bizpos.repository.UserRepository userRepository;
+
     private String adminToken;
     private String staffToken;
     private Product testProduct;
@@ -183,5 +186,94 @@ public class AuditLogIntegrationTest {
                         .header("Authorization", adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    @DisplayName("5. Điều chỉnh tồn kho (PATCH /api/products/{id}/stock) kích hoạt ghi nhận ADJUST_STOCK")
+    void testAdjustStock_TriggersAuditLog() throws Exception {
+        int newStock = 88;
+        mockMvc.perform(patch("/api/products/" + testProduct.getId() + "/stock")
+                        .header("Authorization", adminToken)
+                        .param("quantity", String.valueOf(newStock)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stockQuantity").value(newStock));
+
+        List<AuditLog> logs = auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc("Product", String.valueOf(testProduct.getId()));
+        AuditLog latest = logs.stream()
+                .filter(l -> "ADJUST_STOCK".equals(l.getAction()))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(latest, "Phải ghi nhận bản ghi ADJUST_STOCK trong audit_logs");
+        assertEquals("admin", latest.getPerformedBy());
+        assertTrue(latest.getDetails().contains("88"));
+    }
+
+    @Test
+    @DisplayName("6. Đăng nhập thất bại (POST /api/auth/login sai password) ghi nhận LOGIN_FAILED kể cả khi trả về 401 Unauthorized")
+    void testLoginFailed_TriggersAuditLog() throws Exception {
+        String testUser = "audit_bad_user_" + UUID.randomUUID().toString().substring(0, 5);
+        com.bizpos.dto.LoginRequest badLogin = com.bizpos.dto.LoginRequest.builder()
+                .username(testUser)
+                .password("wrongpassword")
+                .build();
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(badLogin)))
+                .andExpect(status().isUnauthorized());
+
+        List<AuditLog> logs = auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc("User", testUser);
+        assertFalse(logs.isEmpty(), "Phải ghi nhận bản ghi LOGIN_FAILED ngay cả khi xác thực thất bại");
+        assertEquals("LOGIN_FAILED", logs.get(0).getAction());
+        assertEquals("Đăng nhập thất bại", logs.get(0).getActionDescription());
+    }
+
+    @Test
+    @DisplayName("7. Đổi quyền người dùng (PUT /api/users/{id}/role) ghi nhận CHANGE_ROLE")
+    void testChangeUserRole_TriggersAuditLog() throws Exception {
+        String testUser = "staff_to_promote_" + UUID.randomUUID().toString().substring(0, 5);
+        User user = User.builder()
+                .username(testUser)
+                .password("$2a$10$abcdefghijklmnopqrstuvwxyz123456")
+                .role(Role.STAFF)
+                .build();
+        user = userRepository.save(user);
+
+        com.bizpos.dto.UpdateUserRoleRequest req = com.bizpos.dto.UpdateUserRoleRequest.builder()
+                .role(Role.ADMIN)
+                .build();
+
+        mockMvc.perform(put("/api/users/" + user.getId() + "/role")
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+
+        List<AuditLog> logs = auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc("User", String.valueOf(user.getId()));
+        AuditLog latest = logs.stream()
+                .filter(l -> "CHANGE_ROLE".equals(l.getAction()))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(latest, "Phải ghi nhận CHANGE_ROLE khi đổi quyền người dùng");
+        assertEquals("STAFF", latest.getOldValue());
+        assertEquals("ADMIN", latest.getNewValue());
+        assertEquals("admin", latest.getPerformedBy());
+    }
+
+    @Test
+    @DisplayName("8. Nhân viên (STAFF) không có quyền đổi vai trò người dùng (403 Forbidden)")
+    void testStaffCannotChangeUserRole() throws Exception {
+        com.bizpos.dto.UpdateUserRoleRequest req = com.bizpos.dto.UpdateUserRoleRequest.builder()
+                .role(Role.ADMIN)
+                .build();
+
+        mockMvc.perform(put("/api/users/1/role")
+                        .header("Authorization", staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
     }
 }

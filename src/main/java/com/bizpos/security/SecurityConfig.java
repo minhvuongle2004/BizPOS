@@ -61,8 +61,8 @@ public class SecurityConfig {
                         // 2. Thao tác xóa (DELETE) các tài nguyên chỉ dành cho quyền ADMIN
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
 
-                        // 3. Nhật ký kiểm toán hệ thống (Audit Logs) chỉ dành cho quyền ADMIN
-                        .requestMatchers("/api/audit-logs/**").hasRole("ADMIN")
+                        // 3. Nhật ký kiểm toán hệ thống (Audit Logs) & Quản lý User chỉ dành cho quyền ADMIN
+                        .requestMatchers("/api/audit-logs/**", "/api/users/**").hasRole("ADMIN")
 
                         // 4. Toàn bộ các API nghiệp vụ còn lại yêu cầu JWT (cả ADMIN và STAFF đều truy cập được)
                         .requestMatchers("/api/**").authenticated()
