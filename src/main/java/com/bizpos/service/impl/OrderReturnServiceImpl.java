@@ -62,6 +62,11 @@ public class OrderReturnServiceImpl implements OrderReturnService {
         Order order = orderRepository.findByOrderCodeWithLock(orderCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
 
+        // Kiểm tra trạng thái đơn hàng (không cho đổi/trả đơn hàng đã bị hủy)
+        if (order.getStatus() == com.bizpos.enums.OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Đơn hàng '" + orderCode + "' đã bị hủy, không thể thực hiện đổi / trả hàng!");
+        }
+
         // 1. Kiểm tra chính sách hạn đổi trả (7 ngày)
         LocalDate purchaseDate = order.getOrderDate().toLocalDate();
         long daysSincePurchase = ChronoUnit.DAYS.between(purchaseDate, LocalDate.now());
@@ -409,6 +414,17 @@ public class OrderReturnServiceImpl implements OrderReturnService {
 
         Order order = orderRepository.findByOrderCode(orderCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
+
+        if (order.getStatus() == com.bizpos.enums.OrderStatus.CANCELLED) {
+            return EligibleReturnOrderResponse.builder()
+                    .orderId(order.getId())
+                    .orderCode(order.getOrderCode())
+                    .orderDate(order.getOrderDate())
+                    .eligible(false)
+                    .message("Đơn hàng đã bị hủy, không đủ điều kiện đổi trả.")
+                    .items(java.util.Collections.emptyList())
+                    .build();
+        }
 
         LocalDate purchaseDate = order.getOrderDate().toLocalDate();
         long daysSincePurchase = ChronoUnit.DAYS.between(purchaseDate, LocalDate.now());

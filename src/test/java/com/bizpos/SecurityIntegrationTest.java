@@ -455,8 +455,10 @@ public class SecurityIntegrationTest {
     @Test
     @DisplayName("Order Update: ADMIN được phép sửa thông tin hóa đơn trả về HTTP 200 OK")
     void admin_canUpdateOrder_returns200() throws Exception {
-        Order order = orderRepository.findAll().stream().findFirst().orElse(null);
-        if (order != null && !order.getItems().isEmpty()) {
+        Order order = orderRepository.findAll().stream()
+                .filter(o -> o.getStatus() != com.bizpos.enums.OrderStatus.CANCELLED && !o.getItems().isEmpty())
+                .findFirst().orElse(null);
+        if (order != null) {
             CreateOrderRequest req = CreateOrderRequest.builder()
                     .items(List.of(OrderItemRequest.builder()
                             .productId(order.getItems().get(0).getProduct().getId())

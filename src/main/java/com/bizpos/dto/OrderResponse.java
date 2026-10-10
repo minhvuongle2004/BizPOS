@@ -28,6 +28,7 @@ public class OrderResponse {
     private BigDecimal discountAmount;
     private BigDecimal totalAmount;
     private String note;
+    private com.bizpos.enums.OrderStatus status;
     private com.bizpos.enums.PaymentMethod paymentMethod;
     private com.bizpos.enums.PaymentStatus paymentStatus;
     private BigDecimal amountPaid;
@@ -59,6 +60,7 @@ public class OrderResponse {
                 .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .note(order.getNote())
+                .status(order.getStatus())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentStatus(order.getPaymentStatus())
                 .amountPaid(order.getAmountPaid())

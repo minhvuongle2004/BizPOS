@@ -60,6 +60,11 @@ public class Order extends BaseEntity {
     private com.bizpos.enums.PaymentMethod paymentMethod = com.bizpos.enums.PaymentMethod.CASH;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 30, nullable = false)
+    @Builder.Default
+    private com.bizpos.enums.OrderStatus status = com.bizpos.enums.OrderStatus.COMPLETED;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", length = 30, nullable = false)
     @Builder.Default
     private com.bizpos.enums.PaymentStatus paymentStatus = com.bizpos.enums.PaymentStatus.COMPLETED;

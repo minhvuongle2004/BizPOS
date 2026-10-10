@@ -69,9 +69,24 @@ public class OrderController {
     }
 
     /**
-     * 5. Xóa đơn hàng theo ID
+     * 5. Hủy đơn hàng theo ID (hoàn kho an toàn, chống race condition với đổi trả)
+     * POST /api/orders/{id}/cancel
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<OrderResponse> cancelOrder(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
+        Order cancelledOrder = orderService.cancelOrder(id, reason);
+        return ResponseEntity.ok(OrderResponse.fromEntity(cancelledOrder));
+    }
+
+    /**
+     * 6. Xóa đơn hàng theo ID
      * DELETE /api/orders/{id}
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> deleteOrder(@PathVariable Long id) {
         orderService.deleteOrder(id);

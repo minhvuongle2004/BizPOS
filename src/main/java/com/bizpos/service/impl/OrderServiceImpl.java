@@ -6,6 +6,7 @@ import com.bizpos.entity.Customer;
 import com.bizpos.entity.Order;
 import com.bizpos.entity.OrderItem;
 import com.bizpos.entity.Product;
+import com.bizpos.entity.ProductVariant;
 import com.bizpos.exception.ResourceNotFoundException;
 import com.bizpos.repository.CustomerRepository;
 import com.bizpos.repository.OrderRepository;
@@ -31,6 +32,7 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerRepository customerRepository;
     private final com.bizpos.service.StockMovementService stockMovementService;
     private final com.bizpos.repository.ProductVariantRepository productVariantRepository;
+    private final com.bizpos.repository.OrderReturnRepository orderReturnRepository;
 
     /**
      * Tạo đơn hàng mới kết hợp Customer, Product, Order và OrderItem
@@ -217,38 +219,206 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    @com.bizpos.aspect.Auditable(action = "CANCEL_ORDER", entity = "Order")
+    public Order cancelOrder(Long id, String reason) {
+        // 0. KHÓA ĐƠN HÀNG TRƯỚC HẾT (Pessimistic Write Lock) để thống nhất thứ tự: Order -> Products (ID tăng dần)
+        Order order = orderRepository.findByIdWithLock(id)
+                .or(() -> orderRepository.findByIdWithDetails(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
+
+        if (order.getStatus() == com.bizpos.enums.OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Đơn hàng này đã bị hủy trước đó!");
+        }
+
+        // 1. Gom tất cả productIds và variantIds của đơn hàng, sắp xếp tăng dần theo ID để chống Deadlock
+        java.util.Set<Long> productIds = new java.util.TreeSet<>();
+        java.util.Set<Long> variantIds = new java.util.TreeSet<>();
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                if (item.getProduct() != null) {
+                    productIds.add(item.getProduct().getId());
+                }
+                if (item.getVariant() != null) {
+                    variantIds.add(item.getVariant().getId());
+                }
+            }
+        }
+
+        // 2. Khóa các sản phẩm và biến thể theo thứ tự ID tăng dần
+        java.util.Map<Long, Product> lockedProducts = new java.util.HashMap<>();
+        for (Long pid : productIds) {
+            Product p = productRepository.findByIdWithLock(pid)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + pid));
+            lockedProducts.put(pid, p);
+        }
+
+        java.util.Map<Long, com.bizpos.entity.ProductVariant> lockedVariants = new java.util.HashMap<>();
+        for (Long vid : variantIds) {
+            com.bizpos.entity.ProductVariant v = productVariantRepository.findByIdWithLock(vid)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với ID: " + vid));
+            lockedVariants.put(vid, v);
+        }
+
+        // 3. Hoàn tồn kho cho các sản phẩm chưa bị đổi/trả (Tránh hoàn trùng kho nếu thu ngân đã trả hàng trước đó)
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                int alreadyReturned = 0;
+                if (item.getId() != null) {
+                    alreadyReturned = orderReturnRepository.countReturnedQuantityByOrderItem(item.getId());
+                }
+                int remainingToRestock = item.getQuantity() - alreadyReturned;
+                if (remainingToRestock <= 0) {
+                    continue; // Món này đã được thu ngân xử lý trả và hoàn kho trước đó
+                }
+
+                if (item.getVariant() != null) {
+                    com.bizpos.entity.ProductVariant variant = lockedVariants.get(item.getVariant().getId());
+                    int currentStock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+                    int newStock = currentStock + remainingToRestock;
+                    variant.setStockQuantity(newStock);
+                    productVariantRepository.save(variant);
+
+                    Product prod = lockedProducts.get(variant.getProduct().getId());
+                    if (prod != null) {
+                        int pStock = prod.getStockQuantity() != null ? prod.getStockQuantity() : 0;
+                        prod.setStockQuantity(pStock + remainingToRestock);
+                        productRepository.save(prod);
+                    }
+
+                    stockMovementService.recordMovement(
+                            prod,
+                            variant,
+                            com.bizpos.entity.MovementType.RETURN,
+                            remainingToRestock,
+                            currentStock,
+                            newStock,
+                            order.getOrderCode(),
+                            "Hoàn kho do hủy đơn hàng " + order.getOrderCode() + (reason != null ? " (" + reason + ")" : ""),
+                            getCurrentUsername()
+                    );
+                } else if (item.getProduct() != null) {
+                    Product prod = lockedProducts.get(item.getProduct().getId());
+                    int currentStock = prod.getStockQuantity() != null ? prod.getStockQuantity() : 0;
+                    int newStock = currentStock + remainingToRestock;
+                    prod.setStockQuantity(newStock);
+                    productRepository.save(prod);
+
+                    stockMovementService.recordMovement(
+                            prod,
+                            com.bizpos.entity.MovementType.RETURN,
+                            remainingToRestock,
+                            currentStock,
+                            newStock,
+                            order.getOrderCode(),
+                            "Hoàn kho do hủy đơn hàng " + order.getOrderCode() + (reason != null ? " (" + reason + ")" : ""),
+                            getCurrentUsername()
+                    );
+                }
+            }
+        }
+
+        order.setStatus(com.bizpos.enums.OrderStatus.CANCELLED);
+        order.setPaymentStatus(com.bizpos.enums.PaymentStatus.REFUNDED);
+        if (reason != null && !reason.trim().isEmpty()) {
+            order.setNote((order.getNote() != null ? order.getNote() + " | [HỦY ĐƠN]: " : "[HỦY ĐƠN]: ") + reason.trim());
+        }
+        return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
     @com.bizpos.aspect.Auditable(action = "UPDATE_ORDER", entity = "Order")
     public Order updateOrder(Long id, CreateOrderRequest request) {
         if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
             throw new IllegalArgumentException("Đơn hàng phải chứa ít nhất 1 sản phẩm!");
         }
 
-        // 1. Tìm đơn theo id; không có thì báo lỗi
-        Order order = getOrderById(id);
+        // 0. KHÓA ĐƠN HÀNG TRƯỚC HẾT (Pessimistic Write Lock)
+        Order order = orderRepository.findByIdWithLock(id)
+                .or(() -> orderRepository.findByIdWithDetails(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
 
-        // 2. Cập nhật khách hàng và ghi chú
-        Customer customer = null;
-        if (request.getCustomerId() != null) {
-            customer = customerRepository.findById(request.getCustomerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + request.getCustomerId()));
+        if (order.getStatus() == com.bizpos.enums.OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Không thể chỉnh sửa đơn hàng đã bị hủy!");
         }
-        order.setCustomer(customer);
-        order.setNote(request.getNote() != null ? request.getNote().trim() : null);
 
-        // 3. Hoàn trả lại số lượng tồn kho của các OrderItem cũ trước khi thay thế
+        // 1. Gom tất cả productIds và variantIds của CẢ dòng cũ LẪN dòng mới, sắp xếp tăng dần theo ID để PESSIMISTIC LOCK chống DEADLOCK
+        java.util.Set<Long> allProductIds = new java.util.TreeSet<>();
+        java.util.Set<Long> allVariantIds = new java.util.TreeSet<>();
+
+        if (order.getItems() != null) {
+            for (OrderItem oi : order.getItems()) {
+                if (oi.getProduct() != null) allProductIds.add(oi.getProduct().getId());
+                if (oi.getVariant() != null) allVariantIds.add(oi.getVariant().getId());
+            }
+        }
+
+        for (OrderItemRequest reqItem : request.getItems()) {
+            if (reqItem.getProductId() != null) allProductIds.add(reqItem.getProductId());
+            if (reqItem.getVariantId() != null) allVariantIds.add(reqItem.getVariantId());
+        }
+
+        // 2. Khóa các sản phẩm và biến thể theo thứ tự ID tăng dần
+        java.util.Map<Long, Product> lockedProducts = new java.util.HashMap<>();
+        for (Long pid : allProductIds) {
+            Product p = productRepository.findByIdWithLock(pid)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + pid));
+            lockedProducts.put(pid, p);
+        }
+
+        java.util.Map<Long, com.bizpos.entity.ProductVariant> lockedVariants = new java.util.HashMap<>();
+        for (Long vid : allVariantIds) {
+            com.bizpos.entity.ProductVariant v = productVariantRepository.findByIdWithLock(vid)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với ID: " + vid));
+            lockedVariants.put(vid, v);
+        }
+
+        // 3. Hoàn trả tồn kho cho các OrderItem cũ (có trừ đi số lượng đã bị đổi/trả nếu có)
         if (order.getItems() != null) {
             for (OrderItem oldItem : order.getItems()) {
-                if (oldItem.getProduct() != null) {
-                    Product oldProduct = oldItem.getProduct();
+                int alreadyReturned = 0;
+                if (oldItem.getId() != null) {
+                    alreadyReturned = orderReturnRepository.countReturnedQuantityByOrderItem(oldItem.getId());
+                }
+                int remainingToRestock = oldItem.getQuantity() - alreadyReturned;
+                if (remainingToRestock <= 0) continue;
+
+                if (oldItem.getVariant() != null) {
+                    com.bizpos.entity.ProductVariant variant = lockedVariants.get(oldItem.getVariant().getId());
+                    int curStock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+                    int newStock = curStock + remainingToRestock;
+                    variant.setStockQuantity(newStock);
+                    productVariantRepository.save(variant);
+
+                    Product prod = lockedProducts.get(variant.getProduct().getId());
+                    if (prod != null) {
+                        int pStock = prod.getStockQuantity() != null ? prod.getStockQuantity() : 0;
+                        prod.setStockQuantity(pStock + remainingToRestock);
+                        productRepository.save(prod);
+                    }
+
+                    stockMovementService.recordMovement(
+                            prod,
+                            variant,
+                            com.bizpos.entity.MovementType.RETURN,
+                            remainingToRestock,
+                            curStock,
+                            newStock,
+                            order.getOrderCode(),
+                            "Hoàn kho do cập nhật đơn hàng " + order.getOrderCode(),
+                            getCurrentUsername()
+                    );
+                } else if (oldItem.getProduct() != null) {
+                    Product oldProduct = lockedProducts.get(oldItem.getProduct().getId());
                     int currentStock = oldProduct.getStockQuantity() != null ? oldProduct.getStockQuantity() : 0;
-                    int newStock = currentStock + oldItem.getQuantity();
+                    int newStock = currentStock + remainingToRestock;
                     oldProduct.setStockQuantity(newStock);
                     productRepository.save(oldProduct);
 
                     stockMovementService.recordMovement(
                             oldProduct,
                             com.bizpos.entity.MovementType.RETURN,
-                            oldItem.getQuantity(),
+                            remainingToRestock,
                             currentStock,
                             newStock,
                             order.getOrderCode(),
@@ -259,74 +429,114 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 4. Xóa danh sách OrderItem cũ khỏi đơn (orphanRemoval = true sẽ xóa các dòng chi tiết cũ khỏi DB)
+        // 4. Cập nhật khách hàng và ghi chú
+        Customer customer = null;
+        if (request.getCustomerId() != null) {
+            customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + request.getCustomerId()));
+        }
+        order.setCustomer(customer);
+        order.setNote(request.getNote() != null ? request.getNote().trim() : null);
+
+        // 5. Xóa danh sách OrderItem cũ khỏi đơn
         order.getItems().clear();
 
-        // 5. Tạo lại các OrderItem mới từ request (sắp xếp items theo productId tăng dần để chống Deadlock)
+        // 6. Trừ tồn kho và thêm OrderItem mới
+        BigDecimal totalAmount = BigDecimal.ZERO;
         List<OrderItemRequest> sortedItems = request.getItems().stream()
-                .sorted(java.util.Comparator.comparing(OrderItemRequest::getProductId))
+                .sorted(java.util.Comparator.comparing(i -> i.getVariantId() != null ? i.getVariantId() : (i.getProductId() != null ? i.getProductId() : 0L)))
                 .toList();
 
-        BigDecimal totalAmount = BigDecimal.ZERO;
-
         for (OrderItemRequest itemReq : sortedItems) {
-            if (itemReq.getProductId() == null) {
-                throw new IllegalArgumentException("Vui lòng cung cấp productId cho từng mục hàng!");
-            }
-            if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
-                throw new IllegalArgumentException("Số lượng mua cho từng sản phẩm phải lớn hơn 0!");
+            ProductVariant variant = null;
+            Product product = null;
+            if (itemReq.getVariantId() != null) {
+                variant = lockedVariants.get(itemReq.getVariantId());
+                product = variant.getProduct();
+            } else if (itemReq.getProductId() != null) {
+                product = lockedProducts.get(itemReq.getProductId());
             }
 
-            Product product = productRepository.findByIdWithLock(itemReq.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + itemReq.getProductId()));
-
-            // KIỂM TRA VÀ TRỪ TỒN KHO CHO ĐƠN CẬP NHẬT:
-            int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
             int requestedQty = itemReq.getQuantity();
+            int currentStock = variant != null ? (variant.getStockQuantity() != null ? variant.getStockQuantity() : 0)
+                                               : (product.getStockQuantity() != null ? product.getStockQuantity() : 0);
 
             if (requestedQty > currentStock) {
                 throw new com.bizpos.exception.InsufficientStockException(
-                        "Sản phẩm '" + product.getName() + "' (Mã: " + product.getCode() + 
-                        ") không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
+                        "Sản phẩm '" + product.getName() +
+                        "' không đủ số lượng tồn kho (Tồn kho hiện tại: " + currentStock + ", yêu cầu: " + requestedQty + ")!");
             }
 
             int newStock = currentStock - requestedQty;
-            product.setStockQuantity(newStock);
-            productRepository.save(product);
+            if (variant != null) {
+                variant.setStockQuantity(newStock);
+                productVariantRepository.save(variant);
 
-            stockMovementService.recordMovement(
-                    product,
-                    com.bizpos.entity.MovementType.SALE,
-                    requestedQty,
-                    currentStock,
-                    newStock,
-                    order.getOrderCode(),
-                    "Xuất kho bán hàng (cập nhật đơn hàng) " + order.getOrderCode(),
-                    getCurrentUsername()
-            );
+                int pStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                product.setStockQuantity(pStock - requestedQty);
+                productRepository.save(product);
 
-            BigDecimal unitPrice = product.getPrice();
-            int quantity = itemReq.getQuantity();
-            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+                stockMovementService.recordMovement(
+                        product,
+                        variant,
+                        com.bizpos.entity.MovementType.SALE,
+                        requestedQty,
+                        currentStock,
+                        newStock,
+                        order.getOrderCode(),
+                        "Xuất kho bán hàng (cập nhật đơn hàng) " + order.getOrderCode(),
+                        getCurrentUsername()
+                );
+            } else {
+                product.setStockQuantity(newStock);
+                productRepository.save(product);
+
+                stockMovementService.recordMovement(
+                        product,
+                        com.bizpos.entity.MovementType.SALE,
+                        requestedQty,
+                        currentStock,
+                        newStock,
+                        order.getOrderCode(),
+                        "Xuất kho bán hàng (cập nhật đơn hàng) " + order.getOrderCode(),
+                        getCurrentUsername()
+                );
+            }
+
+            BigDecimal unitPrice = (variant != null && variant.getPrice() != null)
+                    ? variant.getPrice()
+                    : product.getPrice();
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(requestedQty));
 
             OrderItem orderItem = OrderItem.builder()
+                    .order(order)
                     .product(product)
+                    .variant(variant)
                     .productName(product.getName())
                     .unitPrice(unitPrice)
-                    .quantity(quantity)
+                    .quantity(requestedQty)
                     .lineTotal(lineTotal)
                     .build();
 
             order.addItem(orderItem);
-
-            // 6. Tính lại totalAmount
             totalAmount = totalAmount.add(lineTotal);
         }
 
-        order.setTotalAmount(totalAmount);
-        applyPaymentDetails(order, request, totalAmount);
+        BigDecimal subtotal = totalAmount;
+        BigDecimal discount = request.getDiscountAmount() != null ? request.getDiscountAmount() : BigDecimal.ZERO;
+        if (discount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Số tiền chiết khấu không được âm!");
+        }
+        if (discount.compareTo(subtotal) > 0) {
+            throw new IllegalArgumentException("Số tiền chiết khấu (" + discount + ") không được vượt quá tổng tiền hàng (" + subtotal + ")!");
+        }
+        BigDecimal finalTotal = subtotal.subtract(discount);
 
-        // 7. Lưu trong @Transactional
+        order.setSubtotal(subtotal);
+        order.setDiscountAmount(discount);
+        order.setTotalAmount(finalTotal);
+        applyPaymentDetails(order, request, finalTotal);
+
         return orderRepository.save(order);
     }
 
@@ -334,26 +544,88 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     @com.bizpos.aspect.Auditable(action = "DELETE_ORDER", entity = "Order")
     public void deleteOrder(Long id) {
-        Order order = getOrderById(id);
+        // 0. KHÓA ĐƠN HÀNG TRƯỚC HẾT (Pessimistic Write Lock) để thống nhất thứ tự: Order -> Products (ID tăng dần)
+        Order order = orderRepository.findByIdWithLock(id)
+                .or(() -> orderRepository.findByIdWithDetails(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + id));
 
-        // Hoàn trả tồn kho cho tất cả các sản phẩm trong đơn khi đơn bị xóa
-        if (order.getItems() != null) {
+        // Nếu đơn hàng chưa bị hủy thì mới cần hoàn kho (nếu đã bị CANCELLED thì kho đã hoàn lúc hủy)
+        if (order.getStatus() != com.bizpos.enums.OrderStatus.CANCELLED && order.getItems() != null) {
+            java.util.Set<Long> productIds = new java.util.TreeSet<>();
+            java.util.Set<Long> variantIds = new java.util.TreeSet<>();
             for (OrderItem item : order.getItems()) {
                 if (item.getProduct() != null) {
-                    Product product = item.getProduct();
-                    int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
-                    int newStock = currentStock + item.getQuantity();
-                    product.setStockQuantity(newStock);
-                    productRepository.save(product);
+                    productIds.add(item.getProduct().getId());
+                }
+                if (item.getVariant() != null) {
+                    variantIds.add(item.getVariant().getId());
+                }
+            }
+
+            java.util.Map<Long, Product> lockedProducts = new java.util.HashMap<>();
+            for (Long pid : productIds) {
+                Product p = productRepository.findByIdWithLock(pid)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + pid));
+                lockedProducts.put(pid, p);
+            }
+
+            java.util.Map<Long, com.bizpos.entity.ProductVariant> lockedVariants = new java.util.HashMap<>();
+            for (Long vid : variantIds) {
+                com.bizpos.entity.ProductVariant v = productVariantRepository.findByIdWithLock(vid)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với ID: " + vid));
+                lockedVariants.put(vid, v);
+            }
+
+            for (OrderItem item : order.getItems()) {
+                int alreadyReturned = 0;
+                if (item.getId() != null) {
+                    alreadyReturned = orderReturnRepository.countReturnedQuantityByOrderItem(item.getId());
+                }
+                int remainingToRestock = item.getQuantity() - alreadyReturned;
+                if (remainingToRestock <= 0) {
+                    continue;
+                }
+
+                if (item.getVariant() != null) {
+                    com.bizpos.entity.ProductVariant variant = lockedVariants.get(item.getVariant().getId());
+                    int currentStock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+                    int newStock = currentStock + remainingToRestock;
+                    variant.setStockQuantity(newStock);
+                    productVariantRepository.save(variant);
+
+                    Product prod = lockedProducts.get(variant.getProduct().getId());
+                    if (prod != null) {
+                        int pStock = prod.getStockQuantity() != null ? prod.getStockQuantity() : 0;
+                        prod.setStockQuantity(pStock + remainingToRestock);
+                        productRepository.save(prod);
+                    }
 
                     stockMovementService.recordMovement(
-                            product,
+                            prod,
+                            variant,
                             com.bizpos.entity.MovementType.RETURN,
-                            item.getQuantity(),
+                            remainingToRestock,
                             currentStock,
                             newStock,
                             order.getOrderCode(),
-                            "Hoàn kho do hủy đơn hàng " + order.getOrderCode(),
+                            "Hoàn kho do xóa đơn hàng " + order.getOrderCode(),
+                            getCurrentUsername()
+                    );
+                } else if (item.getProduct() != null) {
+                    Product prod = lockedProducts.get(item.getProduct().getId());
+                    int currentStock = prod.getStockQuantity() != null ? prod.getStockQuantity() : 0;
+                    int newStock = currentStock + remainingToRestock;
+                    prod.setStockQuantity(newStock);
+                    productRepository.save(prod);
+
+                    stockMovementService.recordMovement(
+                            prod,
+                            com.bizpos.entity.MovementType.RETURN,
+                            remainingToRestock,
+                            currentStock,
+                            newStock,
+                            order.getOrderCode(),
+                            "Hoàn kho do xóa đơn hàng " + order.getOrderCode(),
                             getCurrentUsername()
                     );
                 }

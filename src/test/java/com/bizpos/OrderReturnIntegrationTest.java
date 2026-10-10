@@ -647,4 +647,143 @@ public class OrderReturnIntegrationTest {
         // 6. Sau 3 lần, hết sạch số lượng được trả
         assertEquals(3, orderReturnRepository.countReturnedQuantityByOrderItem(orderItemId));
     }
+
+    @Test
+    @DisplayName("14. Chống trả đơn đã hủy: Đơn hàng có trạng thái CANCELLED bị từ chối đổi trả ngay lập tức")
+    void testProcessReturn_onCancelledOrder_shouldBeRejectedImmediately() throws Exception {
+        Category category = categoryRepository.findAll().stream().findFirst().orElseGet(() ->
+                categoryRepository.save(Category.builder().name("Áo Thời Trang").build()));
+
+        String suffix = java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        Product product = productRepository.save(Product.builder()
+                .code("CANCEL_TEST_" + suffix)
+                .name("Sản phẩm Test Hủy Đơn " + suffix)
+                .price(new BigDecimal("250000.00"))
+                .stockQuantity(10)
+                .category(category)
+                .build());
+
+        Order order = orderService.createOrder(CreateOrderRequest.builder()
+                .items(List.of(OrderItemRequest.builder().productId(product.getId()).quantity(2).build()))
+                .amountPaid(new BigDecimal("500000.00"))
+                .note("Đơn test hủy trước khi đổi trả")
+                .build());
+
+        // Admin hủy đơn hàng
+        orderService.cancelOrder(order.getId(), "Khách hủy do đặt nhầm mẫu");
+
+        // 1. Kiểm tra API Tra cứu điều kiện: eligible = false
+        mockMvc.perform(get("/api/returns/eligible/" + order.getOrderCode())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eligible").value(false))
+                .andExpect(jsonPath("$.message").value("Đơn hàng đã bị hủy, không đủ điều kiện đổi trả."));
+
+        // 2. Thu ngân cố tình gửi request trả hàng: Bị chặn ngay với HTTP 400 Bad Request
+        OrderReturnRequest returnReq = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .reason(ReturnReason.DEFECTIVE)
+                .returnItems(List.of(ReturnItemRequest.builder().productId(product.getId()).quantity(1).build()))
+                .build();
+
+        mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(returnReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("đã bị hủy")));
+    }
+
+    @Test
+    @DisplayName("15. Race condition giữa Admin Hủy Đơn vs Thu Ngân Trả Hàng: Khóa đúng thứ tự Order -> Products, không Deadlock, tồn kho không bị cộng hai lần")
+    void testRaceCondition_adminCancelVsCashierReturn_shouldNeverDoubleRestockAndNoDeadlock() throws Exception {
+        Category category = categoryRepository.findAll().stream().findFirst().orElseGet(() ->
+                categoryRepository.save(Category.builder().name("Áo Thời Trang").build()));
+
+        String suffix = java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        Product raceProd = productRepository.save(Product.builder()
+                .code("RACE_CANCEL_" + suffix)
+                .name("SP Đua Hủy vs Trả " + suffix)
+                .price(new BigDecimal("180000.00"))
+                .stockQuantity(10) // Tồn ban đầu = 10
+                .category(category)
+                .build());
+
+        // Mua 1 cái -> Tồn kho giảm xuống 9
+        Order order = orderService.createOrder(CreateOrderRequest.builder()
+                .items(List.of(OrderItemRequest.builder().productId(raceProd.getId()).quantity(1).build()))
+                .amountPaid(new BigDecimal("180000.00"))
+                .note("Đơn test race giữa cancel và return")
+                .build());
+
+        Long orderId = order.getId();
+        String orderCode = order.getOrderCode();
+        int stockAfterPurchase = productRepository.findById(raceProd.getId()).orElseThrow().getStockQuantity(); // 9
+        assertEquals(9, stockAfterPurchase);
+
+        int threadCount = 2;
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+        java.util.concurrent.CountDownLatch readyLatch = new java.util.concurrent.CountDownLatch(threadCount);
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+
+        java.util.concurrent.atomic.AtomicBoolean cancelSucceeded = new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.concurrent.atomic.AtomicBoolean returnSucceeded = new java.util.concurrent.atomic.AtomicBoolean(false);
+        List<Throwable> exceptions = Collections.synchronizedList(new java.util.ArrayList<>());
+
+        // Luồng 1: Admin thực hiện HỦY ĐƠN HÀNG
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken("admin", null,
+                                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                );
+                orderService.cancelOrder(orderId, "Admin hủy qua dashboard");
+                cancelSucceeded.set(true);
+            } catch (Throwable t) {
+                exceptions.add(t);
+            }
+        });
+
+        // Luồng 2: Thu ngân thực hiện TRẢ HÀNG
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken("cashier_1", null,
+                                List.of(new SimpleGrantedAuthority("ROLE_STAFF")))
+                );
+                OrderReturnRequest req = OrderReturnRequest.builder()
+                        .orderCode(orderCode)
+                        .reason(ReturnReason.DEFECTIVE)
+                        .returnItems(List.of(ReturnItemRequest.builder().productId(raceProd.getId()).quantity(1).build()))
+                        .build();
+                orderReturnService.processReturn(req);
+                returnSucceeded.set(true);
+            } catch (Throwable t) {
+                exceptions.add(t);
+            }
+        });
+
+        readyLatch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        startLatch.countDown(); // Phát súng cho cả 2 luồng cùng đua vào MySQL
+        executor.shutdown();
+        boolean finished = executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(finished, "Cả 2 luồng phải kết thúc an toàn, KHÔNG được xảy ra Deadlock!");
+
+        // 1. Kiểm tra tồn kho sau cuộc đua: Tồn kho ban đầu là 10, bán 1 còn 9.
+        // Dù Admin hủy đơn trước hay Thu ngân trả hàng trước:
+        // Tồn kho cuối cùng CHỈ ĐƯỢC PHÉP HOÀN ĐÚNG 1 LẦN -> Về lại chính xác 10, TUYỆT ĐỐI KHÔNG ĐƯỢC LÊN 11!
+        Product finalProduct = productRepository.findById(raceProd.getId()).orElseThrow();
+        assertEquals(10, finalProduct.getStockQuantity(),
+                "Tồn kho sản phẩm phải về đúng 10 (chỉ hoàn kho đúng 1 cái, không bao giờ bị cộng hai lần lên 11)!");
+
+        // 2. Kiểm tra trạng thái đơn: Phải là CANCELLED nếu admin hủy thành công
+        Order finalOrder = orderRepository.findById(orderId).orElseThrow();
+        if (cancelSucceeded.get()) {
+            assertEquals(com.bizpos.enums.OrderStatus.CANCELLED, finalOrder.getStatus());
+        }
+    }
 }

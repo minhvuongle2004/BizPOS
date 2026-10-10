@@ -33,6 +33,11 @@ public interface OrderService {
     Order updateOrder(Long id, CreateOrderRequest request);
 
     /**
+     * Hủy đơn hàng theo ID (hoàn trả tồn kho cho các sản phẩm chưa bị đổi/trả)
+     */
+    Order cancelOrder(Long id, String reason);
+
+    /**
      * Xóa đơn hàng theo ID
      */
     void deleteOrder(Long id);

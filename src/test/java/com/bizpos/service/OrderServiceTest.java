@@ -525,6 +525,7 @@ public class OrderServiceTest {
                 .build();
 
         when(orderRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(existingOrder));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
         when(productRepository.findByIdWithLock(102L)).thenReturn(Optional.of(productB));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -609,6 +610,8 @@ public class OrderServiceTest {
         existingOrder.addItem(item2);
 
         when(orderRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(existingOrder));
+        when(productRepository.findByIdWithLock(101L)).thenReturn(Optional.of(productA));
+        when(productRepository.findByIdWithLock(102L)).thenReturn(Optional.of(productB));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
