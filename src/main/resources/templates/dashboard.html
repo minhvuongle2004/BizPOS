@@ -174,7 +174,7 @@
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                         <div>
                             <h5 class="mb-1 fw-bold text-dark">
-                                <i class="bi bi-graph-up text-danger me-2"></i>Doanh thu theo ngày
+                                <i class="bi bi-graph-up text-danger me-2"></i><span id="chartTitleText">Doanh thu theo ngày</span>
                             </h5>
                             <p class="text-muted small mb-0" id="chartSubtitle">Biểu đồ doanh thu thực tế theo từng ngày trong khoảng thời gian đã chọn</p>
                         </div>
@@ -592,54 +592,96 @@
                 if (!ctx) return;
 
                 const chartContext = ctx.getContext('2d');
+                const isSingleDay = labels.length <= 1;
 
-                // Tạo gradient nền Crimson Ruby (#e11d48)
-                const gradient = chartContext.createLinearGradient(0, 0, 0, 260);
-                gradient.addColorStop(0, 'rgba(225, 29, 72, 0.22)');
-                gradient.addColorStop(1, 'rgba(225, 29, 72, 0.00)');
+                const subtitleEl = document.getElementById('chartSubtitle');
+                const titleTextEl = document.getElementById('chartTitleText');
+                if (titleTextEl) {
+                    titleTextEl.textContent = isSingleDay ? 'Doanh thu hôm nay' : 'Doanh thu theo ngày';
+                }
+                if (subtitleEl) {
+                    subtitleEl.textContent = isSingleDay 
+                        ? 'Cột doanh thu thực tế ghi nhận trong ngày (Doanh thu thuần)' 
+                        : 'Biểu đồ doanh thu thực tế theo từng ngày trong khoảng thời gian đã chọn';
+                }
 
+                // Huỷ instance cũ để chuyển đổi mượt mà giữa dạng Cột (Bar) khi 1 ngày và dạng Đường (Line) khi nhiều ngày
                 if (revenueChartInstance) {
-                    revenueChartInstance.data.labels = labels;
-                    revenueChartInstance.data.datasets[0].data = data;
-                    revenueChartInstance.update();
-                    return;
+                    revenueChartInstance.destroy();
+                    revenueChartInstance = null;
+                }
+
+                const chartType = isSingleDay ? 'bar' : 'line';
+                const displayLabels = isSingleDay ? ['Hôm nay (' + (labels[0] || '10/10') + ')'] : labels;
+
+                let datasetConfig;
+                if (isSingleDay) {
+                    // Dạng Cột bo góc mềm mại, gradient ruby sang trọng
+                    const barGradient = chartContext.createLinearGradient(0, 0, 0, 300);
+                    barGradient.addColorStop(0, '#e11d48');
+                    barGradient.addColorStop(1, '#f43f5e');
+
+                    datasetConfig = {
+                        label: 'Doanh thu thuần (₫)',
+                        data: data,
+                        backgroundColor: barGradient,
+                        hoverBackgroundColor: '#be123c',
+                        borderColor: '#e11d48',
+                        borderWidth: 1.5,
+                        borderRadius: 14,
+                        maxBarThickness: 76
+                    };
+                } else {
+                    // Dạng Đường nối cong mềm mại (Line chart) với diện tích phủ gradient
+                    const gradient = chartContext.createLinearGradient(0, 0, 0, 260);
+                    gradient.addColorStop(0, 'rgba(225, 29, 72, 0.22)');
+                    gradient.addColorStop(1, 'rgba(225, 29, 72, 0.00)');
+
+                    datasetConfig = {
+                        label: 'Doanh thu thuần (₫)',
+                        data: data,
+                        borderColor: '#e11d48',
+                        backgroundColor: gradient,
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#e11d48',
+                        pointBorderWidth: 2,
+                        pointRadius: 4.5,
+                        pointHoverRadius: 6.5
+                    };
                 }
 
                 revenueChartInstance = new Chart(chartContext, {
-                    type: 'line',
+                    type: chartType,
                     data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Doanh thu (₫)',
-                            data: data,
-                            borderColor: '#e11d48',
-                            backgroundColor: gradient,
-                            borderWidth: 2.5,
-                            fill: true,
-                            tension: 0.35,
-                            pointBackgroundColor: '#ffffff',
-                            pointBorderColor: '#e11d48',
-                            pointBorderWidth: 2,
-                            pointRadius: 4.5,
-                            pointHoverRadius: 6.5
-                        }]
+                        labels: displayLabels,
+                        datasets: [datasetConfig]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: {
+                            duration: 750,
+                            easing: 'easeOutQuart'
+                        },
                         plugins: {
                             legend: { display: false },
                             tooltip: {
                                 backgroundColor: '#0f172a',
                                 titleFont: { family: 'Inter', size: 12, weight: '600' },
                                 bodyFont: { family: 'Inter', size: 13, weight: '500' },
-                                padding: 10,
+                                padding: 12,
                                 cornerRadius: 8,
                                 displayColors: false,
                                 callbacks: {
+                                    title: function () {
+                                        return isSingleDay ? 'Doanh thu hôm nay' : 'Doanh thu ngày';
+                                    },
                                     label: function (context) {
                                         const value = context.parsed.y || 0;
-                                        return 'Doanh thu: ' + value.toLocaleString('vi-VN') + ' ₫';
+                                        return 'Doanh thu thuần: ' + value.toLocaleString('vi-VN') + ' ₫';
                                     }
                                 }
                             }
@@ -647,10 +689,12 @@
                         scales: {
                             x: {
                                 grid: { display: false },
-                                ticks: { font: { family: 'Inter', size: 11 }, color: '#64748b' }
+                                ticks: { font: { family: 'Inter', size: 12, weight: '600' }, color: '#475569' },
+                                offset: isSingleDay
                             },
                             y: {
                                 beginAtZero: true,
+                                suggestedMax: isSingleDay && data.length > 0 && data[0] > 0 ? data[0] * 1.25 : undefined,
                                 grid: { color: '#f1f5f9' },
                                 ticks: {
                                     font: { family: 'Inter', size: 11 },
