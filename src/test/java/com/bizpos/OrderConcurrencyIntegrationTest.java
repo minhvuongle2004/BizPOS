@@ -45,6 +45,9 @@ public class OrderConcurrencyIntegrationTest {
     @Autowired
     private OrderRepository orderRepository;
 
+    @Autowired
+    private com.bizpos.service.StockMovementService stockMovementService;
+
     private Category testCategory;
     private Customer testCustomer;
 
@@ -153,6 +156,10 @@ public class OrderConcurrencyIntegrationTest {
         // 4. Kiểm tra dữ liệu thực tế trong DB: Tồn kho phải về ĐÚNG 0 (không bao giờ âm hay lệch số)
         Product finalProduct = productRepository.findById(product.getId()).orElseThrow();
         assertEquals(0, finalProduct.getStockQuantity(), "Tồn kho trong MySQL phải về đúng 0");
+
+        // 5. Đối soát sổ thẻ kho (Inventory Reconciliation) sau 20 luồng đồng thời: Chuỗi biến động phải toàn vẹn 100%
+        assertTrue(stockMovementService.verifyProductStockReconciliation(product.getId()),
+                "Sổ thẻ kho (Stock Ledger) phải khớp 100% với tồn kho thực tế sau khi 20 luồng tranh mua!");
     }
 
     @Test
@@ -247,5 +254,9 @@ public class OrderConcurrencyIntegrationTest {
         Product finalB = productRepository.findById(idB).orElseThrow();
         assertEquals(0, finalA.getStockQuantity(), "Tồn kho A phải về đúng 0");
         assertEquals(0, finalB.getStockQuantity(), "Tồn kho B phải về đúng 0");
+
+        // Đối soát sổ thẻ kho cho cả 2 sản phẩm A và B:
+        assertTrue(stockMovementService.verifyProductStockReconciliation(idA), "Sổ thẻ kho của sản phẩm A phải khớp 100%");
+        assertTrue(stockMovementService.verifyProductStockReconciliation(idB), "Sổ thẻ kho của sản phẩm B phải khớp 100%");
     }
 }

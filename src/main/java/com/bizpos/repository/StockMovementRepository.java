@@ -77,4 +77,19 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     default void deleteAllById(Iterable<? extends Long> ids) {
         throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
     }
+
+    @Override
+    default void deleteAllInBatch() {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
+
+    @Override
+    default void deleteAllByIdInBatch(Iterable<Long> ids) {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
+
+    @Override
+    default void deleteAllInBatch(Iterable<StockMovement> entities) {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
 }

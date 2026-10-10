@@ -134,58 +134,95 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     @Transactional(readOnly = true)
     public boolean verifyProductStockReconciliation(Long productId) {
+        com.bizpos.dto.StockReconciliationReport report = reconcileProductStock(productId);
+        return report.isReconciled();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.bizpos.dto.StockReconciliationReport reconcileProductStock(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + productId));
 
         List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtAsc(productId);
+        int currentStockOnProduct = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+
         if (movements.isEmpty()) {
-            return true;
+            return com.bizpos.dto.StockReconciliationReport.builder()
+                    .productId(product.getId())
+                    .productCode(product.getCode())
+                    .productName(product.getName())
+                    .initialStock(currentStockOnProduct)
+                    .totalDelta(0)
+                    .calculatedStock(currentStockOnProduct)
+                    .currentStock(currentStockOnProduct)
+                    .movementCount(0)
+                    .isReconciled(true)
+                    .message("Chưa có biến động kho nào phát sinh; số liệu toàn vẹn.")
+                    .build();
         }
 
-        // 1. Kiểm tra tính liên tục của chuỗi biến động (Chain continuity) & Delta consistency
+        // 1. Kiểm tra tính liên tục của chuỗi biến động (Chain continuity) & Tổng Delta có dấu (Sigma Delta)
+        int initialStock = movements.get(0).getPreviousStock();
+        int sumDelta = 0;
+
         for (int i = 0; i < movements.size(); i++) {
             StockMovement current = movements.get(i);
+            int signedDelta = current.getSignedDelta();
+            sumDelta += signedDelta;
 
-            int expectedCurrent;
-            switch (current.getType()) {
-                case SALE -> expectedCurrent = current.getPreviousStock() - current.getQuantity();
-                case RETURN, IMPORT -> expectedCurrent = current.getPreviousStock() + current.getQuantity();
-                case ADJUSTMENT -> {
-                    if (Math.abs(current.getCurrentStock() - current.getPreviousStock()) != current.getQuantity()) {
-                        log.warn(">> [RECONCILIATION FAILED] Bản ghi ADJUSTMENT #{} có quantity ({}) không khớp với chênh lệch tồn ({} -> {})",
-                                current.getId(), current.getQuantity(), current.getPreviousStock(), current.getCurrentStock());
-                        return false;
-                    }
-                    expectedCurrent = current.getCurrentStock();
-                }
-                default -> expectedCurrent = current.getCurrentStock();
-            }
-
-            if (current.getCurrentStock() != expectedCurrent) {
-                log.warn(">> [RECONCILIATION FAILED] Bản ghi #{} (loại {}) tính toán tồn sau ({}) không khớp kỳ vọng ({})",
-                        current.getId(), current.getType(), current.getCurrentStock(), expectedCurrent);
-                return false;
-            }
-
+            // Kiểm tra đứt gãy chuỗi: previousStock của bản ghi i phải khớp currentStock của bản ghi i-1
             if (i > 0) {
                 StockMovement previous = movements.get(i - 1);
                 if (!current.getPreviousStock().equals(previous.getCurrentStock())) {
                     log.warn(">> [RECONCILIATION FAILED] Đứt gãy chuỗi thẻ kho tại bản ghi #{}: previousStock ({}) khác currentStock bản ghi trước ({})",
                             current.getId(), current.getPreviousStock(), previous.getCurrentStock());
-                    return false;
+                    return com.bizpos.dto.StockReconciliationReport.builder()
+                            .productId(product.getId())
+                            .productCode(product.getCode())
+                            .productName(product.getName())
+                            .initialStock(initialStock)
+                            .totalDelta(sumDelta)
+                            .calculatedStock(initialStock + sumDelta)
+                            .currentStock(currentStockOnProduct)
+                            .movementCount(movements.size())
+                            .isReconciled(false)
+                            .message("Đứt gãy chuỗi thẻ kho tại bản ghi #" + current.getId())
+                            .build();
                 }
             }
         }
 
-        // 2. Kiểm tra bản ghi cuối cùng phải khớp chính xác 100% với stockQuantity thực tế của Product
+        // 2. Tính toán: Tồn kho kỳ vọng = Tồn ban đầu + Tổng Delta (Sigma Delta: Tồn hiện tại = Tồn ban đầu + Σ delta)
+        int expectedFinalStock = initialStock + sumDelta;
         StockMovement latestMovement = movements.get(movements.size() - 1);
-        int currentStockOnProduct = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
-        if (!latestMovement.getCurrentStock().equals(currentStockOnProduct)) {
-            log.warn(">> [RECONCILIATION FAILED] Tồn kho bản ghi mới nhất ({}) không khớp với stockQuantity trên sản phẩm ({})",
-                    latestMovement.getCurrentStock(), currentStockOnProduct);
-            return false;
-        }
 
-        return true;
+        boolean isReconciled = latestMovement.getCurrentStock().equals(currentStockOnProduct)
+                && expectedFinalStock == currentStockOnProduct;
+
+        String message = isReconciled
+                ? "Sổ cái khớp 100% với tồn kho thực tế (Tồn ban đầu " + initialStock + " + Σ Delta " + sumDelta + " = " + expectedFinalStock + ")"
+                : "Lệch tồn kho: Tính toán từ sổ cái (" + expectedFinalStock + ") khác tồn thực tế (" + currentStockOnProduct + ")";
+
+        return com.bizpos.dto.StockReconciliationReport.builder()
+                .productId(product.getId())
+                .productCode(product.getCode())
+                .productName(product.getName())
+                .initialStock(initialStock)
+                .totalDelta(sumDelta)
+                .calculatedStock(expectedFinalStock)
+                .currentStock(currentStockOnProduct)
+                .movementCount(movements.size())
+                .isReconciled(isReconciled)
+                .message(message)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.bizpos.dto.StockReconciliationReport> reconcileAllProducts() {
+        return productRepository.findAll().stream()
+                .map(p -> reconcileProductStock(p.getId()))
+                .collect(Collectors.toList());
     }
 }

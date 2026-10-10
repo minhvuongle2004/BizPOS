@@ -277,6 +277,8 @@ public class StockMovementIntegrationTest {
         assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.delete(sample));
         assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.deleteById(sample.getId()));
         assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.deleteAll());
+        assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.deleteAllInBatch());
+        assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.deleteAllByIdInBatch(List.of(sample.getId())));
     }
 
     @Test
@@ -300,5 +302,67 @@ public class StockMovementIntegrationTest {
         assertThrows(Exception.class, () -> {
             jdbcTemplate.update("DELETE FROM stock_movements WHERE id = ?", movementId);
         }, "MySQL Trigger trg_stock_movements_prevent_delete phải chặn câu lệnh DELETE");
+    }
+
+    @Test
+    @DisplayName("8. [RUNTIME RECONCILIATION API] API Đối soát thời gian thực cho Admin trả về báo cáo Sigma Delta chính xác")
+    void testRuntimeReconciliationApi_ReturnsAccurateReport() throws Exception {
+        // Tạo biến động kho: bán 5, kiểm kê +2
+        productService.updateStock(testProduct.getId(), testProduct.getStockQuantity() + 10);
+        productService.updateStock(testProduct.getId(), testProduct.getStockQuantity() - 3);
+
+        mockMvc.perform(get("/api/stock-movements/reconcile/" + testProduct.getId())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.productId").value(testProduct.getId()))
+                .andExpect(jsonPath("$.reconciled").value(true))
+                .andExpect(jsonPath("$.totalDelta").isNumber())
+                .andExpect(jsonPath("$.calculatedStock").isNumber());
+
+        mockMvc.perform(get("/api/stock-movements/reconcile-all")
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    @DisplayName("9. [SIGNED DELTA FORMULA] Công thức đối soát gọn: Tồn hiện tại = Tồn ban đầu + Σ Delta có dấu")
+    void testSignedDeltaFormula_MatchesStockExactly() {
+        Product p = Product.builder()
+                .code("DELTA-" + UUID.randomUUID().toString().substring(0, 5))
+                .name("Sản phẩm Test Delta")
+                .price(new BigDecimal("30000"))
+                .stockQuantity(50)
+                .category(testCategory)
+                .build();
+        p = productRepository.save(p);
+
+        // Chuỗi biến động:
+        // 1. Nhập kho thêm 20 -> Tồn 70 (Delta = +20)
+        productService.updateStock(p.getId(), 70);
+        // 2. Bán 15 cái -> Tồn 55 (Delta = -15)
+        CreateOrderRequest orderReq = CreateOrderRequest.builder()
+                .items(List.of(OrderItemRequest.builder().productId(p.getId()).quantity(15).build()))
+                .build();
+        orderService.createOrder(orderReq);
+        // 3. Điều chỉnh kiểm kê giảm 5 -> Tồn 50 (Delta = -5)
+        productService.updateStock(p.getId(), 50);
+
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtAsc(p.getId());
+        assertEquals(3, movements.size());
+
+        int initialStock = movements.get(0).getPreviousStock(); // 50
+        int sumDelta = movements.stream().mapToInt(StockMovement::getSignedDelta).sum();
+
+        // 50 + (+20) + (-15) + (-5) = 50
+        assertEquals(0, sumDelta, "Tổng Delta của chuỗi +20, -15, -5 phải bằng 0");
+        assertEquals(50, initialStock + sumDelta, "Tồn ban đầu + tổng delta phải bằng đúng 50");
+
+        com.bizpos.dto.StockReconciliationReport report = stockMovementService.reconcileProductStock(p.getId());
+        assertTrue(report.isReconciled());
+        assertEquals(50, report.getCurrentStock());
+        assertEquals(50, report.getCalculatedStock());
     }
 }

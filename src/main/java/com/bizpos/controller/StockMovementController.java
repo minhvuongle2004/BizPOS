@@ -59,4 +59,24 @@ public class StockMovementController {
         Page<StockMovementResponse> movements = stockMovementService.filterMovements(productId, type, from, to, pageable);
         return ResponseEntity.ok(movements);
     }
+
+    /**
+     * 4. Đối soát sổ thẻ kho theo thời gian thực (Runtime Inventory Reconciliation) cho 1 sản phẩm
+     * GET /api/stock-movements/reconcile/{productId}
+     */
+    @GetMapping("/reconcile/{productId}")
+    public ResponseEntity<com.bizpos.dto.StockReconciliationReport> reconcileProduct(@PathVariable Long productId) {
+        com.bizpos.dto.StockReconciliationReport report = stockMovementService.reconcileProductStock(productId);
+        return ResponseEntity.ok(report);
+    }
+
+    /**
+     * 5. Đối soát toàn bộ kho hàng hệ thống (Runtime Inventory Reconciliation)
+     * GET /api/stock-movements/reconcile-all
+     */
+    @GetMapping("/reconcile-all")
+    public ResponseEntity<List<com.bizpos.dto.StockReconciliationReport>> reconcileAllProducts() {
+        List<com.bizpos.dto.StockReconciliationReport> reports = stockMovementService.reconcileAllProducts();
+        return ResponseEntity.ok(reports);
+    }
 }

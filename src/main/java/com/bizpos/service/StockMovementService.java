@@ -67,8 +67,19 @@ public interface StockMovementService {
     /**
      * Đối soát tính toàn vẹn và tính toán học của sổ thẻ kho (Inventory Reconciliation):
      * - Kiểm tra tính liên tục của chuỗi biến động (previousStock == currentStock của bản ghi liền trước)
+     * - Tồn kho hiện tại = Tồn ban đầu + tổng delta các lần biến động (Sigma Delta)
      * - Kiểm tra số lượng tồn kho cuối cùng trong sổ khớp chính xác 100% với stockQuantity hiện tại của sản phẩm
      * @return true nếu số liệu hoàn toàn khớp và chuỗi biến động toàn vẹn
      */
     boolean verifyProductStockReconciliation(Long productId);
+
+    /**
+     * Tạo báo cáo đối soát chi tiết cho một sản phẩm (Runtime Report)
+     */
+    com.bizpos.dto.StockReconciliationReport reconcileProductStock(Long productId);
+
+    /**
+     * Tạo báo cáo đối soát kho cho toàn bộ danh mục sản phẩm trong hệ thống
+     */
+    List<com.bizpos.dto.StockReconciliationReport> reconcileAllProducts();
 }
