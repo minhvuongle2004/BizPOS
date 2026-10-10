@@ -153,17 +153,16 @@
 
                             <!-- Trạng thái 1: Ô tìm kiếm SĐT / Tên (khi chưa chọn khách) -->
                             <div id="customerSearchContainer" class="position-relative">
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white border-end-0 text-muted">
-                                        <i class="bi bi-telephone-fill small"></i>
-                                    </span>
-                                    <input type="text" id="posCustomerPhoneInput" class="biz-input border-start-0 py-2 ps-1" 
+                                <div class="position-relative">
+                                    <i class="bi bi-telephone-fill position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                                    <input type="text" id="posCustomerPhoneInput" class="biz-input ps-5 pe-5 py-2" 
                                            placeholder="Nhập SĐT hoặc Tên khách (VD: 0987...)" 
                                            autocomplete="off"
                                            oninput="handleCustomerPhoneSearch(this.value)"
                                            onfocus="handleCustomerPhoneFocus()"
                                            onkeydown="if(event.key === 'Enter') handleCustomerPhoneEnter(event)">
-                                    <button type="button" id="btnClearCustomerSearch" class="btn btn-outline-secondary d-none border-start-0" onclick="clearCustomerSearch()" title="Xóa">
+                                    <button type="button" id="btnClearCustomerSearch" class="btn position-absolute top-50 end-0 translate-middle-y me-2 text-muted p-1 d-none" 
+                                            onclick="clearCustomerSearch()" title="Xóa">
                                         <i class="bi bi-x-circle-fill"></i>
                                     </button>
                                 </div>
