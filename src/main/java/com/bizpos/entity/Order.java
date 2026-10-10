@@ -32,9 +32,24 @@ public class Order extends BaseEntity {
     @Column(name = "order_date", nullable = false)
     private LocalDateTime orderDate;
 
+    @Column(name = "subtotal", precision = 15, scale = 2)
+    private BigDecimal subtotal;
+
+    @Column(name = "discount_amount", precision = 15, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
     @Column(name = "total_amount", precision = 15, scale = 2, nullable = false)
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
+
+    public BigDecimal getSubtotal() {
+        return this.subtotal != null ? this.subtotal : (this.totalAmount != null ? this.totalAmount : BigDecimal.ZERO);
+    }
+
+    public BigDecimal getDiscountAmount() {
+        return this.discountAmount != null ? this.discountAmount : BigDecimal.ZERO;
+    }
 
     @Column(name = "note", length = 500)
     private String note;

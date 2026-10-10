@@ -24,6 +24,8 @@ public class OrderResponse {
     private String orderCode;
     private CustomerResponse customer;
     private LocalDateTime orderDate;
+    private BigDecimal subtotal;
+    private BigDecimal discountAmount;
     private BigDecimal totalAmount;
     private String note;
     private com.bizpos.enums.PaymentMethod paymentMethod;
@@ -53,6 +55,8 @@ public class OrderResponse {
                 .orderCode(order.getOrderCode())
                 .customer(order.getCustomer() != null ? CustomerResponse.fromEntity(order.getCustomer()) : null)
                 .orderDate(order.getOrderDate())
+                .subtotal(order.getSubtotal())
+                .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .note(order.getNote())
                 .paymentMethod(order.getPaymentMethod())

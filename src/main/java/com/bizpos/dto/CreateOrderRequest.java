@@ -27,6 +27,8 @@ public class CreateOrderRequest {
     @Builder.Default
     private com.bizpos.enums.PaymentMethod paymentMethod = com.bizpos.enums.PaymentMethod.CASH;
 
+    private java.math.BigDecimal discountAmount;
+
     private java.math.BigDecimal amountPaid;
 
     @Size(max = 255, message = "Ghi chú thanh toán không được vượt quá 255 ký tự!")

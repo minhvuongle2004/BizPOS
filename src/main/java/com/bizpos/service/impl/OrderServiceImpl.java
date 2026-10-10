@@ -179,8 +179,20 @@ public class OrderServiceImpl implements OrderService {
             totalAmount = totalAmount.add(lineTotal);
         }
 
-        order.setTotalAmount(totalAmount);
-        applyPaymentDetails(order, request, totalAmount);
+        BigDecimal subtotal = totalAmount;
+        BigDecimal discount = request.getDiscountAmount() != null ? request.getDiscountAmount() : BigDecimal.ZERO;
+        if (discount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Số tiền chiết khấu không được âm!");
+        }
+        if (discount.compareTo(subtotal) > 0) {
+            throw new IllegalArgumentException("Số tiền chiết khấu (" + discount + ") không được vượt quá tổng tiền hàng (" + subtotal + ")!");
+        }
+        BigDecimal finalTotal = subtotal.subtract(discount);
+
+        order.setSubtotal(subtotal);
+        order.setDiscountAmount(discount);
+        order.setTotalAmount(finalTotal);
+        applyPaymentDetails(order, request, finalTotal);
 
         // Lưu Order cùng các OrderItem (CascadeType.ALL sẽ tự động lưu các OrderItem)
         return orderRepository.save(order);

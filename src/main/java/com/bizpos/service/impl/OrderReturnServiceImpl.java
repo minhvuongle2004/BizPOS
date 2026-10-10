@@ -244,9 +244,33 @@ public class OrderReturnServiceImpl implements OrderReturnService {
                 );
             }
 
-            BigDecimal unitPrice = originalItem.getUnitPrice();
-            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(returnQty));
-            totalRefundAmount = totalRefundAmount.add(lineTotal);
+            // 5a. Phân bổ chiết khấu cho dòng (lineNet)
+            BigDecimal orderSubtotal = order.getSubtotal();
+            BigDecimal orderDiscount = order.getDiscountAmount();
+            BigDecimal itemLineTotal = originalItem.getLineTotal() != null
+                    ? originalItem.getLineTotal()
+                    : originalItem.getUnitPrice().multiply(BigDecimal.valueOf(purchasedQty));
+
+            BigDecimal lineDiscount = (orderDiscount.compareTo(BigDecimal.ZERO) > 0 && orderSubtotal.compareTo(BigDecimal.ZERO) > 0)
+                    ? orderDiscount.multiply(itemLineTotal).divide(orderSubtotal, 4, java.math.RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            BigDecimal lineNet = itemLineTotal.subtract(lineDiscount);
+            if (lineNet.compareTo(BigDecimal.ZERO) < 0) {
+                lineNet = BigDecimal.ZERO;
+            }
+
+            // 5b. Tính tiền hoàn lũy kế chống sai lệch do làm tròn (Cumulative Refund Algorithm)
+            int newCumulativeQty = alreadyReturnedQty + returnQty;
+            BigDecimal cumulativeAfter = calculateCumulativeRefund(lineNet, newCumulativeQty, purchasedQty);
+            BigDecimal cumulativeBefore = calculateCumulativeRefund(lineNet, alreadyReturnedQty, purchasedQty);
+            BigDecimal lineRefundAmount = cumulativeAfter.subtract(cumulativeBefore);
+
+            BigDecimal effectiveUnitPrice = returnQty > 0
+                    ? lineRefundAmount.divide(BigDecimal.valueOf(returnQty), 2, java.math.RoundingMode.HALF_UP)
+                    : originalItem.getUnitPrice();
+
+            totalRefundAmount = totalRefundAmount.add(lineRefundAmount);
 
             OrderReturnItem returnItem = OrderReturnItem.builder()
                     .orderReturn(orderReturn)
@@ -258,8 +282,8 @@ public class OrderReturnServiceImpl implements OrderReturnService {
                     .size(variant != null && variant.getSize() != null ? variant.getSize() : (originalItem.getVariant() != null ? originalItem.getVariant().getSize() : product.getSize()))
                     .color(variant != null && variant.getColor() != null ? variant.getColor() : (originalItem.getVariant() != null ? originalItem.getVariant().getColor() : product.getColor()))
                     .quantity(returnQty)
-                    .unitPrice(unitPrice)
-                    .lineTotal(lineTotal)
+                    .unitPrice(effectiveUnitPrice)
+                    .lineTotal(lineRefundAmount)
                     .reason(itemReason)
                     .note(ri.getNote() != null ? ri.getNote().trim() : null)
                     .build();
@@ -487,5 +511,18 @@ public class OrderReturnServiceImpl implements OrderReturnService {
             return auth.getName();
         }
         return "SYSTEM";
+    }
+
+    /**
+     * Thuật toán hoàn tiền lũy kế (Cumulative Refund Algorithm):
+     * cumulativeRefund(q) = round(lineNet * q / purchasedQty)
+     * Đảm bảo tính toán chính xác tiền hoàn theo phần trăm chiết khấu và triệt tiêu 100% sai số làm tròn khi trả nhiều lần.
+     */
+    private BigDecimal calculateCumulativeRefund(BigDecimal lineNet, int cumulativeQty, int purchasedQty) {
+        if (purchasedQty <= 0 || cumulativeQty <= 0 || lineNet.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return lineNet.multiply(BigDecimal.valueOf(cumulativeQty))
+                .divide(BigDecimal.valueOf(purchasedQty), 0, java.math.RoundingMode.HALF_UP);
     }
 }

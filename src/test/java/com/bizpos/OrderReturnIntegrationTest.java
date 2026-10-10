@@ -515,4 +515,136 @@ public class OrderReturnIntegrationTest {
         assertEquals(0, reCheckItem2.getRemainingQuantity());
         assertFalse(reCheckItem2.isCanReturn());
     }
+
+    @Test
+    @DisplayName("13. Thuật toán hoàn tiền lũy kế (Cumulative Refund): Trả từng phần nhiều lần trên đơn có chiết khấu, triệt tiêu sai số làm tròn")
+    void testPartialReturnsWithDiscount_CalculatesExactCumulativeRefundWithoutRoundingError() throws Exception {
+        // 1. Tạo đơn mua 3 cái áo giá niêm yết 500,000 đ (Subtotal = 1,500,000 đ), chiết khấu 500,000 đ -> Khách thực trả 1,000,000 đ
+        String suffix = java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        Category category = categoryRepository.findAll().stream().findFirst().orElseGet(() ->
+                categoryRepository.save(Category.builder().name("Áo Thời Trang").build()));
+
+        Product shirt = Product.builder()
+                .code("SHIRT-" + suffix)
+                .name("Áo Sơ Mi Cao Cấp " + suffix)
+                .price(new BigDecimal("500000"))
+                .stockQuantity(100)
+                .category(category)
+                .build();
+        shirt = productRepository.save(shirt);
+
+        CreateOrderRequest orderReq = CreateOrderRequest.builder()
+                .discountAmount(new BigDecimal("500000"))
+                .amountPaid(new BigDecimal("1000000"))
+                .note("Đơn mua 3 áo có chiết khấu 500k")
+                .items(List.of(
+                        OrderItemRequest.builder()
+                                .productId(shirt.getId())
+                                .quantity(3)
+                                .build()
+                ))
+                .build();
+
+        Order order = orderService.createOrder(orderReq);
+        assertEquals(0, new BigDecimal("1500000").compareTo(order.getSubtotal()));
+        assertEquals(0, new BigDecimal("500000").compareTo(order.getDiscountAmount()));
+        assertEquals(0, new BigDecimal("1000000").compareTo(order.getTotalAmount()));
+
+        OrderItem orderItem = order.getItems().get(0);
+        Long orderItemId = orderItem.getId();
+
+        // 2. Lần trả thứ 1: Khách trả 1 cái
+        // lineNet = 1,000,000. Lũy kế sau = round(1,000,000 * 1 / 3) = 333,333 đ. Lũy kế trước = 0.
+        // Hoàn lần 1 = 333,333 đ
+        OrderReturnRequest return1 = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .returnType(ReturnType.RETURN_ONLY)
+                .reason(ReturnReason.CUSTOMER_CHANGE_MIND)
+                .note("Trả lần 1: 1 cái")
+                .returnItems(List.of(
+                        ReturnItemRequest.builder()
+                                .orderItemId(orderItemId)
+                                .productId(shirt.getId())
+                                .quantity(1)
+                                .build()
+                ))
+                .build();
+
+        MvcResult res1 = mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(return1)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        OrderReturnResponse ret1 = objectMapper.readValue(res1.getResponse().getContentAsString(), OrderReturnResponse.class);
+        assertEquals(0, new BigDecimal("333333").compareTo(ret1.getTotalRefundAmount()),
+                "Lần 1 phải hoàn đúng 333,333 đ theo thuật toán lũy kế phân bổ chiết khấu");
+
+        // 3. Lần trả thứ 2: Khách trả tiếp 1 cái nữa
+        // Lũy kế sau (2 cái) = round(1,000,000 * 2 / 3) = 666,667 đ. Lũy kế trước = 333,333 đ.
+        // Hoàn lần 2 = 666,667 - 333,333 = 333,334 đ (tự bù trừ 1 đồng làm tròn!)
+        OrderReturnRequest return2 = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .returnType(ReturnType.RETURN_ONLY)
+                .reason(ReturnReason.CUSTOMER_CHANGE_MIND)
+                .note("Trả lần 2: 1 cái")
+                .returnItems(List.of(
+                        ReturnItemRequest.builder()
+                                .orderItemId(orderItemId)
+                                .productId(shirt.getId())
+                                .quantity(1)
+                                .build()
+                ))
+                .build();
+
+        MvcResult res2 = mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(return2)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        OrderReturnResponse ret2 = objectMapper.readValue(res2.getResponse().getContentAsString(), OrderReturnResponse.class);
+        assertEquals(0, new BigDecimal("333334").compareTo(ret2.getTotalRefundAmount()),
+                "Lần 2 phải hoàn đúng 333,334 đ để bảo toàn lũy kế");
+
+        // 4. Lần trả thứ 3: Khách trả nốt cái cuối cùng
+        // Lũy kế sau (3 cái) = 1,000,000 đ. Lũy kế trước = 666,667 đ.
+        // Hoàn lần 3 = 1,000,000 - 666,667 = 333,333 đ
+        OrderReturnRequest return3 = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .returnType(ReturnType.RETURN_ONLY)
+                .reason(ReturnReason.CUSTOMER_CHANGE_MIND)
+                .note("Trả lần 3: 1 cái")
+                .returnItems(List.of(
+                        ReturnItemRequest.builder()
+                                .orderItemId(orderItemId)
+                                .productId(shirt.getId())
+                                .quantity(1)
+                                .build()
+                ))
+                .build();
+
+        MvcResult res3 = mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(return3)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        OrderReturnResponse ret3 = objectMapper.readValue(res3.getResponse().getContentAsString(), OrderReturnResponse.class);
+        assertEquals(0, new BigDecimal("333333").compareTo(ret3.getTotalRefundAmount()),
+                "Lần 3 phải hoàn đúng 333,333 đ");
+
+        // 5. Kiểm tra tổng 3 lần hoàn: 333,333 + 333,334 + 333,333 = 1,000,000 đ
+        BigDecimal grandTotalRefund = ret1.getTotalRefundAmount()
+                .add(ret2.getTotalRefundAmount())
+                .add(ret3.getTotalRefundAmount());
+        assertEquals(0, new BigDecimal("1000000").compareTo(grandTotalRefund),
+                "Tổng tiền hoàn của 3 lần trả phải CHÍNH XÁC 100% bằng số tiền khách đã thanh toán (1,000,000 đ)!");
+
+        // 6. Sau 3 lần, hết sạch số lượng được trả
+        assertEquals(3, orderReturnRepository.countReturnedQuantityByOrderItem(orderItemId));
+    }
 }
