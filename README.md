@@ -14,6 +14,7 @@
   - [5. Báo cáo & Phân tích kinh doanh (Sales & Analytics Dashboard)](#5-báo-cáo--phân-tích-kinh-doanh-sales--analytics-dashboard)
   - [6. Xuất / Nhập Excel chuyên ngành Thời trang](#6-xuất--nhập-excel-chuyên-ngành-thời-trang)
   - [7. Nhật ký kiểm toán hệ thống (Audit Trail via Spring AOP)](#7-nhật-ký-kiểm-toán-hệ-thống-audit-trail-via-spring-aop)
+- [🏛️ Kiến trúc & Quyết định Kỹ thuật (Architecture & ADR)](docs/ARCHITECTURE.md)
 - [🔒 Ma trận Phân quyền & Chống gian lận (RBAC Matrix)](#-ma-trận-phân-quyền--chống-gian-lận-rbac-matrix)
 - [🗄️ Cấu trúc Cơ sở dữ liệu (Database Schema)](#️-cấu-trúc-cơ-sở-dữ-liệu-database-schema)
 - [🧪 Hệ thống Kiểm thử Tự động (215 Automated Tests)](#-hệ-thống-kiểm-thử-tự-động-215-automated-tests)
@@ -136,6 +137,19 @@ Quy trình Đổi - Trả hàng giải quyết trọn vẹn bài toán có tỷ 
   * Module `LoginRateLimiter` tự động giới hạn tối đa **5 lần đăng nhập thất bại trong 5 phút** theo từng tài khoản.
   * Khi vượt ngưỡng, hệ thống lập tức chặn với mã `HTTP 429 Too Many Requests`, từ chối truy cập ngay tại cửa ngõ và không ghi thêm bản ghi log rác vào cơ sở dữ liệu.
 * Toàn bộ API `/api/audit-logs/**` được bảo vệ nghiêm ngặt: **chỉ tài khoản `ADMIN` mới có quyền truy cập**.
+
+---
+
+## 🏛️ Kiến trúc & Quyết định Kỹ thuật (Architecture & Design Decisions)
+
+Hệ thống BizPOS được thiết kế giải quyết các bài toán kỹ thuật phức tạp trong môi trường bán lẻ đa luồng (multi-threaded retail operations):
+* **Phòng chống Race Condition & Deadlock:** Chuỗi khóa tuần tự $\mathbf{Order \to Products \to Variants}$ và khóa bi quan `PESSIMISTIC_WRITE` trên hóa đơn gốc.
+* **Thuật toán Chiết khấu Lũy kế (Cumulative Refund):** Triệt tiêu hoàn toàn sai số làm tròn số học khi đổi trả nhiều lần.
+* **Sổ cái kho Bất biến (4-Tier Immutability):** Hibernate `@Immutable`, chặn `delete()` ở Repository, Database Triggers và phân quyền Database.
+* **Chiến lược Audit Log Kép:** Phân định transaction có chủ đích (`REQUIRED` cho đường thành công để không sinh log ma; `REQUIRES_NEW` cho đường thất bại để bảo toàn dấu vết vi phạm).
+* **Tính Lũy Đẳng (Idempotency Pattern):** Bắt `DuplicateKeyException` qua Unique Constraint, chống kẹt trạng thái với TTL và băm SHA-256 payload chống gửi sai nội dung.
+
+👉 **Tài liệu phân tích chuyên sâu & Trade-offs:** **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** *(Kèm sơ đồ Mermaid tuần tự, Phân tích đánh đổi kỹ thuật & Hạn chế đã biết).*
 
 ---
 
