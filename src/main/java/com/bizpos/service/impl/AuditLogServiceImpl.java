@@ -23,7 +23,37 @@ public class AuditLogServiceImpl implements AuditLogService {
     private final AuditLogRepository auditLogRepository;
 
     @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRED)
+    public AuditLog recordSuccessLog(
+            String entityName,
+            String entityId,
+            String action,
+            String actionDescription,
+            String oldValue,
+            String newValue,
+            String details,
+            String performedBy,
+            String ipAddress) {
+        return saveAuditLog(entityName, entityId, action, actionDescription, oldValue, newValue, details, performedBy, ipAddress);
+    }
+
+    @Override
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public AuditLog recordFailureLog(
+            String entityName,
+            String entityId,
+            String action,
+            String actionDescription,
+            String oldValue,
+            String newValue,
+            String details,
+            String performedBy,
+            String ipAddress) {
+        return saveAuditLog(entityName, entityId, action, actionDescription, oldValue, newValue, details, performedBy, ipAddress);
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRED)
     public AuditLog recordLog(
             String entityName,
             String entityId,
@@ -34,7 +64,19 @@ public class AuditLogServiceImpl implements AuditLogService {
             String details,
             String performedBy,
             String ipAddress) {
+        return saveAuditLog(entityName, entityId, action, actionDescription, oldValue, newValue, details, performedBy, ipAddress);
+    }
 
+    private AuditLog saveAuditLog(
+            String entityName,
+            String entityId,
+            String action,
+            String actionDescription,
+            String oldValue,
+            String newValue,
+            String details,
+            String performedBy,
+            String ipAddress) {
         String user = (performedBy != null && !performedBy.trim().isEmpty()) ? performedBy.trim() : "SYSTEM";
         String ip = (ipAddress != null && !ipAddress.trim().isEmpty()) ? ipAddress.trim() : "127.0.0.1";
 

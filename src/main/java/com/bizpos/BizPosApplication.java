@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 @org.springframework.scheduling.annotation.EnableScheduling
+@org.springframework.transaction.annotation.EnableTransactionManagement(order = org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 50)
 public class BizPosApplication {
 
     @jakarta.annotation.PostConstruct

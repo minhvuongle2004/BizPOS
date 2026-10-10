@@ -69,6 +69,9 @@ public class AuditLogIntegrationTest {
     @Autowired
     private com.bizpos.repository.UserRepository userRepository;
 
+    @Autowired
+    private com.bizpos.security.LoginRateLimiter loginRateLimiter;
+
     private String adminToken;
     private String staffToken;
     private Product testProduct;
@@ -77,6 +80,7 @@ public class AuditLogIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        loginRateLimiter.clear();
         adminToken = "Bearer " + jwtTokenProvider.generateToken("admin", "ROLE_ADMIN");
         staffToken = "Bearer " + jwtTokenProvider.generateToken("staff", "ROLE_STAFF");
 
@@ -275,5 +279,46 @@ public class AuditLogIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("9. Rate Limiting đăng nhập thất bại: Sau 5 lần thử sai thì khóa và trả về 429 Too Many Requests, không làm phình bảng Audit Log")
+    void testLoginRateLimiting_PreventsAuditLogBloat() throws Exception {
+        String victimUser = "victim_user_" + UUID.randomUUID().toString().substring(0, 6);
+        com.bizpos.dto.LoginRequest badLogin = com.bizpos.dto.LoginRequest.builder()
+                .username(victimUser)
+                .password("wrong_password")
+                .build();
+
+        String body = objectMapper.writeValueAsString(badLogin);
+
+        // 5 lần thử đầu tiên -> 401 Unauthorized
+        for (int i = 1; i <= 5; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        // Đếm số log sau 5 lần thử: Phải là 5 log (4 LOGIN_FAILED và 1 LOGIN_LOCKED)
+        List<AuditLog> logsAfter5 = auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc("User", victimUser);
+        assertEquals(5, logsAfter5.size(), "Chính xác 5 bản ghi log cho 5 lần thử");
+        assertEquals("LOGIN_LOCKED", logsAfter5.get(0).getAction(), "Lần thử thứ 5 phải ghi nhận LOGIN_LOCKED");
+
+        // Lần thử thứ 6 và thứ 7 -> Bị chặn ngay lập tức với HTTP 429 Too Many Requests
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("tạm thời bị khóa")));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isTooManyRequests());
+
+        // Khẳng định: Số lượng log trong database KHÔNG BỊ TĂNG THÊM (vẫn giữ nguyên 5, không bị thành 7!)
+        List<AuditLog> logsAfterSpam = auditLogRepository.findByEntityNameAndEntityIdOrderByCreatedAtDesc("User", victimUser);
+        assertEquals(5, logsAfterSpam.size(), "Bảng audit_logs được bảo vệ tuyệt đối khỏi spam brute force!");
     }
 }

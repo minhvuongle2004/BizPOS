@@ -16,7 +16,7 @@
   - [7. Nhật ký kiểm toán hệ thống (Audit Trail via Spring AOP)](#7-nhật-ký-kiểm-toán-hệ-thống-audit-trail-via-spring-aop)
 - [🔒 Ma trận Phân quyền & Chống gian lận (RBAC Matrix)](#-ma-trận-phân-quyền--chống-gian-lận-rbac-matrix)
 - [🗄️ Cấu trúc Cơ sở dữ liệu (Database Schema)](#️-cấu-trúc-cơ-sở-dữ-liệu-database-schema)
-- [🧪 Hệ thống Kiểm thử Tự động (172 Automated Tests)](#-hệ-thống-kiểm-thử-tự-động-172-automated-tests)
+- [🧪 Hệ thống Kiểm thử Tự động (208 Automated Tests)](#-hệ-thống-kiểm-thử-tự-động-208-automated-tests)
 - [⚙️ Cài đặt & Khởi chạy](#️-cài-đặt--khởi-chạy)
 - [👤 Tài khoản Mặc định](#-tài-khoản-mặc-định)
 
@@ -111,12 +111,20 @@ Quy trình Đổi - Trả hàng giải quyết trọn vẹn bài toán có tỷ 
 * **Import Sản phẩm (`POST /api/products/import`)**: Nhập hàng loạt sản phẩm từ file Excel, tự động validate mã trùng, giá bán, số lượng tồn kho và thuộc tính kích cỡ/màu sắc mà không làm gián đoạn request.
 
 ### 7. Nhật ký kiểm toán hệ thống (Audit Trail via Spring AOP)
-* Tự động bắt vết bằng Spring AOP `@Around("@annotation(Auditable)")`:
+* **Tự động bắt vết bằng Spring AOP (`@Order: HIGHEST_PRECEDENCE + 100`)**:
   * `UPDATE_PRICE`: Phát hiện sửa giá bán sản phẩm, lưu vết giá cũ vs giá mới.
   * `UPDATE_PRODUCT`: Lưu vết thay đổi thông tin sản phẩm.
   * `DELETE_PRODUCT`: Lưu snapshot toàn bộ thông tin sản phẩm trước khi xóa.
   * `DELETE_ORDER`: Lưu vết mã đơn và tổng tiền khi hủy đơn hàng.
   * `CREATE_RETURN` / `CREATE_EXCHANGE`: Lưu vết toàn bộ giao dịch đổi - trả hàng.
+  * `ADJUST_STOCK`: Lưu vết điều chỉnh tồn kho, kiểm kê cửa hàng.
+  * `CHANGE_ROLE`: Lưu vết thay đổi quyền nhân viên.
+* **Quy tắc Transaction có chủ đích (Intentional Transactional Isolation Strategy)**:
+  * **Đường thành công (Success Path — `Propagation.REQUIRED`)**: Log audit được ghi **CÙNG TRANSACTION** với nghiệp vụ chính. Nếu insert log gặp lỗi (hoặc nghiệp vụ thất bại), cả hai cùng rollback nguyên tử. Triệt tiêu hoàn toàn rủi ro *"kho/tiền đã đổi mà audit chưa ghi"* và không tạo ra *"log ma"*.
+  * **Đường thất bại (Failure Path — `Propagation.REQUIRES_NEW`)**: Khi nghiệp vụ ném ngoại lệ hoặc vi phạm ràng buộc (vd: đăng nhập sai mật khẩu, gian lận vượt hạn mức), Audit log được ghi trong một transaction độc lập mới. Dấu vết sự cố/gian lận được bảo toàn vĩnh viễn dù nghiệp vụ chính bị rollback về 0.
+* **Chống phình bảng Audit Log & Tấn công DoS (Login Rate Limiting)**:
+  * Module `LoginRateLimiter` tự động giới hạn tối đa **5 lần đăng nhập thất bại trong 5 phút** theo từng tài khoản.
+  * Khi vượt ngưỡng, hệ thống lập tức chặn với mã `HTTP 429 Too Many Requests`, từ chối truy cập ngay tại cửa ngõ và không ghi thêm bản ghi log rác vào cơ sở dữ liệu.
 * Toàn bộ API `/api/audit-logs/**` được bảo vệ nghiêm ngặt: **chỉ tài khoản `ADMIN` mới có quyền truy cập**.
 
 ---
@@ -323,15 +331,15 @@ erDiagram
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (185 Automated Tests - 100% Pass)
+## 🧪 Hệ thống Kiểm thử Tự động (208 Automated Tests - 100% Pass)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 185, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 208, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
-Total time:  18.408 s
+Total time:  24.087 s
 ```
 
 ### 1. Integration Tests Mô hình SPU — SKU (`ProductVariantIntegrationTest`) — 6 tests

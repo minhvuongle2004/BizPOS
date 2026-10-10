@@ -10,6 +10,39 @@ import java.util.List;
 
 public interface AuditLogService {
 
+    /**
+     * Ghi Audit Log cho đường THÀNH CÔNG (Success Path) - Chạy CÙNG TRANSACTION với nghiệp vụ (Propagation.REQUIRED).
+     * Rollback cùng nhau nếu nghiệp vụ lỗi, commit cùng nhau để chống "log ma" (phantom log).
+     */
+    AuditLog recordSuccessLog(
+            String entityName,
+            String entityId,
+            String action,
+            String actionDescription,
+            String oldValue,
+            String newValue,
+            String details,
+            String performedBy,
+            String ipAddress);
+
+    /**
+     * Ghi Audit Log cho đường THẤT BẠI (Failure Path / LOGIN_FAILED) - Chạy TRANSACTION ĐỘC LẬP (Propagation.REQUIRES_NEW).
+     * Đảm bảo dấu vết sự cố/gian lận được bảo toàn vĩnh viễn kể cả khi nghiệp vụ chính bị rollback.
+     */
+    AuditLog recordFailureLog(
+            String entityName,
+            String entityId,
+            String action,
+            String actionDescription,
+            String oldValue,
+            String newValue,
+            String details,
+            String performedBy,
+            String ipAddress);
+
+    /**
+     * Phương thức mặc định (Tương thích ngược) - Sử dụng cùng Transaction với nghiệp vụ (Propagation.REQUIRED)
+     */
     AuditLog recordLog(
             String entityName,
             String entityId,

@@ -107,6 +107,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Nhóm 2a2: Vượt quá giới hạn thử đăng nhập (Rate limit brute force) -> 429 Too Many Requests
+     */
+    @ExceptionHandler(LoginRateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleLoginRateLimitExceeded(LoginRateLimitExceededException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
+    }
+
+    /**
      * Nhóm 2b: Xung đột dữ liệu / ràng buộc nghiệp vụ (Sản phẩm trong đơn hàng, danh mục có sản phẩm liên kết) -> 409 Conflict
      */
     @ExceptionHandler({

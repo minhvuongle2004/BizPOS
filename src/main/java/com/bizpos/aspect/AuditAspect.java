@@ -81,13 +81,13 @@ public class AuditAspect {
                         details = String.format("Cập nhật thông tin sản phẩm '%s' (Mã: %s)", updated.getName(), updated.getCode());
                     }
 
-                    auditLogService.recordLog("Product", String.valueOf(id), finalAction, actionDesc,
+                    auditLogService.recordSuccessLog("Product", String.valueOf(id), finalAction, actionDesc,
                             oldValueStr, newValueStr, details, getCurrentUsername(), getClientIp());
                 }
 
                 return result;
             } catch (Throwable ex) {
-                auditLogService.recordLog("Product", String.valueOf(id), "UPDATE_PRODUCT_FAILED", "Cập nhật sản phẩm thất bại",
+                auditLogService.recordFailureLog("Product", String.valueOf(id), "UPDATE_PRODUCT_FAILED", "Cập nhật sản phẩm thất bại",
                         String.format("Mã: %s | Tên: %s", oldCode, oldName), null,
                         "Lỗi khi cập nhật sản phẩm: " + ex.getMessage(), getCurrentUsername(), getClientIp());
                 throw ex;
@@ -106,12 +106,12 @@ public class AuditAspect {
             try {
                 Object result = joinPoint.proceed();
 
-                auditLogService.recordLog("Product", String.valueOf(id), "DELETE_PRODUCT", "Xóa sản phẩm",
+                auditLogService.recordSuccessLog("Product", String.valueOf(id), "DELETE_PRODUCT", "Xóa sản phẩm",
                         oldInfo, null, details, getCurrentUsername(), getClientIp());
 
                 return result;
             } catch (Throwable ex) {
-                auditLogService.recordLog("Product", String.valueOf(id), "DELETE_PRODUCT_FAILED", "Xóa sản phẩm thất bại",
+                auditLogService.recordFailureLog("Product", String.valueOf(id), "DELETE_PRODUCT_FAILED", "Xóa sản phẩm thất bại",
                         oldInfo, null, "Lỗi khi xóa sản phẩm: " + ex.getMessage(), getCurrentUsername(), getClientIp());
                 throw ex;
             }
@@ -136,7 +136,7 @@ public class AuditAspect {
                 String details = String.format("Điều chỉnh tồn kho sản phẩm '%s' (Mã: %s) từ %d -> %d cái (Chênh lệch: %+d)",
                         pName, pCode, oldStock, newStock, delta);
 
-                auditLogService.recordLog("Product", String.valueOf(id), "ADJUST_STOCK", "Điều chỉnh tồn kho thủ công",
+                auditLogService.recordSuccessLog("Product", String.valueOf(id), "ADJUST_STOCK", "Điều chỉnh tồn kho thủ công",
                         oldValueStr, newValueStr, details, getCurrentUsername(), getClientIp());
 
                 return result;
@@ -145,7 +145,7 @@ public class AuditAspect {
                 String details = String.format("Thất bại khi điều chỉnh tồn kho sản phẩm '%s' (Mục tiêu: %s cái): %s",
                         pName, requestedStock, ex.getMessage());
 
-                auditLogService.recordLog("Product", String.valueOf(id), "ADJUST_STOCK_FAILED", "Điều chỉnh tồn kho thất bại",
+                auditLogService.recordFailureLog("Product", String.valueOf(id), "ADJUST_STOCK_FAILED", "Điều chỉnh tồn kho thất bại",
                         "Tồn: " + oldStock, "Yêu cầu: " + requestedStock, details, getCurrentUsername(), getClientIp());
                 throw ex;
             }
@@ -188,13 +188,13 @@ public class AuditAspect {
                     String details = String.format("Chỉnh sửa hóa đơn %s: Tổng tiền thay đổi từ %,.0f đ -> %,.0f đ (%d món -> %d món)",
                             updatedOrder.getOrderCode(), oldTotal, newTotal, oldItemCount, newItemCount);
 
-                    auditLogService.recordLog("Order", updatedOrder.getOrderCode(), "UPDATE_ORDER", "Chỉnh sửa hóa đơn",
+                    auditLogService.recordSuccessLog("Order", updatedOrder.getOrderCode(), "UPDATE_ORDER", "Chỉnh sửa hóa đơn",
                             oldValueStr, newValueStr, details, getCurrentUsername(), getClientIp());
                 }
 
                 return result;
             } catch (Throwable ex) {
-                auditLogService.recordLog("Order", orderCode, "UPDATE_ORDER_FAILED", "Chỉnh sửa hóa đơn thất bại",
+                auditLogService.recordFailureLog("Order", orderCode, "UPDATE_ORDER_FAILED", "Chỉnh sửa hóa đơn thất bại",
                         String.format("Mã đơn: %s | Tổng tiền: %,.0f đ", orderCode, oldTotal), null,
                         "Lỗi khi sửa hóa đơn: " + ex.getMessage(), getCurrentUsername(), getClientIp());
                 throw ex;
@@ -217,12 +217,12 @@ public class AuditAspect {
             try {
                 Object result = joinPoint.proceed();
 
-                auditLogService.recordLog("Order", orderCode, "DELETE_ORDER", "Hủy hóa đơn",
+                auditLogService.recordSuccessLog("Order", orderCode, "DELETE_ORDER", "Hủy hóa đơn",
                         oldValueStr, null, details, getCurrentUsername(), getClientIp());
 
                 return result;
             } catch (Throwable ex) {
-                auditLogService.recordLog("Order", orderCode, "DELETE_ORDER_FAILED", "Hủy hóa đơn thất bại",
+                auditLogService.recordFailureLog("Order", orderCode, "DELETE_ORDER_FAILED", "Hủy hóa đơn thất bại",
                         oldValueStr, null, "Lỗi khi hủy hóa đơn: " + ex.getMessage(), getCurrentUsername(), getClientIp());
                 throw ex;
             }
@@ -235,7 +235,7 @@ public class AuditAspect {
         try {
             Object result = joinPoint.proceed();
             if (result instanceof com.bizpos.dto.OrderReturnResponse ret) {
-                auditLogService.recordLog(
+                auditLogService.recordSuccessLog(
                         "OrderReturn",
                         ret.getReturnCode(),
                         "PROCESS_RETURN",
@@ -250,7 +250,7 @@ public class AuditAspect {
             }
             return result;
         } catch (Throwable ex) {
-            auditLogService.recordLog(
+            auditLogService.recordFailureLog(
                     "OrderReturn",
                     "UNKNOWN",
                     "PROCESS_RETURN_FAILED",
