@@ -382,14 +382,15 @@ public class OrderReturnIntegrationTest {
         assertEquals(1, successCount.get(), "Chỉ duy nhất 1 thu ngân được phép trả hàng thành công!");
         assertEquals(1, failCount.get(), "Thu ngân còn lại phải bị chặn lại với lỗi không còn đủ số lượng được trả!");
 
-        // 2. Thu ngân thất bại phải nhận được IllegalArgumentException về số lượng cho phép trả
+        // 2. Thu ngân thất bại phải nhận được lỗi về số lượng cho phép trả hoặc đơn đã hoàn trả toàn bộ
         Throwable failure = exceptions.get(0);
-        while (failure.getCause() != null && !(failure instanceof IllegalArgumentException)) {
+        while (failure.getCause() != null && !(failure instanceof IllegalArgumentException) && !(failure instanceof IllegalStateException)) {
             failure = failure.getCause();
         }
-        assertTrue(failure instanceof IllegalArgumentException, "Lỗi phải là IllegalArgumentException");
-        assertTrue(failure.getMessage().contains("chỉ còn được trả tối đa 0 món") || failure.getMessage().contains("đã trả trước đó: 1"),
-                "Thông báo lỗi phải chỉ rõ số lượng đã trả trước đó: " + failure.getMessage());
+        assertTrue(failure instanceof IllegalArgumentException || failure instanceof IllegalStateException,
+                "Lỗi phải là IllegalArgumentException hoặc IllegalStateException: " + failure.getClass());
+        assertTrue(failure.getMessage().contains("hoàn trả toàn bộ") || failure.getMessage().contains("chỉ còn được trả tối đa 0 món") || failure.getMessage().contains("đã trả trước đó: 1"),
+                "Thông báo lỗi phải chỉ rõ trạng thái hoặc số lượng đã trả trước đó: " + failure.getMessage());
 
         // 3. Kiểm tra DB: Số lượng đã trả thực tế chỉ đúng bằng 1
         int returnedInDb = orderReturnRepository.countReturnedQuantityByOrderAndProduct(raceOrder.getId(), raceProd.getId());
@@ -785,5 +786,221 @@ public class OrderReturnIntegrationTest {
         if (cancelSucceeded.get()) {
             assertEquals(com.bizpos.enums.OrderStatus.CANCELLED, finalOrder.getStatus());
         }
+    }
+
+    @Test
+    @DisplayName("15. Trạng thái đơn hàng: Trả 1 phần chuyển sang PARTIALLY_RETURNED, trả hết chuyển sang RETURNED")
+    void testPartialReturn_transitionsOrderStatusFromPartiallyReturnedToReturned() throws Exception {
+        Category cat = categoryRepository.findAll().get(0);
+        Product prod = productRepository.save(Product.builder()
+                .code("PRD_STATUS_" + System.currentTimeMillis())
+                .name("Sản phẩm Test Status Order")
+                .price(new BigDecimal("100000"))
+                .stockQuantity(20)
+                .category(cat)
+                .build());
+
+        // Mua 2 cái
+        Order order = orderService.createOrder(CreateOrderRequest.builder()
+                .paymentMethod(com.bizpos.enums.PaymentMethod.CASH)
+                .amountPaid(new BigDecimal("200000"))
+                .items(List.of(OrderItemRequest.builder()
+                        .productId(prod.getId())
+                        .quantity(2)
+                        .build()))
+                .build());
+
+        assertEquals(com.bizpos.enums.OrderStatus.COMPLETED, order.getStatus(), "Ban đầu đơn hàng COMPLETED");
+        Long orderItemId = order.getItems().get(0).getId();
+
+        // 1. Trả 1 cái (trả 1 phần) -> Đơn hàng phải chuyển sang PARTIALLY_RETURNED
+        OrderReturnRequest ret1 = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .reason(ReturnReason.WRONG_SIZE)
+                .returnItems(List.of(ReturnItemRequest.builder()
+                        .orderItemId(orderItemId)
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build();
+
+        mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ret1)))
+                .andExpect(status().isCreated());
+
+        Order afterRet1 = orderRepository.findById(order.getId()).orElseThrow();
+        assertEquals(com.bizpos.enums.OrderStatus.PARTIALLY_RETURNED, afterRet1.getStatus(),
+                "Trả 1/2 cái thì đơn hàng phải chuyển sang PARTIALLY_RETURNED!");
+
+        // 2. Trả nốt 1 cái còn lại -> Đơn hàng phải chuyển sang RETURNED
+        OrderReturnRequest ret2 = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .reason(ReturnReason.WRONG_SIZE)
+                .returnItems(List.of(ReturnItemRequest.builder()
+                        .orderItemId(orderItemId)
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build();
+
+        mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ret2)))
+                .andExpect(status().isCreated());
+
+        Order afterRet2 = orderRepository.findById(order.getId()).orElseThrow();
+        assertEquals(com.bizpos.enums.OrderStatus.RETURNED, afterRet2.getStatus(),
+                "Trả hết 2/2 cái thì đơn hàng phải chuyển sang RETURNED!");
+    }
+
+    @Test
+    @DisplayName("16. Duyệt ngoại lệ đổi trả quá hạn (Policy Override): ADMIN duyệt trực tiếp kèm lý do")
+    void testPolicyOverride_AdminApprovesExpiredReturn_RecordsAudit() throws Exception {
+        Category cat = categoryRepository.findAll().get(0);
+        Product prod = productRepository.save(Product.builder()
+                .code("PRD_OVR_" + System.currentTimeMillis())
+                .name("Sản phẩm Quá Hạn")
+                .price(new BigDecimal("200000"))
+                .stockQuantity(10)
+                .category(cat)
+                .build());
+
+        Order order = orderService.createOrder(CreateOrderRequest.builder()
+                .paymentMethod(com.bizpos.enums.PaymentMethod.CASH)
+                .amountPaid(new BigDecimal("200000"))
+                .items(List.of(OrderItemRequest.builder()
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build());
+
+        // Sửa ngày mua thành 15 ngày trước (> 7 ngày quy định)
+        order.setOrderDate(java.time.LocalDateTime.now().minusDays(15));
+        orderRepository.save(order);
+
+        Long orderItemId = order.getItems().get(0).getId();
+
+        // 1. Thử trả không có duyệt ngoại lệ -> 400 Bad Request
+        OrderReturnRequest reqNoOverride = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .reason(ReturnReason.DEFECTIVE)
+                .returnItems(List.of(ReturnItemRequest.builder()
+                        .orderItemId(orderItemId)
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build();
+
+        mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqNoOverride)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("vượt quá thời hạn cho phép")));
+
+        // 2. ADMIN gửi yêu cầu có duyệt ngoại lệ -> Thành công HTTP 201
+        OrderReturnRequest reqWithOverride = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .reason(ReturnReason.DEFECTIVE)
+                .isOverridePolicy(true)
+                .overrideReason("Khách hàng VIP khiếu nại sản phẩm lỗi đường may")
+                .returnItems(List.of(ReturnItemRequest.builder()
+                        .orderItemId(orderItemId)
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build();
+
+        MvcResult res = mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqWithOverride)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        OrderReturnResponse resp = objectMapper.readValue(
+                res.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8), OrderReturnResponse.class);
+        assertTrue(resp.getIsPolicyOverridden());
+        assertEquals("admin", resp.getApprovedBy());
+        assertEquals("Khách hàng VIP khiếu nại sản phẩm lỗi đường may", resp.getOverrideReason());
+    }
+
+    @Test
+    @DisplayName("17. Duyệt ngoại lệ đổi trả quá hạn: STAFF cần xác thực tài khoản Quản lý (ADMIN) tại quầy")
+    void testPolicyOverride_StaffRequiresValidManagerCredentials() throws Exception {
+        Category cat = categoryRepository.findAll().get(0);
+        Product prod = productRepository.save(Product.builder()
+                .code("PRD_STF_OVR_" + System.currentTimeMillis())
+                .name("Sản phẩm Quá Hạn Thu Ngân")
+                .price(new BigDecimal("150000"))
+                .stockQuantity(10)
+                .category(cat)
+                .build());
+
+        Order order = orderService.createOrder(CreateOrderRequest.builder()
+                .paymentMethod(com.bizpos.enums.PaymentMethod.CASH)
+                .amountPaid(new BigDecimal("150000"))
+                .items(List.of(OrderItemRequest.builder()
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build());
+
+        order.setOrderDate(java.time.LocalDateTime.now().minusDays(10));
+        orderRepository.save(order);
+        Long orderItemId = order.getItems().get(0).getId();
+
+        String staffToken = "Bearer " + jwtTokenProvider.generateToken("staff", "ROLE_STAFF");
+
+        // 1. STAFF duyệt ngoại lệ nhưng nhập sai mật khẩu Quản lý -> 403 Forbidden
+        OrderReturnRequest reqWrongPass = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .reason(ReturnReason.DEFECTIVE)
+                .isOverridePolicy(true)
+                .overrideReason("Khách muốn đổi size")
+                .managerUsername("admin")
+                .managerPassword("wrong_password")
+                .returnItems(List.of(ReturnItemRequest.builder()
+                        .orderItemId(orderItemId)
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build();
+
+        mockMvc.perform(post("/api/returns")
+                        .header("Authorization", staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqWrongPass)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Mật khẩu Quản lý không chính xác")));
+
+        // 2. STAFF duyệt ngoại lệ với đúng thông tin Quản lý ("admin" / "admin123") -> 201 Created
+        OrderReturnRequest reqCorrectPass = OrderReturnRequest.builder()
+                .orderCode(order.getOrderCode())
+                .reason(ReturnReason.DEFECTIVE)
+                .isOverridePolicy(true)
+                .overrideReason("Quản lý đồng ý hỗ trợ khách")
+                .managerUsername("admin")
+                .managerPassword("admin123")
+                .returnItems(List.of(ReturnItemRequest.builder()
+                        .orderItemId(orderItemId)
+                        .productId(prod.getId())
+                        .quantity(1)
+                        .build()))
+                .build();
+
+        MvcResult res = mockMvc.perform(post("/api/returns")
+                        .header("Authorization", staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqCorrectPass)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        OrderReturnResponse resp = objectMapper.readValue(res.getResponse().getContentAsString(), OrderReturnResponse.class);
+        assertTrue(resp.getIsPolicyOverridden());
+        assertEquals("admin", resp.getApprovedBy(), "Người duyệt phải là Quản lý 'admin'");
     }
 }

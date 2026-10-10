@@ -59,9 +59,14 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank() &&
+                !"Access is denied".equalsIgnoreCase(ex.getMessage().trim()) &&
+                !"Access Denied".equalsIgnoreCase(ex.getMessage().trim()))
+                ? ex.getMessage()
+                : "Bạn không có quyền thực hiện thao tác này (yêu cầu quyền ADMIN)!";
         ErrorResponse response = ErrorResponse.builder()
                 .status(HttpStatus.FORBIDDEN.value())
-                .message("Bạn không có quyền thực hiện thao tác này (yêu cầu quyền ADMIN)!")
+                .message(msg)
                 .timestamp(LocalDateTime.now())
                 .build();
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);

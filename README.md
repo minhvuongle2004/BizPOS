@@ -16,7 +16,7 @@
   - [7. Nhật ký kiểm toán hệ thống (Audit Trail via Spring AOP)](#7-nhật-ký-kiểm-toán-hệ-thống-audit-trail-via-spring-aop)
 - [🔒 Ma trận Phân quyền & Chống gian lận (RBAC Matrix)](#-ma-trận-phân-quyền--chống-gian-lận-rbac-matrix)
 - [🗄️ Cấu trúc Cơ sở dữ liệu (Database Schema)](#️-cấu-trúc-cơ-sở-dữ-liệu-database-schema)
-- [🧪 Hệ thống Kiểm thử Tự động (208 Automated Tests)](#-hệ-thống-kiểm-thử-tự-động-208-automated-tests)
+- [🧪 Hệ thống Kiểm thử Tự động (215 Automated Tests)](#-hệ-thống-kiểm-thử-tự-động-215-automated-tests)
 - [⚙️ Cài đặt & Khởi chạy](#️-cài-đặt--khởi-chạy)
 - [👤 Tài khoản Mặc định](#-tài-khoản-mặc-định)
 
@@ -81,6 +81,16 @@ Quy trình Đổi - Trả hàng giải quyết trọn vẹn bài toán có tỷ 
   * Biến thể trả: Tăng tồn kho SKU, ghi thẻ kho loại **`RETURN`** kèm mã phiếu đổi trả và `variant_id`.
   * Biến thể đổi mới: Giảm tồn kho SKU, ghi thẻ kho loại **`SALE`** kèm mã phiếu đổi trả và `variant_id`.
   * Cơ chế khóa dòng `PESSIMISTIC_WRITE` trên danh sách `productId` sắp xếp tăng dần triệt tiêu nguy cơ Deadlock khi nhiều quầy POS cùng thao tác.
+* **Quản lý Trạng thái Đơn hàng Minh bạch (`OrderStatus`)**:
+  * Khi khách trả một phần số lượng: Đơn hàng tự động chuyển sang **`PARTIALLY_RETURNED`** (Đã hoàn trả một phần).
+  * Khi khách trả hết toàn bộ số lượng trên đơn: Đơn hàng tự động chuyển sang **`RETURNED`** (Đã hoàn trả toàn bộ).
+* **Cơ chế Duyệt Ngoại lệ Chính sách Thời hạn Đổi trả (`Policy Override & Manager Authorization`)**:
+  * Đơn hàng quá hạn 7 ngày mặc định bị từ chối đổi trả.
+  * Trong trường hợp khách VIP hoặc xử lý khiếu nại tại quầy, Quản lý (`ADMIN`) có thể duyệt ngoại lệ trực tiếp hoặc Thu ngân (`STAFF`) gọi Quản lý xác thực mật khẩu/PIN ngay tại quầy (`managerUsername`, `managerPassword`).
+  * Hệ thống bắt buộc nhập lý do duyệt ngoại lệ (`overrideReason`), lưu vết người phê duyệt (`approved_by`) vào phiếu đổi trả và tự động ghi Audit Log loại **`OVERRIDE_RETURN_POLICY`**.
+* **Phương thức Hoàn tiền Minh bạch (No Phantom Liabilities)**:
+  * Hệ thống chỉ hỗ trợ 2 hình thức hoàn tiền thực tế có đối soát sổ quỹ: **`CASH` (Tiền mặt tại két POS)** và **`BANK_TRANSFER` (Chuyển khoản ngân hàng)**.
+  * Tuyệt đối không lưu các hình thức credit/voucher ảo khi chưa có sổ theo dõi số dư, bảo vệ an toàn nghĩa vụ tài chính của doanh nghiệp.
 * **Biên lai Đổi - Trả**: Tự động sinh mã phiếu định dạng `RET-YYYYMMDDHHmmss-XXXX`, hiển thị thông tin thu ngân, khách hàng, lý do (*Mặc chật, Rộng size, Lỗi vải, Không ưng màu, Đổi ý...*), thông tin biến thể đổi/trả và hỗ trợ in biên lai ngay tại quầy.
 
 ### 3. Quầy bán hàng thời gian thực (POS)
@@ -142,7 +152,7 @@ Hệ thống BizPOS tuân thủ chặt chẽ tiêu chuẩn kiểm soát gian l�
 | **Xem danh sách Sản phẩm, Danh mục, Đơn hàng** | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Xem Sổ thẻ kho** (`GET /api/stock-movements/**`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
 | **Xem Dashboard Analytics** (`GET /api/dashboard/**`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
-| **Cập nhật tồn kho kiểm đếm** (`PATCH /stock`) | ❌ 401 Unauthorized | ✅ **Cho phép** | ✅ Cho phép |
+| **Cập nhật tồn kho kiểm đếm** (`PATCH /stock`) | ❌ 401 Unauthorized | ⚠️ **Hạn mức $\le 10$ cái (bắt buộc lý do)** | ✅ **Toàn quyền (bắt buộc lý do)** |
 | **Xem Nhật ký kiểm toán** (`GET /api/audit-logs/**`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
 | **Sửa giá / Sửa sản phẩm** (`PUT /api/products/{id}`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
 | **Sửa hóa đơn đã tạo** (`PUT /api/orders/{id}`) | ❌ 401 Unauthorized | ⛔ **403 Forbidden** | ✅ **Cho phép** |
@@ -331,15 +341,15 @@ erDiagram
 
 ---
 
-## 🧪 Hệ thống Kiểm thử Tự động (208 Automated Tests - 100% Pass)
+## 🧪 Hệ thống Kiểm thử Tự động (215 Automated Tests - 100% Pass)
 
 BizPOS sở hữu bộ kiểm thử tự động toàn diện bao phủ từ Unit Test nghiệp vụ đến Integration Test trên cơ sở dữ liệu thật MySQL:
 
 ```text
 Results :
-Tests run: 208, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 215, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
-Total time:  24.087 s
+Total time:  58.573 s
 ```
 
 ### 1. Integration Tests Mô hình SPU — SKU (`ProductVariantIntegrationTest`) — 6 tests
@@ -350,7 +360,7 @@ Total time:  24.087 s
 * **`exchangeWithVariant_sameModelVsDifferentModel_shouldDetectCorrectly`**: Đổi hàng theo biến thể, tự động xác định chính xác cờ `isSameModel = true` (khi đổi size cùng mẫu) và `isSameModel = false` (khi đổi mẫu khác).
 * **`pessimisticLocking_onProductAndVariants_shouldPreventOverselling`**: Khóa bi quan chống bán vượt tồn kho đồng thời trên các biến thể cùng mẫu.
 
-### 2. Integration Tests Module Đổi - Trả hàng Thời trang (`OrderReturnIntegrationTest`) — 8 tests
+### 2. Integration Tests Module Đổi - Trả hàng Thời trang (`OrderReturnIntegrationTest`) — 11 tests
 * **`getEligibleReturnInfo_shouldReturnCorrectQuantities`**: Tra cứu đơn hàng mới mua trong hạn 7 ngày, tính toán chính xác số lượng đã mua, đã trả và số lượng còn được phép trả theo từng dòng hóa đơn.
 * **`processReturn_returnOnly_shouldIncreaseStockAndRecordMovement`**: Xử lý trả hàng hoàn tiền (`RETURN_ONLY`), tăng tồn kho chính xác, ghi nhận thẻ kho `RETURN`, tính đúng tiền hoàn.
 * **`processReturn_exchange_shouldUpdateBothStocksAndCalculateNet`**: Xử lý đổi hàng lấy mẫu mới (`EXCHANGE`), tồn kho món trả tăng 1 (`RETURN`), tồn kho món mới giảm 1 (`SALE`), tính đúng tiền bù trừ chênh lệch ($\Delta = \text{Đổi mới} - \text{Hoàn trả}$).
@@ -359,13 +369,16 @@ Total time:  24.087 s
 * **`processReturn_shouldFail_whenProductNotInOrder`**: Chặn yêu cầu trả sản phẩm không tồn tại trong hóa đơn gốc.
 * **`processReturn_raceCondition_twoCashiersReturningSameOrder_shouldPreventDoubleReturn`**: **Kiểm thử đua lệnh (Concurrency / Race Condition)**: Hai thu ngân cùng xử lý trả cho một hóa đơn tại cùng một thời điểm. Hệ thống khóa bi quan `PESSIMISTIC_WRITE` trên hóa đơn gốc ngay khi bắt đầu giao dịch, đảm bảo tuần tự hóa tuyệt đối, chỉ đúng 1 thu ngân thành công, chặn đứng nguy cơ hoàn tiền gấp đôi.
 * **`processReturn_withSameProductAtDifferentPrices_shouldAccuratelyTrackOrderItemAndRefundExactPrice`**: **Định danh chính xác dòng hóa đơn (`order_item_id`)**: Khi đơn hàng có cùng sản phẩm ở 2 dòng với 2 mức giá khác nhau (ví dụ: dòng giá sale 200k và dòng giá gốc 300k), việc đổi trả định danh chính xác dòng được trả qua `order_item_id`, hoàn tiền đúng từng đồng theo đơn giá của dòng đó và bảo toàn độc lập hạn mức đổi trả cho dòng còn lại.
+* **`testPartialReturn_transitionsOrderStatusFromPartiallyReturnedToReturned`**: Trả hàng một phần chuyển trạng thái đơn sang `PARTIALLY_RETURNED`, trả hết toàn bộ chuyển sang `RETURNED`.
+* **`testPolicyOverride_AdminApprovesExpiredReturn_RecordsAudit`**: Đơn quá hạn 7 ngày được Quản lý (`ADMIN`) duyệt ngoại lệ kèm lý do, lưu vết `approvedBy = "admin"` và ghi Audit Log.
+* **`testPolicyOverride_StaffRequiresValidManagerCredentials`**: Thu ngân (`STAFF`) đổi trả đơn quá hạn phải nhập xác thực Quản lý tại quầy (sai mật khẩu nhận 403 Forbidden, đúng mật khẩu được duyệt thành công).
 
-### 3. Integration Tests Module Thanh toán POS (Tiền mặt & Chuyển khoản VietQR) — 5 tests
+### 3. Integration Tests Module Thanh toán POS (Tiền mặt & Chuyển khoản ngân hàng) — 5 tests
 * **`createOrder_withCashPayment_exactAmount_shouldCalculateZeroChange`**: Thanh toán tiền mặt đưa đúng số tiền, xác nhận `amountPaid = totalAmount` và `changeAmount = 0`.
 * **`createOrder_withCashPayment_greaterAmount_shouldCalculateCorrectChange`**: Thanh toán tiền mặt đưa thừa tiền, tự động tính chính xác tiền thừa trả khách (`changeAmount = amountPaid - totalAmount`).
 * **`createOrder_withCashPayment_insufficientAmount_shouldThrowException`**: Khách đưa thiếu tiền mặt, chặn đứng tạo đơn và trả lỗi HTTP 400 Bad Request kèm thông điệp cảnh báo rõ ràng.
-* **`createOrder_withBankTransfer_shouldSetAmountPaidEqualTotal`**: Thanh toán chuyển khoản ngân hàng (VietQR Napas247), lưu vết mã tham chiếu chuyển khoản `paymentNote`, khớp đúng doanh thu.
-* **`getPaymentConfig_shouldReturnConfiguredBankDetails`**: API lấy cấu hình tài khoản ngân hàng thụ hưởng (VietinBank / Napas247) phục vụ render mã QR động trên POS.
+* **`createOrder_withBankTransfer_shouldSetAmountPaidEqualTotal`**: Thanh toán ghi nhận chuyển khoản ngân hàng, lưu vết mã tham chiếu chuyển khoản `paymentNote`, khớp đúng doanh thu.
+* **`getPaymentConfig_shouldReturnConfiguredBankDetails`**: API lấy cấu hình tài khoản ngân hàng thụ hưởng (VietinBank) phục vụ hiển thị thông tin chuyển khoản tại quầy POS.
 
 ### 4. Bộ Unit & Integration Tests Cốt lõi — 166 tests
 * **`AuditLogServiceTest` & `AuditLogIntegrationTest` (8 tests)**: Bắt vết Spring AOP khi sửa giá, sửa đơn, hủy đơn, chặn STAFF (403), cấp quyền ADMIN.

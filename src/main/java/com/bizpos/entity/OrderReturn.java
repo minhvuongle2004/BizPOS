@@ -62,6 +62,16 @@ public class OrderReturn extends BaseEntity {
     @Column(name = "performed_by", length = 50, nullable = false)
     private String performedBy;
 
+    @Column(name = "is_policy_overridden")
+    @Builder.Default
+    private Boolean isPolicyOverridden = false;
+
+    @Column(name = "override_reason", length = 500)
+    private String overrideReason;
+
+    @Column(name = "approved_by", length = 50)
+    private String approvedBy;
+
     @org.hibernate.annotations.BatchSize(size = 25)
     @OneToMany(mappedBy = "orderReturn", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default

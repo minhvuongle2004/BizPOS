@@ -209,20 +209,48 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.save(existingProduct);
     }
 
+    public static final int STAFF_MAX_ADJUSTMENT_DELTA = 10;
+
     @Override
     @Transactional
     @com.bizpos.aspect.Auditable(action = "ADJUST_STOCK", entity = "Product")
     public Product updateStock(Long id, Integer quantity) {
+        return updateStock(id, quantity, "Điều chỉnh tồn kho kiểm kê định kỳ");
+    }
+
+    @Override
+    @Transactional
+    @com.bizpos.aspect.Auditable(action = "ADJUST_STOCK", entity = "Product")
+    public Product updateStock(Long id, Integer quantity, String reason) {
         if (quantity == null || quantity < 0) {
             throw new IllegalArgumentException("Số lượng tồn kho phải là số nguyên không âm (>= 0)!");
         }
+        if (reason == null || reason.trim().length() < 3) {
+            throw new IllegalArgumentException("Vui lòng cung cấp lý do điều chỉnh tồn kho hợp lệ (tối thiểu 3 ký tự)!");
+        }
+
         Product existingProduct = getProductById(id);
         int prevStock = existingProduct.getStockQuantity() != null ? existingProduct.getStockQuantity() : 0;
         int delta = Math.abs(quantity - prevStock);
+
+        // Kiểm tra phân quyền: Nhân viên (STAFF) không được điều chỉnh chênh lệch lớn (> 10 cái) mà không có Quản lý
+        org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isStaff = auth != null && auth.isAuthenticated() &&
+                auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STAFF")) &&
+                auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        if (isStaff && delta > STAFF_MAX_ADJUSTMENT_DELTA) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Chênh lệch điều chỉnh tồn kho (" + delta + " cái) vượt quá hạn mức cho phép của Nhân viên (tối đa " +
+                    STAFF_MAX_ADJUSTMENT_DELTA + " cái). Yêu cầu Quản lý (ADMIN) thực hiện hoặc phê duyệt!");
+        }
+
         existingProduct.setStockQuantity(quantity);
         Product updated = productRepository.save(existingProduct);
 
         if (quantity != prevStock) {
+            String note = reason.trim() + " (" + (quantity > prevStock ? "+" : "-") + delta + ")";
             stockMovementService.recordMovement(
                     updated,
                     com.bizpos.entity.MovementType.ADJUSTMENT,
@@ -230,7 +258,7 @@ public class ProductServiceImpl implements ProductService {
                     prevStock,
                     quantity,
                     "ADJUST-" + id,
-                    "Điều chỉnh tồn kho thủ công (" + (quantity > prevStock ? "+" : "-") + delta + ")",
+                    note,
                     getCurrentUsername()
             );
         }

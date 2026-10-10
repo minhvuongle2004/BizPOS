@@ -229,6 +229,9 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() == com.bizpos.enums.OrderStatus.CANCELLED) {
             throw new IllegalStateException("Đơn hàng này đã bị hủy trước đó!");
         }
+        if (order.getStatus() == com.bizpos.enums.OrderStatus.RETURNED) {
+            throw new IllegalStateException("Đơn hàng này đã được hoàn trả toàn bộ, không thể hủy đơn!");
+        }
 
         // 1. Gom tất cả productIds và variantIds của đơn hàng, sắp xếp tăng dần theo ID để chống Deadlock
         java.util.Set<Long> productIds = new java.util.TreeSet<>();

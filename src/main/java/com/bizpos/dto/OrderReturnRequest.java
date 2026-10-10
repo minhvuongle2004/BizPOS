@@ -42,4 +42,10 @@ public class OrderReturnRequest {
     @Valid
     @Builder.Default
     private List<ExchangeItemRequest> exchangeItems = new ArrayList<>();
+
+    // Duyệt ngoại lệ chính sách thời hạn đổi trả
+    private Boolean isOverridePolicy;
+    private String overrideReason;
+    private String managerUsername;
+    private String managerPassword;
 }

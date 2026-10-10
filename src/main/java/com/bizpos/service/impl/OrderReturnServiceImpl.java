@@ -44,6 +44,17 @@ public class OrderReturnServiceImpl implements OrderReturnService {
     private final ProductRepository productRepository;
     private final StockMovementService stockMovementService;
     private final com.bizpos.repository.ProductVariantRepository productVariantRepository;
+    private final com.bizpos.repository.UserRepository userRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final com.bizpos.service.AuditLogService auditLogService;
+
+    private boolean isCurrentUserAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        }
+        return false;
+    }
 
     @Override
     @Transactional
@@ -62,17 +73,55 @@ public class OrderReturnServiceImpl implements OrderReturnService {
         Order order = orderRepository.findByOrderCodeWithLock(orderCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với mã: " + orderCode));
 
-        // Kiểm tra trạng thái đơn hàng (không cho đổi/trả đơn hàng đã bị hủy)
+        // Kiểm tra trạng thái đơn hàng (không cho đổi/trả đơn hàng đã bị hủy hoặc đã trả toàn bộ)
         if (order.getStatus() == com.bizpos.enums.OrderStatus.CANCELLED) {
             throw new IllegalStateException("Đơn hàng '" + orderCode + "' đã bị hủy, không thể thực hiện đổi / trả hàng!");
+        }
+        if (order.getStatus() == com.bizpos.enums.OrderStatus.RETURNED) {
+            throw new IllegalStateException("Đơn hàng '" + orderCode + "' đã được hoàn trả toàn bộ, không thể thực hiện đổi / trả hàng thêm!");
         }
 
         // 1. Kiểm tra chính sách hạn đổi trả (7 ngày)
         LocalDate purchaseDate = order.getOrderDate().toLocalDate();
         long daysSincePurchase = ChronoUnit.DAYS.between(purchaseDate, LocalDate.now());
+        boolean isPolicyOverridden = false;
+        String approvedBy = null;
+        String overrideReason = null;
+
         if (daysSincePurchase > RETURN_POLICY_DAYS) {
-            throw new IllegalArgumentException("Đơn hàng '" + orderCode + "' đã mua cách đây " + daysSincePurchase + 
-                    " ngày, vượt quá thời hạn cho phép đổi trả (" + RETURN_POLICY_DAYS + " ngày)!");
+            if (Boolean.TRUE.equals(request.getIsOverridePolicy())) {
+                if (request.getOverrideReason() == null || request.getOverrideReason().trim().length() < 3) {
+                    throw new IllegalArgumentException("Vui lòng cung cấp lý do duyệt ngoại lệ khi đổi trả quá hạn quy định (tối thiểu 3 ký tự)!");
+                }
+                overrideReason = request.getOverrideReason().trim();
+
+                String currentUsername = getCurrentUsername();
+                if (isCurrentUserAdmin()) {
+                    approvedBy = currentUsername;
+                } else {
+                    // Thu ngân (STAFF) cần có sự xác nhận của Quản lý (ADMIN) tại quầy
+                    String mgrUser = request.getManagerUsername() != null ? request.getManagerUsername().trim() : "";
+                    String mgrPass = request.getManagerPassword() != null ? request.getManagerPassword().trim() : "";
+                    if (mgrUser.isEmpty() || mgrPass.isEmpty()) {
+                        throw new IllegalArgumentException("Thu ngân cần sự phê duyệt của Quản lý tại quầy để đổi trả đơn quá hạn (vui lòng cung cấp tài khoản và mật khẩu Quản lý)!");
+                    }
+                    com.bizpos.entity.User manager = userRepository.findByUsername(mgrUser)
+                            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Xác thực Quản lý thất bại: Tài khoản không tồn tại!"));
+                    if (!passwordEncoder.matches(mgrPass, manager.getPassword())) {
+                        throw new org.springframework.security.access.AccessDeniedException("Xác thực Quản lý thất bại: Mật khẩu Quản lý không chính xác!");
+                    }
+                    if (manager.getRole() != com.bizpos.entity.Role.ADMIN) {
+                        throw new org.springframework.security.access.AccessDeniedException("Xác thực Quản lý thất bại: Tài khoản '" + mgrUser + "' không có vai trò Quản lý (ADMIN)!");
+                    }
+                    approvedBy = manager.getUsername();
+                }
+                isPolicyOverridden = true;
+                log.info(">> [DUYỆT NGOẠI LỆ ĐỔI TRẢ] Đơn: {}, Quá hạn {} ngày, Duyệt bởi: {}, Lý do: {}",
+                        orderCode, daysSincePurchase, approvedBy, overrideReason);
+            } else {
+                throw new IllegalArgumentException("Đơn hàng '" + orderCode + "' đã mua cách đây " + daysSincePurchase + 
+                        " ngày, vượt quá thời hạn cho phép đổi trả (" + RETURN_POLICY_DAYS + " ngày)!");
+            }
         }
 
         if (request.getReturnItems() == null || request.getReturnItems().isEmpty()) {
@@ -159,6 +208,9 @@ public class OrderReturnServiceImpl implements OrderReturnService {
                 .reason(request.getReason())
                 .note(request.getNote() != null ? request.getNote().trim() : null)
                 .performedBy(currentUser)
+                .isPolicyOverridden(isPolicyOverridden)
+                .overrideReason(overrideReason)
+                .approvedBy(approvedBy)
                 .build();
 
         BigDecimal totalRefundAmount = BigDecimal.ZERO;
@@ -398,9 +450,44 @@ public class OrderReturnServiceImpl implements OrderReturnService {
         orderReturn.setTotalExchangeAmount(totalExchangeAmount);
         orderReturn.setNetAmount(netAmount);
 
+        // 8. Cập nhật trạng thái đơn hàng (PARTIALLY_RETURNED vs RETURNED)
+        int totalOrderedQty = order.getItems() != null ? order.getItems().stream().mapToInt(OrderItem::getQuantity).sum() : 0;
+        int totalReturnedQtySoFar = 0;
+        if (order.getItems() != null) {
+            for (OrderItem oi : order.getItems()) {
+                totalReturnedQtySoFar += orderReturnRepository.countReturnedQuantityByOrderItem(oi.getId());
+            }
+        }
+        int batchReturnQty = request.getReturnItems().stream()
+                .mapToInt(ri -> ri.getQuantity() != null ? ri.getQuantity() : 1).sum();
+        totalReturnedQtySoFar += batchReturnQty;
+
+        if (totalReturnedQtySoFar >= totalOrderedQty) {
+            order.setStatus(com.bizpos.enums.OrderStatus.RETURNED);
+            order.setPaymentStatus(com.bizpos.enums.PaymentStatus.REFUNDED);
+        } else if (totalReturnedQtySoFar > 0) {
+            order.setStatus(com.bizpos.enums.OrderStatus.PARTIALLY_RETURNED);
+        }
+        orderRepository.save(order);
+
         OrderReturn saved = orderReturnRepository.save(orderReturn);
-        log.info(">> [ĐỔI - TRẢ HÀNG] Tạo thành công phiếu: {} (Đơn gốc: {}, Loại: {}, Hoàn: {} đ, Đổi: {} đ, Chênh lệch: {} đ)",
-                returnCode, orderCode, resolvedType, totalRefundAmount, totalExchangeAmount, netAmount);
+
+        if (isPolicyOverridden) {
+            auditLogService.recordSuccessLog(
+                    "OrderReturn",
+                    returnCode,
+                    "OVERRIDE_RETURN_POLICY",
+                    "Duyệt ngoại lệ thời hạn đổi trả",
+                    "Thời hạn quy định: " + RETURN_POLICY_DAYS + " ngày",
+                    "Đã mua: " + daysSincePurchase + " ngày (Duyệt bởi: " + approvedBy + ")",
+                    "Phê duyệt đổi trả quá hạn cho đơn " + orderCode + ". Lý do: " + overrideReason,
+                    currentUser,
+                    "127.0.0.1"
+            );
+        }
+
+        log.info(">> [ĐỔI - TRẢ HÀNG] Tạo thành công phiếu: {} (Đơn gốc: {}, Trạng thái đơn: {}, Loại: {}, Hoàn: {} đ, Đổi: {} đ, Chênh lệch: {} đ)",
+                returnCode, orderCode, order.getStatus(), resolvedType, totalRefundAmount, totalExchangeAmount, netAmount);
 
         return OrderReturnResponse.fromEntity(saved);
     }
@@ -422,6 +509,17 @@ public class OrderReturnServiceImpl implements OrderReturnService {
                     .orderDate(order.getOrderDate())
                     .eligible(false)
                     .message("Đơn hàng đã bị hủy, không đủ điều kiện đổi trả.")
+                    .items(java.util.Collections.emptyList())
+                    .build();
+        }
+
+        if (order.getStatus() == com.bizpos.enums.OrderStatus.RETURNED) {
+            return EligibleReturnOrderResponse.builder()
+                    .orderId(order.getId())
+                    .orderCode(order.getOrderCode())
+                    .orderDate(order.getOrderDate())
+                    .eligible(false)
+                    .message("Đơn hàng đã được hoàn trả toàn bộ, không còn sản phẩm nào để đổi trả.")
                     .items(java.util.Collections.emptyList())
                     .build();
         }

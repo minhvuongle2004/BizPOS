@@ -36,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -472,5 +473,92 @@ public class SecurityIntegrationTest {
                             .content(objectMapper.writeValueAsString(req)))
                     .andExpect(status().isOk());
         }
+    }
+
+    // =========================================================================
+    // 5. KIỂM SOÁT TỒN KHO: PATCH /api/products/{id}/stock
+    // =========================================================================
+
+    @Test
+    @DisplayName("Stock Update: STAFF được phép điều chỉnh tồn kho trong hạn mức (delta <= 10) kèm lý do")
+    void staff_canUpdateStock_withinThreshold_withReason_returns200() throws Exception {
+        Category cat = categoryRepository.findAll().get(0);
+        Product prod = productRepository.save(Product.builder()
+                .code("STOCK_STF_OK_" + System.currentTimeMillis())
+                .name("Test Stock Staff OK")
+                .price(new BigDecimal("100000"))
+                .stockQuantity(50)
+                .category(cat)
+                .build());
+
+        // Điều chỉnh từ 50 -> 55 (delta = 5 <= 10) kèm lý do
+        mockMvc.perform(patch("/api/products/" + prod.getId() + "/stock")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .param("quantity", "55")
+                        .param("reason", "Kiểm kê đầu ca phát hiện thừa 5 áo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stockQuantity").value(55));
+    }
+
+    @Test
+    @DisplayName("Stock Update: STAFF bị từ chối khi chênh lệch lớn (delta > 10) trả về HTTP 403 Forbidden")
+    void staff_cannotUpdateStock_exceedingThreshold_returns403() throws Exception {
+        Category cat = categoryRepository.findAll().get(0);
+        Product prod = productRepository.save(Product.builder()
+                .code("STOCK_STF_ERR_" + System.currentTimeMillis())
+                .name("Test Stock Staff Err")
+                .price(new BigDecimal("100000"))
+                .stockQuantity(50)
+                .category(cat)
+                .build());
+
+        // Điều chỉnh từ 50 -> 20 (delta = 30 > 10) -> Bị chặn
+        mockMvc.perform(patch("/api/products/" + prod.getId() + "/stock")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .param("quantity", "20")
+                        .param("reason", "Kiểm kê lệch lớn"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("vượt quá hạn mức cho phép của Nhân viên")));
+    }
+
+    @Test
+    @DisplayName("Stock Update: ADMIN được phép điều chỉnh tồn kho chênh lệch lớn (delta > 10) kèm lý do")
+    void admin_canUpdateStock_exceedingThreshold_returns200() throws Exception {
+        Category cat = categoryRepository.findAll().get(0);
+        Product prod = productRepository.save(Product.builder()
+                .code("STOCK_ADM_OK_" + System.currentTimeMillis())
+                .name("Test Stock Admin OK")
+                .price(new BigDecimal("100000"))
+                .stockQuantity(50)
+                .category(cat)
+                .build());
+
+        // Điều chỉnh từ 50 -> 100 (delta = 50)
+        mockMvc.perform(patch("/api/products/" + prod.getId() + "/stock")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("quantity", "100")
+                        .param("reason", "Quản lý đối soát kiểm kê tổng kho cuối tháng"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stockQuantity").value(100));
+    }
+
+    @Test
+    @DisplayName("Stock Update: Lý do điều chỉnh dưới 3 ký tự bị từ chối HTTP 400 Bad Request")
+    void updateStock_withBlankReason_returns400() throws Exception {
+        Category cat = categoryRepository.findAll().get(0);
+        Product prod = productRepository.save(Product.builder()
+                .code("STOCK_REASON_ERR_" + System.currentTimeMillis())
+                .name("Test Stock Reason Err")
+                .price(new BigDecimal("100000"))
+                .stockQuantity(50)
+                .category(cat)
+                .build());
+
+        mockMvc.perform(patch("/api/products/" + prod.getId() + "/stock")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("quantity", "55")
+                        .param("reason", "a"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("lý do điều chỉnh tồn kho hợp lệ")));
     }
 }

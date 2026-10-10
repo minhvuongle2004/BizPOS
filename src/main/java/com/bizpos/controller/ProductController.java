@@ -110,8 +110,9 @@ public class ProductController {
     @PatchMapping("/{id}/stock")
     public ResponseEntity<ProductResponse> updateStock(
             @PathVariable Long id,
-            @RequestParam Integer quantity) {
-        Product updatedProduct = productService.updateStock(id, quantity);
+            @RequestParam Integer quantity,
+            @RequestParam(required = false, defaultValue = "Điều chỉnh tồn kho kiểm kê định kỳ") String reason) {
+        Product updatedProduct = productService.updateStock(id, quantity, reason);
         return ResponseEntity.ok(ProductResponse.fromEntity(updatedProduct));
     }
 

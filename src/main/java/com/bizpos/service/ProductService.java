@@ -54,9 +54,16 @@ public interface ProductService {
     List<Product> getProductsByCategory(Long categoryId);
 
     /**
-     * Cập nhật số lượng tồn kho của sản phẩm
+     * Cập nhật số lượng tồn kho của sản phẩm kèm lý do kiểm kê
      */
-    Product updateStock(Long id, Integer quantity);
+    Product updateStock(Long id, Integer quantity, String reason);
+
+    /**
+     * Cập nhật số lượng tồn kho với lý do mặc định
+     */
+    default Product updateStock(Long id, Integer quantity) {
+        return updateStock(id, quantity, "Điều chỉnh tồn kho kiểm kê định kỳ");
+    }
 
     /**
      * Thêm một biến thể mới cho sản phẩm có sẵn

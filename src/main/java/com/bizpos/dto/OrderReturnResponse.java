@@ -36,6 +36,9 @@ public class OrderReturnResponse {
     private String note;
     private String performedBy;
     private LocalDateTime createdAt;
+    private Boolean isPolicyOverridden;
+    private String overrideReason;
+    private String approvedBy;
     private List<OrderReturnItemResponse> returnItems;
     private List<OrderExchangeItemResponse> exchangeItems;
 
@@ -86,6 +89,9 @@ public class OrderReturnResponse {
                 .note(entity.getNote())
                 .performedBy(entity.getPerformedBy())
                 .createdAt(entity.getCreatedAt())
+                .isPolicyOverridden(entity.getIsPolicyOverridden())
+                .overrideReason(entity.getOverrideReason())
+                .approvedBy(entity.getApprovedBy())
                 .returnItems(entity.getReturnItems() != null ?
                         entity.getReturnItems().stream().map(OrderReturnItemResponse::fromEntity).collect(Collectors.toList()) :
                         List.of())
