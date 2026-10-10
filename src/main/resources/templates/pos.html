@@ -2033,6 +2033,7 @@
             }
 
             function getReturnItemKey(item) {
+                if (item.orderItemId) return `oi_${item.orderItemId}`;
                 return item.variantId ? `var_${item.variantId}` : `prod_${item.productId}`;
             }
 
@@ -2082,7 +2083,7 @@
                         </td>
                         <td>
                             <select class="biz-input py-1 px-2 small" id="reason_ret_${itemKey}" disabled
-                                    onchange="onReturnReasonChange('${itemKey}', this.value)">
+                                     onchange="onReturnReasonChange('${itemKey}', this.value)">
                                 <option value="WRONG_SIZE">Size không vừa</option>
                                 <option value="DEFECTIVE">Lỗi may / Lỗi vải</option>
                                 <option value="COLOR_MISMATCH">Không hợp màu</option>
@@ -2113,6 +2114,7 @@
                     reasonSel.disabled = false;
                     qtyInput.value = 1;
                     selectedReturnItems[itemKey] = {
+                        orderItemId: item.orderItemId || null,
                         productId: item.productId,
                         variantId: item.variantId || null,
                         unitPrice: item.unitPrice,
@@ -2377,6 +2379,7 @@
                 const returnType = isExchange ? 'EXCHANGE' : 'RETURN_ONLY';
 
                 const returnItemsPayload = returnKeys.map(k => ({
+                    orderItemId: selectedReturnItems[k].orderItemId ? Number(selectedReturnItems[k].orderItemId) : null,
                     productId: Number(selectedReturnItems[k].productId),
                     variantId: selectedReturnItems[k].variantId ? Number(selectedReturnItems[k].variantId) : null,
                     quantity: selectedReturnItems[k].quantity,

@@ -50,6 +50,11 @@ public interface OrderReturnRepository extends JpaRepository<OrderReturn, Long> 
            "WHERE r.order.id = :orderId AND ri.variant.id = :variantId AND r.status = 'COMPLETED'")
     int countReturnedQuantityByOrderAndVariant(@Param("orderId") Long orderId, @Param("variantId") Long variantId);
 
+    @Query("SELECT COALESCE(SUM(ri.quantity), 0) FROM OrderReturnItem ri " +
+           "JOIN ri.orderReturn r " +
+           "WHERE ri.orderItem.id = :orderItemId AND r.status = 'COMPLETED'")
+    int countReturnedQuantityByOrderItem(@Param("orderItemId") Long orderItemId);
+
     @Query("SELECT r FROM OrderReturn r WHERE r.createdAt >= :startDate AND r.createdAt <= :endDate ORDER BY r.createdAt DESC")
     List<OrderReturn> findBetweenDates(
             @Param("startDate") LocalDateTime startDate,

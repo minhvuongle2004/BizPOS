@@ -83,11 +83,16 @@ public class OrderReturnServiceImpl implements OrderReturnService {
         Set<Long> allVariantIds = new TreeSet<>();
 
         for (ReturnItemRequest ri : request.getReturnItems()) {
-            if ((ri.getProductId() == null && ri.getVariantId() == null) || ri.getQuantity() == null || ri.getQuantity() <= 0) {
+            if ((ri.getOrderItemId() == null && ri.getProductId() == null && ri.getVariantId() == null) || ri.getQuantity() == null || ri.getQuantity() <= 0) {
                 throw new IllegalArgumentException("Thông tin sản phẩm trả lại không hợp lệ!");
             }
             OrderItem match = null;
-            if (ri.getVariantId() != null) {
+            if (ri.getOrderItemId() != null) {
+                match = order.getItems().stream()
+                        .filter(item -> item.getId().equals(ri.getOrderItemId()))
+                        .findFirst().orElse(null);
+            }
+            if (match == null && ri.getVariantId() != null) {
                 match = order.getItems().stream()
                         .filter(item -> item.getVariant() != null && item.getVariant().getId().equals(ri.getVariantId()))
                         .findFirst().orElse(null);
@@ -156,7 +161,12 @@ public class OrderReturnServiceImpl implements OrderReturnService {
         // 5. Xử lý các món trả lại (RETURN ITEMS)
         for (ReturnItemRequest ri : request.getReturnItems()) {
             OrderItem originalItem = null;
-            if (ri.getVariantId() != null) {
+            if (ri.getOrderItemId() != null) {
+                originalItem = order.getItems().stream()
+                        .filter(item -> item.getId().equals(ri.getOrderItemId()))
+                        .findFirst().orElse(null);
+            }
+            if (originalItem == null && ri.getVariantId() != null) {
                 originalItem = order.getItems().stream()
                         .filter(item -> item.getVariant() != null && item.getVariant().getId().equals(ri.getVariantId()))
                         .findFirst().orElse(null);
@@ -167,16 +177,11 @@ public class OrderReturnServiceImpl implements OrderReturnService {
                         .findFirst().orElse(null);
             }
             if (originalItem == null) {
-                throw new IllegalArgumentException("Sản phẩm ID " + (ri.getVariantId() != null ? ri.getVariantId() : ri.getProductId()) + " không có trong đơn hàng gốc " + orderCode + "!");
+                throw new IllegalArgumentException("Dòng sản phẩm yêu cầu trả lại không có trong đơn hàng gốc " + orderCode + "!");
             }
 
             int purchasedQty = originalItem.getQuantity();
-            int alreadyReturnedQty;
-            if (originalItem.getVariant() != null) {
-                alreadyReturnedQty = orderReturnRepository.countReturnedQuantityByOrderAndVariant(order.getId(), originalItem.getVariant().getId());
-            } else {
-                alreadyReturnedQty = orderReturnRepository.countReturnedQuantityByOrderAndProduct(order.getId(), originalItem.getProduct().getId());
-            }
+            int alreadyReturnedQty = orderReturnRepository.countReturnedQuantityByOrderItem(originalItem.getId());
             int remainingAllowedQty = purchasedQty - alreadyReturnedQty;
 
             if (ri.getQuantity() > remainingAllowedQty) {
@@ -244,12 +249,14 @@ public class OrderReturnServiceImpl implements OrderReturnService {
             totalRefundAmount = totalRefundAmount.add(lineTotal);
 
             OrderReturnItem returnItem = OrderReturnItem.builder()
+                    .orderReturn(orderReturn)
+                    .orderItem(originalItem)
                     .product(product)
                     .variant(variant)
                     .productCode(product.getCode())
-                    .productName(product.getName())
-                    .size(variant != null && variant.getSize() != null ? variant.getSize() : product.getSize())
-                    .color(variant != null && variant.getColor() != null ? variant.getColor() : product.getColor())
+                    .productName(originalItem.getProductName())
+                    .size(variant != null && variant.getSize() != null ? variant.getSize() : (originalItem.getVariant() != null ? originalItem.getVariant().getSize() : product.getSize()))
+                    .color(variant != null && variant.getColor() != null ? variant.getColor() : (originalItem.getVariant() != null ? originalItem.getVariant().getColor() : product.getColor()))
                     .quantity(returnQty)
                     .unitPrice(unitPrice)
                     .lineTotal(lineTotal)
@@ -400,12 +407,11 @@ public class OrderReturnServiceImpl implements OrderReturnService {
                 Product p = oi.getProduct();
                 ProductVariant v = oi.getVariant();
                 int purchasedQty = oi.getQuantity();
-                int alreadyReturned = (v != null)
-                        ? orderReturnRepository.countReturnedQuantityByOrderAndVariant(order.getId(), v.getId())
-                        : orderReturnRepository.countReturnedQuantityByOrderAndProduct(order.getId(), p.getId());
+                int alreadyReturned = orderReturnRepository.countReturnedQuantityByOrderItem(oi.getId());
                 int remaining = Math.max(0, purchasedQty - alreadyReturned);
 
                 itemResponses.add(EligibleReturnItemResponse.builder()
+                        .orderItemId(oi.getId())
                         .productId(p.getId())
                         .variantId(v != null ? v.getId() : null)
                         .variantSku(v != null ? v.getSku() : null)

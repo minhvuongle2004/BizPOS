@@ -399,4 +399,120 @@ public class OrderReturnIntegrationTest {
         Product finalProd = productRepository.findById(raceProd.getId()).orElseThrow();
         assertEquals(initialStockAfterSale + 1, finalProd.getStockQuantity(), "Tồn kho chỉ được tăng +1 cho món hàng trả hợp lệ!");
     }
+
+    @Test
+    @DisplayName("8. Định danh chính xác theo order_item_id: Cùng 1 sản phẩm ở 2 dòng với giá khác nhau -> Hoàn tiền đúng đơn giá của dòng được chọn")
+    void processReturn_withSameProductAtDifferentPrices_shouldAccuratelyTrackOrderItemAndRefundExactPrice() throws Exception {
+        Category category = categoryRepository.findByName("Áo Thời Trang")
+                .orElseGet(() -> categoryRepository.save(Category.builder().name("Áo Thời Trang").build()));
+
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(6);
+
+        // Tạo 1 sản phẩm
+        Product testProd = productRepository.save(Product.builder()
+                .code("DIFF_PRICE_" + suffix)
+                .name("Áo Test 2 Mức Giá " + suffix)
+                .price(new BigDecimal("300000.00"))
+                .stockQuantity(20)
+                .category(category)
+                .build());
+
+        // Tạo đơn hàng có 2 dòng cùng sản phẩm này nhưng 2 mức giá khác nhau
+        // Dòng 1: Giá khuyến mãi 200,000đ, SL: 1
+        // Dòng 2: Giá niêm yết 300,000đ, SL: 1
+        Order diffPriceOrder = Order.builder()
+                .orderCode("ORD_DIFF_" + suffix)
+                .orderDate(java.time.LocalDateTime.now())
+                .totalAmount(new BigDecimal("500000.00"))
+                .note("Đơn test 2 dòng cùng SP khác giá")
+                .build();
+
+        OrderItem item1 = OrderItem.builder()
+                .order(diffPriceOrder)
+                .product(testProd)
+                .productName(testProd.getName())
+                .quantity(1)
+                .unitPrice(new BigDecimal("200000.00"))
+                .lineTotal(new BigDecimal("200000.00"))
+                .build();
+
+        OrderItem item2 = OrderItem.builder()
+                .order(diffPriceOrder)
+                .product(testProd)
+                .productName(testProd.getName())
+                .quantity(1)
+                .unitPrice(new BigDecimal("300000.00"))
+                .lineTotal(new BigDecimal("300000.00"))
+                .build();
+
+        diffPriceOrder.addItem(item1);
+        diffPriceOrder.addItem(item2);
+        diffPriceOrder = orderRepository.save(diffPriceOrder);
+
+        Long item1Id = diffPriceOrder.getItems().get(0).getId();
+        Long item2Id = diffPriceOrder.getItems().get(1).getId();
+
+        // 1. Kiểm tra API Tra cứu điều kiện đổi trả: Trả về đầy đủ 2 dòng với orderItemId và đúng đơn giá
+        MvcResult eligibleResult = mockMvc.perform(get("/api/returns/eligible/" + diffPriceOrder.getOrderCode())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andReturn();
+
+        EligibleReturnOrderResponse eligibleOrder = objectMapper.readValue(
+                eligibleResult.getResponse().getContentAsString(), EligibleReturnOrderResponse.class);
+
+        EligibleReturnItemResponse eligibleItem1 = eligibleOrder.getItems().stream()
+                .filter(i -> i.getOrderItemId().equals(item1Id)).findFirst().orElseThrow();
+        EligibleReturnItemResponse eligibleItem2 = eligibleOrder.getItems().stream()
+                .filter(i -> i.getOrderItemId().equals(item2Id)).findFirst().orElseThrow();
+
+        assertEquals(new BigDecimal("200000.00"), eligibleItem1.getUnitPrice());
+        assertEquals(1, eligibleItem1.getRemainingQuantity());
+        assertEquals(new BigDecimal("300000.00"), eligibleItem2.getUnitPrice());
+        assertEquals(1, eligibleItem2.getRemainingQuantity());
+
+        // 2. Thu ngân thực hiện trả đúng Dòng 2 (orderItemId = item2Id, giá 300,000đ)
+        OrderReturnRequest returnReq = OrderReturnRequest.builder()
+                .orderCode(diffPriceOrder.getOrderCode())
+                .reason(ReturnReason.DEFECTIVE)
+                .returnItems(List.of(
+                        ReturnItemRequest.builder()
+                                .orderItemId(item2Id)
+                                .productId(testProd.getId())
+                                .quantity(1)
+                                .build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/api/returns")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(returnReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalRefundAmount").value(300000.00)) // Hoàn CHÍNH XÁC 300,000đ chứ không phải 200,000đ
+                .andExpect(jsonPath("$.returnItems[0].orderItemId").value(item2Id));
+
+        // 3. Kiểm tra lại điều kiện đổi trả sau khi đã trả Dòng 2:
+        // Dòng 2 (300k): remainingQuantity = 0, canReturn = false
+        // Dòng 1 (200k): remainingQuantity = 1, canReturn = true (quyền đổi trả của dòng 1 được bảo toàn độc lập!)
+        MvcResult reCheckResult = mockMvc.perform(get("/api/returns/eligible/" + diffPriceOrder.getOrderCode())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        EligibleReturnOrderResponse reCheckOrder = objectMapper.readValue(
+                reCheckResult.getResponse().getContentAsString(), EligibleReturnOrderResponse.class);
+
+        EligibleReturnItemResponse reCheckItem1 = reCheckOrder.getItems().stream()
+                .filter(i -> i.getOrderItemId().equals(item1Id)).findFirst().orElseThrow();
+        EligibleReturnItemResponse reCheckItem2 = reCheckOrder.getItems().stream()
+                .filter(i -> i.getOrderItemId().equals(item2Id)).findFirst().orElseThrow();
+
+        assertEquals(1, reCheckItem1.getRemainingQuantity());
+        assertTrue(reCheckItem1.isCanReturn());
+
+        assertEquals(0, reCheckItem2.getRemainingQuantity());
+        assertFalse(reCheckItem2.isCanReturn());
+    }
 }

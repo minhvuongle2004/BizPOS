@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 @Builder
 public class OrderReturnItemResponse {
     private Long id;
+    private Long orderItemId;
     private Long productId;
     private Long variantId;
     private String variantSku;
@@ -32,6 +33,7 @@ public class OrderReturnItemResponse {
         if (item == null) return null;
         return OrderReturnItemResponse.builder()
                 .id(item.getId())
+                .orderItemId(item.getOrderItem() != null ? item.getOrderItem().getId() : null)
                 .productId(item.getProduct() != null ? item.getProduct().getId() : null)
                 .variantId(item.getVariant() != null ? item.getVariant().getId() : null)
                 .variantSku(item.getVariant() != null ? item.getVariant().getSku() : null)

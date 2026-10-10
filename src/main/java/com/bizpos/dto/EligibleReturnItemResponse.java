@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class EligibleReturnItemResponse {
+    private Long orderItemId;
     private Long productId;
     private Long variantId;
     private String variantSku;

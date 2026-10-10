@@ -34,6 +34,11 @@ public class OrderReturnItem extends BaseEntity {
     @JoinColumn(name = "variant_id")
     private ProductVariant variant;
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_item_id")
+    private OrderItem orderItem;
+
     @Column(name = "product_name", length = 150, nullable = false)
     private String productName;
 

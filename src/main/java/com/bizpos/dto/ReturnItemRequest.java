@@ -14,6 +14,11 @@ import lombok.*;
 public class ReturnItemRequest {
 
     /**
+     * ID dòng hóa đơn gốc (khuyên dùng để định danh chính xác dòng được trả)
+     */
+    private Long orderItemId;
+
+    /**
      * ID sản phẩm mẫu (dùng cho client cũ hoặc tương thích ngược)
      */
     private Long productId;
