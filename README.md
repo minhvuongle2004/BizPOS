@@ -382,7 +382,7 @@ Total time:  18.408 s
 ### 2. Cấu hình cơ sở dữ liệu
 Mở file `src/main/resources/application.properties` và chỉnh sửa thông tin kết nối MySQL:
 ```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/bizpos_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.url=jdbc:mysql://localhost:3306/bizpos_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
 spring.datasource.username=root
 spring.datasource.password=your_mysql_password
 ```

@@ -20,6 +20,20 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import com.bizpos.dto.CreateOrderRequest;
+import com.bizpos.dto.OrderItemRequest;
+import com.bizpos.dto.OrderReturnRequest;
+import com.bizpos.dto.ReturnItemRequest;
+import com.bizpos.dto.ExchangeItemRequest;
+import com.bizpos.enums.ReturnReason;
+import com.bizpos.service.OrderService;
+import com.bizpos.service.OrderReturnService;
+import com.bizpos.repository.OrderRepository;
+import com.bizpos.repository.OrderReturnRepository;
+import com.bizpos.entity.Order;
+import com.bizpos.entity.OrderReturn;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,6 +51,18 @@ public class DashboardIntegrationTest {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private OrderService orderService;
+
+    @Autowired
+    private OrderReturnService orderReturnService;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderReturnRepository orderReturnRepository;
 
     @Autowired
     private CategoryRepository categoryRepository;
@@ -265,5 +291,132 @@ public class DashboardIntegrationTest {
             assertTrue(stock <= 0, "Khi threshold = 0, tất cả sản phẩm phải có stock <= 0");
             assertEquals("Hết hàng", item.get("status").asText());
         }
+    }
+
+    @Test
+    @DisplayName("Dashboard: Kiểm tra công thức Doanh thu thuần = Σ orders.total_amount + Σ order_returns.net_amount cho cả 4 trường hợp (Δ > 0, Δ = 0, Δ < 0, và trả hàng thuần)")
+    void getSummary_netRevenueFormula_withAllExchangeDeltasAndPureReturn() throws Exception {
+        LocalDate today = LocalDate.now();
+
+        // 1. Lấy chỉ số Dashboard trước khi chạy test
+        MvcResult baseResult = mockMvc.perform(get("/api/dashboard/summary")
+                        .param("startDate", today.toString())
+                        .param("endDate", today.toString())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode baseJson = objectMapper.readTree(baseResult.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        BigDecimal initialGross = new BigDecimal(baseJson.get("grossRevenue").asText());
+        BigDecimal initialNetAdj = new BigDecimal(baseJson.get("netReturnAdjustment").asText());
+        BigDecimal initialTotalRevenue = new BigDecimal(baseJson.get("totalRevenue").asText());
+
+        String suffix = String.valueOf(System.currentTimeMillis()).substring(7);
+
+        // Tạo 4 sản phẩm mẫu
+        // SP A (500k) - Dùng cho trả hàng thuần
+        Product prodA = productRepository.save(Product.builder()
+                .code("NET_A_" + suffix).name("SP A " + suffix).price(new BigDecimal("500000.00")).stockQuantity(10).category(testCategory).build());
+        // SP B (300k) - Dùng làm sản phẩm gốc cho 3 ca đổi hàng
+        Product prodB = productRepository.save(Product.builder()
+                .code("NET_B_" + suffix).name("SP B " + suffix).price(new BigDecimal("300000.00")).stockQuantity(10).category(testCategory).build());
+        // SP C (400k) - Dùng để đổi đắt hơn (Δ > 0: 400k - 300k = +100k)
+        Product prodC = productRepository.save(Product.builder()
+                .code("NET_C_" + suffix).name("SP C " + suffix).price(new BigDecimal("400000.00")).stockQuantity(10).category(testCategory).build());
+        // SP D (200k) - Dùng để đổi rẻ hơn (Δ < 0: 200k - 300k = -100k)
+        Product prodD = productRepository.save(Product.builder()
+                .code("NET_D_" + suffix).name("SP D " + suffix).price(new BigDecimal("200000.00")).stockQuantity(10).category(testCategory).build());
+        // SP E (300k) - Dùng để đổi ngang giá (Δ = 0: 300k - 300k = 0k)
+        Product prodE = productRepository.save(Product.builder()
+                .code("NET_E_" + suffix).name("SP E " + suffix).price(new BigDecimal("300000.00")).stockQuantity(10).category(testCategory).build());
+
+        // 2. Tạo 4 đơn hàng tương ứng
+        // Order 1: Mua SP A (500k)
+        Order order1 = orderService.createOrder(CreateOrderRequest.builder()
+                .items(List.of(OrderItemRequest.builder().productId(prodA.getId()).quantity(1).build()))
+                .amountPaid(new BigDecimal("500000.00"))
+                .build());
+
+        // Order 2: Mua SP B (300k) -> sẽ đổi sang SP C (400k, bù 100k)
+        Order order2 = orderService.createOrder(CreateOrderRequest.builder()
+                .items(List.of(OrderItemRequest.builder().productId(prodB.getId()).quantity(1).build()))
+                .amountPaid(new BigDecimal("300000.00"))
+                .build());
+
+        // Order 3: Mua SP B (300k) -> sẽ đổi sang SP E (300k, bù 0k)
+        Order order3 = orderService.createOrder(CreateOrderRequest.builder()
+                .items(List.of(OrderItemRequest.builder().productId(prodB.getId()).quantity(1).build()))
+                .amountPaid(new BigDecimal("300000.00"))
+                .build());
+
+        // Order 4: Mua SP B (300k) -> sẽ đổi sang SP D (200k, hoàn 100k)
+        Order order4 = orderService.createOrder(CreateOrderRequest.builder()
+                .items(List.of(OrderItemRequest.builder().productId(prodB.getId()).quantity(1).build()))
+                .amountPaid(new BigDecimal("300000.00"))
+                .build());
+
+        // Tổng doanh thu gộp mới thêm: 500k + 300k + 300k + 300k = 1,400,000 đ
+        BigDecimal expectedAddedGross = new BigDecimal("1400000.00");
+
+        // 3. Thực hiện 4 ca đổi / trả hàng
+        // Case 1: Trả hàng thuần (Order 1, trả SP A) -> Refund = 500k, Exchange = 0k, Net = -500k
+        orderReturnService.processReturn(OrderReturnRequest.builder()
+                .orderCode(order1.getOrderCode())
+                .reason(ReturnReason.DEFECTIVE)
+                .returnItems(List.of(ReturnItemRequest.builder().productId(prodA.getId()).quantity(1).build()))
+                .build());
+
+        // Case 2: Đổi sang món đắt hơn (Δ > 0: Order 2, trả SP B 300k, lấy SP C 400k) -> Net = +100k
+        orderReturnService.processReturn(OrderReturnRequest.builder()
+                .orderCode(order2.getOrderCode())
+                .reason(ReturnReason.WRONG_SIZE)
+                .returnItems(List.of(ReturnItemRequest.builder().productId(prodB.getId()).quantity(1).build()))
+                .exchangeItems(List.of(ExchangeItemRequest.builder().productId(prodC.getId()).quantity(1).build()))
+                .build());
+
+        // Case 3: Đổi ngang giá (Δ = 0: Order 3, trả SP B 300k, lấy SP E 300k) -> Net = 0k
+        orderReturnService.processReturn(OrderReturnRequest.builder()
+                .orderCode(order3.getOrderCode())
+                .reason(ReturnReason.COLOR_MISMATCH)
+                .returnItems(List.of(ReturnItemRequest.builder().productId(prodB.getId()).quantity(1).build()))
+                .exchangeItems(List.of(ExchangeItemRequest.builder().productId(prodE.getId()).quantity(1).build()))
+                .build());
+
+        // Case 4: Đổi sang món rẻ hơn (Δ < 0: Order 4, trả SP B 300k, lấy SP D 200k) -> Net = -100k
+        orderReturnService.processReturn(OrderReturnRequest.builder()
+                .orderCode(order4.getOrderCode())
+                .reason(ReturnReason.CUSTOMER_CHANGE_MIND)
+                .returnItems(List.of(ReturnItemRequest.builder().productId(prodB.getId()).quantity(1).build()))
+                .exchangeItems(List.of(ExchangeItemRequest.builder().productId(prodD.getId()).quantity(1).build()))
+                .build());
+
+        // Tổng điều chỉnh netAmount từ 4 phiếu đổi trả:
+        // (-500,000) + (+100,000) + 0 + (-100,000) = -500,000 đ
+        BigDecimal expectedAddedNetAdj = new BigDecimal("-500000.00");
+
+        // Doanh thu thuần tăng thêm = Gross (1,400,000) + NetAdj (-500,000) = 900,000 đ
+        BigDecimal expectedAddedTotalRevenue = new BigDecimal("900000.00");
+
+        // 4. Gọi lại Dashboard Summary và kiểm tra tính toán
+        MvcResult updatedResult = mockMvc.perform(get("/api/dashboard/summary")
+                        .param("startDate", today.toString())
+                        .param("endDate", today.toString())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode updatedJson = objectMapper.readTree(updatedResult.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        BigDecimal updatedGross = new BigDecimal(updatedJson.get("grossRevenue").asText());
+        BigDecimal updatedNetAdj = new BigDecimal(updatedJson.get("netReturnAdjustment").asText());
+        BigDecimal updatedTotalRevenue = new BigDecimal(updatedJson.get("totalRevenue").asText());
+
+        assertEquals(0, initialGross.add(expectedAddedGross).compareTo(updatedGross),
+                "Gross Revenue phải tăng thêm đúng 1,400,000 đ");
+        assertEquals(0, initialNetAdj.add(expectedAddedNetAdj).compareTo(updatedNetAdj),
+                "Net Return Adjustment phải cộng dồn đúng -500,000 đ");
+        assertEquals(0, initialTotalRevenue.add(expectedAddedTotalRevenue).compareTo(updatedTotalRevenue),
+                "Doanh thu thuần (totalRevenue) phải tăng đúng 900,000 đ (tránh hoàn toàn nguy cơ trừ trùng hay sót Δ < 0)");
+        assertEquals(0, updatedGross.add(updatedNetAdj).compareTo(updatedTotalRevenue),
+                "Doanh thu thuần luôn bằng chính xác Gross Revenue + Net Return Adjustment");
     }
 }
