@@ -66,6 +66,12 @@ public class StockMovementIntegrationTest {
     @Autowired
     private StockMovementRepository stockMovementRepository;
 
+    @Autowired
+    private com.bizpos.service.StockMovementService stockMovementService;
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     private String adminToken;
     private String staffToken;
     private Product testProduct;
@@ -221,5 +227,78 @@ public class StockMovementIntegrationTest {
                 .andExpect(jsonPath("$[0].type").value("SALE"))
                 .andExpect(jsonPath("$[0].typeDescription").value("Xuất bán hàng"))
                 .andExpect(jsonPath("$[0].quantity").value(10));
+    }
+
+    @Test
+    @DisplayName("5. [RECONCILIATION] Đối soát toán học chuỗi thẻ kho khớp 100% với stockQuantity thực tế")
+    void testStockLedgerReconciliation_MatchesCurrentStock() {
+        // Chu kỳ nghiệp vụ liên hoàn:
+        // Ban đầu: tồn = 100
+
+        // Bước 1: Bán 10 cái (SALE) -> Tồn còn 90
+        orderService.createOrder(CreateOrderRequest.builder()
+                .customerId(testCustomer.getId())
+                .items(List.of(OrderItemRequest.builder().productId(testProduct.getId()).quantity(10).build()))
+                .build());
+
+        // Bước 2: Bán tiếp 25 cái (SALE) -> Tồn còn 65
+        Order order2 = orderService.createOrder(CreateOrderRequest.builder()
+                .customerId(testCustomer.getId())
+                .items(List.of(OrderItemRequest.builder().productId(testProduct.getId()).quantity(25).build()))
+                .build());
+
+        // Bước 3: Hủy đơn order2 (RETURN) -> Tồn hồi phục lên 90
+        orderService.deleteOrder(order2.getId());
+
+        // Bước 4: Kiểm kê điều chỉnh lên 110 cái (ADJUSTMENT) -> Tồn là 110
+        productService.updateStock(testProduct.getId(), 110);
+
+        // Kiểm tra đối soát toán học qua StockMovementService
+        boolean isReconciled = stockMovementService.verifyProductStockReconciliation(testProduct.getId());
+        assertTrue(isReconciled, "Chuỗi thẻ kho phải bảo toàn tính toàn vẹn và khớp 100% với tồn kho thực tế");
+
+        // Kiểm tra Product hiện tại
+        Product refreshed = productRepository.findById(testProduct.getId()).orElseThrow();
+        assertEquals(110, refreshed.getStockQuantity());
+    }
+
+    @Test
+    @DisplayName("6. [SECURITY - TẦNG REPOSITORY] Chặn đứng toàn bộ phương thức xóa bản ghi thẻ kho")
+    void testRepositoryDeleteOperations_AreBlocked() {
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtDesc(testProduct.getId());
+        if (movements.isEmpty()) {
+            productService.updateStock(testProduct.getId(), testProduct.getStockQuantity() + 1);
+            movements = stockMovementRepository.findByProductIdOrderByCreatedAtDesc(testProduct.getId());
+        }
+
+        assertFalse(movements.isEmpty());
+        StockMovement sample = movements.get(0);
+
+        assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.delete(sample));
+        assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.deleteById(sample.getId()));
+        assertThrows(UnsupportedOperationException.class, () -> stockMovementRepository.deleteAll());
+    }
+
+    @Test
+    @DisplayName("7. [SECURITY - TẦNG DATABASE TRIGGER] MySQL Trigger chặn UPDATE và DELETE trực tiếp trên bảng stock_movements")
+    void testDatabaseTriggers_PreventDirectUpdateAndDelete() {
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtDesc(testProduct.getId());
+        if (movements.isEmpty()) {
+            productService.updateStock(testProduct.getId(), testProduct.getStockQuantity() + 5);
+            movements = stockMovementRepository.findByProductIdOrderByCreatedAtDesc(testProduct.getId());
+        }
+
+        assertFalse(movements.isEmpty());
+        Long movementId = movements.get(0).getId();
+
+        // 1. Cố tình UPDATE trực tiếp bằng JDBC SQL -> Trigger chặn và ném ngoại lệ
+        assertThrows(Exception.class, () -> {
+            jdbcTemplate.update("UPDATE stock_movements SET quantity = 9999 WHERE id = ?", movementId);
+        }, "MySQL Trigger trg_stock_movements_prevent_update phải chặn câu lệnh UPDATE");
+
+        // 2. Cố tình DELETE trực tiếp bằng JDBC SQL -> Trigger chặn và ném ngoại lệ
+        assertThrows(Exception.class, () -> {
+            jdbcTemplate.update("DELETE FROM stock_movements WHERE id = ?", movementId);
+        }, "MySQL Trigger trg_stock_movements_prevent_delete phải chặn câu lệnh DELETE");
     }
 }

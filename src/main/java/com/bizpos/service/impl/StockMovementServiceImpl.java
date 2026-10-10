@@ -130,4 +130,62 @@ public class StockMovementServiceImpl implements StockMovementService {
         return stockMovementRepository.filterMovements(productId, type, from, to, pageable)
                 .map(StockMovementResponse::fromEntity);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean verifyProductStockReconciliation(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + productId));
+
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtAsc(productId);
+        if (movements.isEmpty()) {
+            return true;
+        }
+
+        // 1. Kiểm tra tính liên tục của chuỗi biến động (Chain continuity) & Delta consistency
+        for (int i = 0; i < movements.size(); i++) {
+            StockMovement current = movements.get(i);
+
+            int expectedCurrent;
+            switch (current.getType()) {
+                case SALE -> expectedCurrent = current.getPreviousStock() - current.getQuantity();
+                case RETURN, IMPORT -> expectedCurrent = current.getPreviousStock() + current.getQuantity();
+                case ADJUSTMENT -> {
+                    if (Math.abs(current.getCurrentStock() - current.getPreviousStock()) != current.getQuantity()) {
+                        log.warn(">> [RECONCILIATION FAILED] Bản ghi ADJUSTMENT #{} có quantity ({}) không khớp với chênh lệch tồn ({} -> {})",
+                                current.getId(), current.getQuantity(), current.getPreviousStock(), current.getCurrentStock());
+                        return false;
+                    }
+                    expectedCurrent = current.getCurrentStock();
+                }
+                default -> expectedCurrent = current.getCurrentStock();
+            }
+
+            if (current.getCurrentStock() != expectedCurrent) {
+                log.warn(">> [RECONCILIATION FAILED] Bản ghi #{} (loại {}) tính toán tồn sau ({}) không khớp kỳ vọng ({})",
+                        current.getId(), current.getType(), current.getCurrentStock(), expectedCurrent);
+                return false;
+            }
+
+            if (i > 0) {
+                StockMovement previous = movements.get(i - 1);
+                if (!current.getPreviousStock().equals(previous.getCurrentStock())) {
+                    log.warn(">> [RECONCILIATION FAILED] Đứt gãy chuỗi thẻ kho tại bản ghi #{}: previousStock ({}) khác currentStock bản ghi trước ({})",
+                            current.getId(), current.getPreviousStock(), previous.getCurrentStock());
+                    return false;
+                }
+            }
+        }
+
+        // 2. Kiểm tra bản ghi cuối cùng phải khớp chính xác 100% với stockQuantity thực tế của Product
+        StockMovement latestMovement = movements.get(movements.size() - 1);
+        int currentStockOnProduct = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+        if (!latestMovement.getCurrentStock().equals(currentStockOnProduct)) {
+            log.warn(">> [RECONCILIATION FAILED] Tồn kho bản ghi mới nhất ({}) không khớp với stockQuantity trên sản phẩm ({})",
+                    latestMovement.getCurrentStock(), currentStockOnProduct);
+            return false;
+        }
+
+        return true;
+    }
 }

@@ -43,4 +43,38 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             Pageable pageable);
+
+    @Query("SELECT sm FROM StockMovement sm WHERE sm.product.id = :productId ORDER BY sm.createdAt ASC, sm.id ASC")
+    List<StockMovement> findByProductIdOrderByCreatedAtAsc(@Param("productId") Long productId);
+
+    @Query("SELECT sm FROM StockMovement sm WHERE sm.variant.id = :variantId ORDER BY sm.createdAt ASC, sm.id ASC")
+    List<StockMovement> findByVariantIdOrderByCreatedAtAsc(@Param("variantId") Long variantId);
+
+    // =========================================================================
+    // KHÓA BẤT BIẾN (APPEND-ONLY): CHẶN TRIỆT ĐỂ MỌI THAO TÁC XÓA BẢN GHI THẺ KHO
+    // =========================================================================
+    @Override
+    default void delete(StockMovement entity) {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
+
+    @Override
+    default void deleteById(Long id) {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
+
+    @Override
+    default void deleteAll(Iterable<? extends StockMovement> entities) {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
+
+    @Override
+    default void deleteAll() {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
+
+    @Override
+    default void deleteAllById(Iterable<? extends Long> ids) {
+        throw new UnsupportedOperationException("Sổ thẻ kho là Append-Only (Bất biến), nghiêm cấm thao tác xóa!");
+    }
 }

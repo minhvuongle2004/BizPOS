@@ -9,8 +9,8 @@ import lombok.*;
         @Index(name = "idx_stock_movement_product", columnList = "product_id"),
         @Index(name = "idx_stock_movement_created_at", columnList = "created_at")
 })
+@org.hibernate.annotations.Immutable
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

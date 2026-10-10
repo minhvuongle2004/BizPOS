@@ -63,4 +63,12 @@ public interface StockMovementService {
             LocalDateTime from,
             LocalDateTime to,
             Pageable pageable);
+
+    /**
+     * Đối soát tính toàn vẹn và tính toán học của sổ thẻ kho (Inventory Reconciliation):
+     * - Kiểm tra tính liên tục của chuỗi biến động (previousStock == currentStock của bản ghi liền trước)
+     * - Kiểm tra số lượng tồn kho cuối cùng trong sổ khớp chính xác 100% với stockQuantity hiện tại của sản phẩm
+     * @return true nếu số liệu hoàn toàn khớp và chuỗi biến động toàn vẹn
+     */
+    boolean verifyProductStockReconciliation(Long productId);
 }
