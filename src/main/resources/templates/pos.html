@@ -2274,9 +2274,11 @@
                 }
 
                 try {
+                    const headers = getAuthHeaders();
+                    headers['Idempotency-Key'] = 'pos-ord-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
                     const response = await fetch('/api/orders', {
                         method: 'POST',
-                        headers: getAuthHeaders(),
+                        headers: headers,
                         body: JSON.stringify(payload)
                     });
 
@@ -2305,6 +2307,8 @@
 
                         // Tải lại sản phẩm
                         await loadProducts();
+                    } else if (response.status === 409) {
+                        showToast('Đang xử lý (409)', data.message || 'Hóa đơn đang được xử lý song song, vui lòng đợi!', false);
                     } else if (response.status === 400) {
                         showToast('Lỗi dữ liệu (400)', data.message || 'Số lượng trong kho không đủ hoặc tiền không hợp lệ!', false);
                         await loadProducts();
@@ -3270,9 +3274,11 @@
                 }
 
                 try {
+                    const headers = getAuthHeaders();
+                    headers['Idempotency-Key'] = 'pos-ret-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
                     const response = await fetch('/api/returns', {
                         method: 'POST',
-                        headers: getAuthHeaders(),
+                        headers: headers,
                         body: JSON.stringify(payload)
                     });
 
@@ -3291,6 +3297,8 @@
                         showToast('Thành công', `Phiếu [${data.returnCode}] đã xử lý thành công!`, true);
 
                         await loadProducts();
+                    } else if (response.status === 409) {
+                        showToast('Đang xử lý (409)', data.message || 'Phiếu đổi trả đang được xử lý song song, vui lòng đợi!', false);
                     } else {
                         showToast('Lỗi xử lý', data.message || 'Không thể tạo phiếu đổi trả!', false);
                     }

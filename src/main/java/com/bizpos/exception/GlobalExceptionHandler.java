@@ -81,6 +81,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Nhóm 2a: Xung đột tính lũy thừa (Idempotency Key đang xử lý) -> 409 Conflict
+     */
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ErrorResponse> handleIdempotencyConflict(IdempotencyConflictException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.CONFLICT.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
      * Nhóm 2b: Xung đột dữ liệu / ràng buộc nghiệp vụ (Sản phẩm trong đơn hàng, danh mục có sản phẩm liên kết) -> 409 Conflict
      */
     @ExceptionHandler({

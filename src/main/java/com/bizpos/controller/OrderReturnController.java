@@ -21,10 +21,11 @@ public class OrderReturnController {
     private final OrderReturnService orderReturnService;
 
     /**
-     * 1. Xử lý tạo phiếu đổi / trả hàng
+     * 1. Xử lý tạo phiếu đổi / trả hàng (Áp dụng Idempotency-Key chống tạo phiếu lặp)
      * POST /api/returns
      */
     @PostMapping
+    @com.bizpos.aspect.Idempotent
     public ResponseEntity<OrderReturnResponse> processReturn(@Valid @RequestBody OrderReturnRequest request) {
         OrderReturnResponse response = orderReturnService.processReturn(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

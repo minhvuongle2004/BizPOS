@@ -23,10 +23,11 @@ public class OrderController {
     private final OrderService orderService;
 
     /**
-     * 1. Tạo mới đơn hàng
+     * 1. Tạo mới đơn hàng (Áp dụng Idempotency-Key chống tạo đơn lặp khi bấm đúp)
      * POST /api/orders
      */
     @PostMapping
+    @com.bizpos.aspect.Idempotent
     public ResponseEntity<OrderResponse> createOrder(@jakarta.validation.Valid @RequestBody CreateOrderRequest request) {
         Order order = orderService.createOrder(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.fromEntity(order));
