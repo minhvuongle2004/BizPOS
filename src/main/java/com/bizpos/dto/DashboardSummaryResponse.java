@@ -13,8 +13,14 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class DashboardSummaryResponse {
 
-    private BigDecimal totalRevenue;
+    private BigDecimal totalRevenue; // Doanh thu thuần (Net Revenue)
     private Long totalOrders;
     private BigDecimal averageOrderValue;
     private Long lowStockCount;
+
+    // Chi tiết minh bạch doanh thu bán hàng & đổi trả
+    private BigDecimal grossRevenue;
+    private BigDecimal totalRefundAmount;
+    private BigDecimal totalExchangeAmount;
+    private BigDecimal netReturnAdjustment;
 }

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -57,6 +58,36 @@ public interface OrderReturnRepository extends JpaRepository<OrderReturn, Long> 
 
     @Query("SELECT r FROM OrderReturn r WHERE r.createdAt >= :startDate AND r.createdAt <= :endDate ORDER BY r.createdAt DESC")
     List<OrderReturn> findBetweenDates(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT COALESCE(SUM(r.netAmount), 0) FROM OrderReturn r " +
+           "WHERE r.status = com.bizpos.enums.ReturnStatus.COMPLETED " +
+           "AND r.createdAt >= :startDate AND r.createdAt <= :endDate")
+    BigDecimal calculateTotalNetAmountBetween(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT COALESCE(SUM(r.totalRefundAmount), 0) FROM OrderReturn r " +
+           "WHERE r.status = com.bizpos.enums.ReturnStatus.COMPLETED " +
+           "AND r.createdAt >= :startDate AND r.createdAt <= :endDate")
+    BigDecimal calculateTotalRefundAmountBetween(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT COALESCE(SUM(r.totalExchangeAmount), 0) FROM OrderReturn r " +
+           "WHERE r.status = com.bizpos.enums.ReturnStatus.COMPLETED " +
+           "AND r.createdAt >= :startDate AND r.createdAt <= :endDate")
+    BigDecimal calculateTotalExchangeAmountBetween(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query(value = "SELECT DATE_FORMAT(r.created_at, '%Y-%m-%d') AS returnDay, COALESCE(SUM(r.net_amount), 0) AS dayNetAmount " +
+                   "FROM order_returns r " +
+                   "WHERE r.status = 'COMPLETED' AND r.created_at >= :startDate AND r.created_at <= :endDate " +
+                   "GROUP BY DATE_FORMAT(r.created_at, '%Y-%m-%d') " +
+                   "ORDER BY returnDay ASC", nativeQuery = true)
+    List<Object[]> findDailyNetAmountBetween(
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 }

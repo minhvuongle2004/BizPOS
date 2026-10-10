@@ -7,6 +7,7 @@ import com.bizpos.dto.TopProductResponse;
 import com.bizpos.entity.Product;
 import com.bizpos.repository.OrderItemRepository;
 import com.bizpos.repository.OrderRepository;
+import com.bizpos.repository.OrderReturnRepository;
 import com.bizpos.repository.ProductRepository;
 import com.bizpos.service.DashboardService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
+    private final OrderReturnRepository orderReturnRepository;
 
     private static final int DEFAULT_LOW_STOCK_THRESHOLD = 5;
 
@@ -41,10 +43,28 @@ public class DashboardServiceImpl implements DashboardService {
         LocalDateTime startDateTime = range[0].atStartOfDay();
         LocalDateTime endDateTime = range[1].atTime(LocalTime.MAX);
 
-        BigDecimal totalRevenue = orderRepository.calculateRevenueBetween(startDateTime, endDateTime);
-        if (totalRevenue == null) {
-            totalRevenue = BigDecimal.ZERO;
+        BigDecimal grossRevenue = orderRepository.calculateRevenueBetween(startDateTime, endDateTime);
+        if (grossRevenue == null) {
+            grossRevenue = BigDecimal.ZERO;
         }
+
+        BigDecimal netReturnAdjustment = orderReturnRepository.calculateTotalNetAmountBetween(startDateTime, endDateTime);
+        if (netReturnAdjustment == null) {
+            netReturnAdjustment = BigDecimal.ZERO;
+        }
+
+        BigDecimal totalRefundAmount = orderReturnRepository.calculateTotalRefundAmountBetween(startDateTime, endDateTime);
+        if (totalRefundAmount == null) {
+            totalRefundAmount = BigDecimal.ZERO;
+        }
+
+        BigDecimal totalExchangeAmount = orderReturnRepository.calculateTotalExchangeAmountBetween(startDateTime, endDateTime);
+        if (totalExchangeAmount == null) {
+            totalExchangeAmount = BigDecimal.ZERO;
+        }
+
+        // Doanh thu thuần = Bán hàng - Hoàn trả (± chênh lệch đổi) = Gross Revenue + netReturnAdjustment
+        BigDecimal totalRevenue = grossRevenue.add(netReturnAdjustment);
 
         long totalOrders = orderRepository.countOrdersBetween(startDateTime, endDateTime);
 
@@ -60,6 +80,10 @@ public class DashboardServiceImpl implements DashboardService {
                 .totalOrders(totalOrders)
                 .averageOrderValue(averageOrderValue)
                 .lowStockCount(lowStockCount)
+                .grossRevenue(grossRevenue)
+                .totalRefundAmount(totalRefundAmount)
+                .totalExchangeAmount(totalExchangeAmount)
+                .netReturnAdjustment(netReturnAdjustment)
                 .build();
     }
 
@@ -87,9 +111,8 @@ public class DashboardServiceImpl implements DashboardService {
             cur = cur.plusDays(1);
         }
 
-        // Lấy dữ liệu tổng hợp trực tiếp từ database
+        // Lấy dữ liệu bán hàng trực tiếp từ database
         List<Object[]> rows = orderRepository.findDailyRevenueBetween(startDateTime, endDateTime);
-        BigDecimal totalRevenue = BigDecimal.ZERO;
 
         if (rows != null) {
             for (Object[] r : rows) {
@@ -97,11 +120,24 @@ public class DashboardServiceImpl implements DashboardService {
                     String dateKey = r[0].toString();
                     BigDecimal rev = r[1] != null ? new BigDecimal(r[1].toString()) : BigDecimal.ZERO;
                     dailyMap.put(dateKey, rev);
-                    totalRevenue = totalRevenue.add(rev);
                 }
             }
         }
 
+        // Cộng dồn chênh lệch đổi trả theo từng ngày (net_amount: âm nếu trả hoàn tiền, dương nếu khách bù tiền đổi mới)
+        List<Object[]> returnRows = orderReturnRepository.findDailyNetAmountBetween(startDateTime, endDateTime);
+        if (returnRows != null) {
+            for (Object[] r : returnRows) {
+                if (r != null && r.length >= 2 && r[0] != null) {
+                    String dateKey = r[0].toString();
+                    BigDecimal returnNet = r[1] != null ? new BigDecimal(r[1].toString()) : BigDecimal.ZERO;
+                    BigDecimal currentDayRev = dailyMap.getOrDefault(dateKey, BigDecimal.ZERO);
+                    dailyMap.put(dateKey, currentDayRev.add(returnNet));
+                }
+            }
+        }
+
+        BigDecimal totalRevenue = BigDecimal.ZERO;
         List<String> labels = new ArrayList<>();
         List<BigDecimal> data = new ArrayList<>();
 
@@ -109,6 +145,7 @@ public class DashboardServiceImpl implements DashboardService {
             LocalDate date = LocalDate.parse(entry.getKey(), isoFormatter);
             labels.add(date.format(displayFormatter));
             data.add(entry.getValue());
+            totalRevenue = totalRevenue.add(entry.getValue());
         }
 
         return RevenueChartResponse.builder()

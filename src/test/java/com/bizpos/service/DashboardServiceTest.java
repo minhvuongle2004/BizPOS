@@ -8,6 +8,7 @@ import com.bizpos.entity.Category;
 import com.bizpos.entity.Product;
 import com.bizpos.repository.OrderItemRepository;
 import com.bizpos.repository.OrderRepository;
+import com.bizpos.repository.OrderReturnRepository;
 import com.bizpos.repository.ProductRepository;
 import com.bizpos.service.impl.DashboardServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,9 @@ public class DashboardServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private OrderReturnRepository orderReturnRepository;
 
     @InjectMocks
     private DashboardServiceImpl dashboardService;
@@ -81,6 +85,38 @@ public class DashboardServiceTest {
         // AOV = 1,000,000 / 4 = 250,000
         assertEquals(new BigDecimal("250000"), response.getAverageOrderValue());
         assertEquals(3L, response.getLowStockCount());
+    }
+
+    @Test
+    @DisplayName("Summary: Doanh thu thuần = Bán hàng - Hoàn trả (± chênh lệch đổi)")
+    void getSummary_shouldDeductReturnsFromGrossRevenue() {
+        LocalDate start = today.minusDays(6);
+        LocalDate end = today;
+
+        when(orderRepository.calculateRevenueBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(new BigDecimal("1000000.00"));
+        when(orderReturnRepository.calculateTotalNetAmountBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(new BigDecimal("-200000.00")); // Đã hoàn trả 200,000 đ
+        when(orderReturnRepository.calculateTotalRefundAmountBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(new BigDecimal("200000.00"));
+        when(orderReturnRepository.calculateTotalExchangeAmountBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(BigDecimal.ZERO);
+        when(orderRepository.countOrdersBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(4L);
+        when(productRepository.countLowStockProducts(5))
+                .thenReturn(3L);
+
+        DashboardSummaryResponse response = dashboardService.getSummary(start, end);
+
+        assertNotNull(response);
+        // Doanh thu thuần = 1,000,000 - 200,000 = 800,000
+        assertEquals(new BigDecimal("800000.00"), response.getTotalRevenue());
+        assertEquals(new BigDecimal("1000000.00"), response.getGrossRevenue());
+        assertEquals(new BigDecimal("-200000.00"), response.getNetReturnAdjustment());
+        assertEquals(new BigDecimal("200000.00"), response.getTotalRefundAmount());
+        assertEquals(4L, response.getTotalOrders());
+        // AOV = 800,000 / 4 = 200,000
+        assertEquals(new BigDecimal("200000"), response.getAverageOrderValue());
     }
 
     @Test
@@ -258,6 +294,38 @@ public class DashboardServiceTest {
         assertEquals(BigDecimal.ZERO, response.getData().get(2));
 
         assertEquals(new BigDecimal("250000.00"), response.getTotalRevenue());
+    }
+
+    @Test
+    @DisplayName("Revenue Chart: Điền chính xác doanh thu thuần sau khi cộng dồn chênh lệch đổi trả theo ngày")
+    void getRevenueChart_shouldAdjustDailyRevenueWithReturns() {
+        LocalDate start = LocalDate.of(2026, 10, 1);
+        LocalDate end = LocalDate.of(2026, 10, 2);
+
+        // Ngày 1: Bán 500,000; Ngày 2: Bán 300,000
+        List<Object[]> orderRows = List.of(
+                new Object[]{"2026-10-01", new BigDecimal("500000.00")},
+                new Object[]{"2026-10-02", new BigDecimal("300000.00")}
+        );
+        // Ngày 1: Trả hàng hoàn -100,000; Ngày 2: Đổi mới bù thêm +50,000
+        List<Object[]> returnRows = List.of(
+                new Object[]{"2026-10-01", new BigDecimal("-100000.00")},
+                new Object[]{"2026-10-02", new BigDecimal("50000.00")}
+        );
+
+        when(orderRepository.findDailyRevenueBetween(any(), any())).thenReturn(orderRows);
+        when(orderReturnRepository.findDailyNetAmountBetween(any(), any())).thenReturn(returnRows);
+
+        RevenueChartResponse response = dashboardService.getRevenueChart(start, end);
+
+        assertNotNull(response);
+        assertEquals(2, response.getData().size());
+        // Ngày 1: 500,000 - 100,000 = 400,000
+        assertEquals(new BigDecimal("400000.00"), response.getData().get(0));
+        // Ngày 2: 300,000 + 50,000 = 350,000
+        assertEquals(new BigDecimal("350000.00"), response.getData().get(1));
+        // Tổng = 400,000 + 350,000 = 750,000
+        assertEquals(new BigDecimal("750000.00"), response.getTotalRevenue());
     }
 
     @Test

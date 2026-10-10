@@ -86,7 +86,7 @@
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="biz-card p-3 p-xl-4 h-100 position-relative overflow-hidden">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Tổng doanh thu</span>
+                        <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.04em;">Doanh thu thuần</span>
                         <div class="p-2 rounded-3" style="background-color: var(--biz-primary-light); color: var(--biz-primary);">
                             <i class="bi bi-cash-stack fs-5"></i>
                         </div>
@@ -97,6 +97,12 @@
                     <div class="small text-muted d-flex align-items-center gap-1" id="kpiRevenueSub">
                         <i class="bi bi-calendar-check text-secondary"></i>
                         <span id="kpiRevenueDateText">Khoảng thời gian đã chọn</span>
+                    </div>
+                    <!-- Chi tiết minh bạch: Bán hàng & Đổi trả -->
+                    <div class="small mt-1 text-muted d-none" id="kpiRevenueBreakdown" style="font-size: 0.76rem;">
+                        <span>Bán: <span class="fw-semibold text-dark" id="kpiGrossRevenue">0 đ</span></span>
+                        <span class="mx-1">•</span>
+                        <span>Đổi/Trả: <span class="fw-semibold" id="kpiReturnAdjustment">0 đ</span></span>
                     </div>
                 </div>
             </div>
@@ -515,6 +521,21 @@
                         if (ordersEl) ordersEl.textContent = Number(data.totalOrders).toLocaleString('vi-VN');
                         if (aovEl) aovEl.textContent = formatVND(data.averageOrderValue);
                         if (lowStockEl) lowStockEl.textContent = Number(data.lowStockCount).toLocaleString('vi-VN');
+
+                        const breakdownEl = document.getElementById('kpiRevenueBreakdown');
+                        const grossEl = document.getElementById('kpiGrossRevenue');
+                        const adjEl = document.getElementById('kpiReturnAdjustment');
+                        if (breakdownEl && grossEl && adjEl) {
+                            if (data.netReturnAdjustment && Number(data.netReturnAdjustment) !== 0) {
+                                breakdownEl.classList.remove('d-none');
+                                grossEl.textContent = formatVND(data.grossRevenue || 0);
+                                const adjVal = Number(data.netReturnAdjustment);
+                                adjEl.textContent = (adjVal > 0 ? '+' : '') + formatVND(adjVal);
+                                adjEl.className = 'fw-semibold ' + (adjVal < 0 ? 'text-danger' : 'text-success');
+                            } else {
+                                breakdownEl.classList.add('d-none');
+                            }
+                        }
                     } else {
                         const err = await res.json();
                         showToast('Lỗi thống kê', err.message || 'Không thể lấy số liệu tổng quan!', false);
