@@ -17,4 +17,11 @@ public @interface Idempotent {
      * Tên header HTTP được kiểm tra. Mặc định là 'Idempotency-Key'
      */
     String headerName() default "Idempotency-Key";
+
+    /**
+     * Bắt buộc phải có header hay không.
+     * Nếu true và client không gửi header, hệ thống trả về HTTP 400 Bad Request.
+     * Mặc định là false để tương thích ngược.
+     */
+    boolean required() default false;
 }

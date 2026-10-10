@@ -46,8 +46,13 @@ public class IdempotencyAspect {
             key = request.getHeader("X-Idempotency-Key");
         }
 
-        // Nếu client không truyền header Idempotency-Key -> Giữ nguyên hành vi bình thường
+        // Nếu client không truyền header Idempotency-Key
         if (key == null || key.trim().isEmpty()) {
+            if (idempotent.required()) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "Header '" + idempotent.headerName() + "' là bắt buộc đối với thao tác này!");
+            }
             return joinPoint.proceed();
         }
 
@@ -106,12 +111,17 @@ public class IdempotencyAspect {
                 responseJson = objectMapper.writeValueAsString(result);
             }
 
-            // Ghi nhận hoàn thành và lưu trữ response
-            idempotencyService.completeExecution(trimmedKey, statusCode, responseJson);
+            // CHỈ lưu COMPLETED khi mã HTTP là thành công (2xx).
+            // Nếu là lỗi tạm thời (4xx, 5xx) -> Giải phóng key để client được phép retry!
+            if (statusCode >= 200 && statusCode < 300) {
+                idempotencyService.completeExecution(trimmedKey, statusCode, responseJson);
+            } else {
+                idempotencyService.failExecution(trimmedKey);
+            }
 
             return result;
         } catch (Throwable ex) {
-            // Khi có lỗi phát sinh trong nghiệp vụ, xóa hoặc cập nhật để client có thể retry
+            // Khi có lỗi phát sinh trong nghiệp vụ (exception), giải phóng key để client có thể retry
             idempotencyService.failExecution(trimmedKey);
             throw ex;
         }

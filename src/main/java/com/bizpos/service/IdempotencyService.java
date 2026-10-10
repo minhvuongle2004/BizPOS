@@ -21,4 +21,9 @@ public interface IdempotencyService {
      * Đánh dấu hoặc xóa phiên xử lý khi nghiệp vụ thất bại, cho phép client retry.
      */
     void failExecution(String idempotencyKey);
+
+    /**
+     * Dọn dẹp các bản ghi idempotency cũ hơn số ngày chỉ định.
+     */
+    int cleanupOldRecords(int daysToKeep);
 }

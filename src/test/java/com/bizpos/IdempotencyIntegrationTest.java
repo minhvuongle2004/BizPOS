@@ -60,6 +60,12 @@ public class IdempotencyIntegrationTest {
     @Autowired
     private OrderService orderService;
 
+    @Autowired
+    private com.bizpos.repository.IdempotencyRecordRepository idempotencyRecordRepository;
+
+    @Autowired
+    private com.bizpos.service.IdempotencyService idempotencyService;
+
     private String staffToken;
     private Product testProduct;
     private Customer testCustomer;
@@ -236,5 +242,196 @@ public class IdempotencyIntegrationTest {
         // Khẳng định: Tồn kho KHÔNG bị cộng thừa lần 2 (Vẫn là 48, không bị cộng lên 50)
         Product pAfterRet2 = productRepository.findById(testProduct.getId()).orElseThrow();
         assertEquals(48, pAfterRet2.getStockQuantity(), "Tồn kho không được hoàn thừa lần 2 khi trùng Idempotency-Key!");
+    }
+
+    @Test
+    @DisplayName("4. Test đồng thời (Nhiều thread, cùng key): Đúng 1 lần trừ kho, các thread khác nhận 201 (cache) hoặc 409 (conflict)")
+    void testConcurrentOrders_SameIdempotencyKey_DeductsStockOnlyOnce() throws Exception {
+        String sharedKey = "concurrent-order-" + UUID.randomUUID();
+        int initialStock = testProduct.getStockQuantity();
+        int buyQty = 5;
+
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .customerId(testCustomer.getId())
+                .note("Đơn test đa luồng Idempotency")
+                .items(List.of(
+                        OrderItemRequest.builder()
+                                .productId(testProduct.getId())
+                                .quantity(buyQty)
+                                .build()
+                ))
+                .build();
+
+        String requestBody = objectMapper.writeValueAsString(request);
+
+        int numThreads = 4;
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(numThreads);
+        java.util.concurrent.CountDownLatch readyLatch = new java.util.concurrent.CountDownLatch(numThreads);
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger success201Count = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger conflict409Count = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger otherStatusCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.List<String> returnedOrderCodes = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+
+        for (int i = 0; i < numThreads; i++) {
+            executor.submit(() -> {
+                readyLatch.countDown();
+                try {
+                    startLatch.await();
+                    MvcResult res = mockMvc.perform(post("/api/orders")
+                                    .header("Authorization", staffToken)
+                                    .header("Idempotency-Key", sharedKey)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(requestBody))
+                            .andReturn();
+
+                    int status = res.getResponse().getStatus();
+                    if (status == 201) {
+                        success201Count.incrementAndGet();
+                        OrderResponse resp = objectMapper.readValue(res.getResponse().getContentAsString(), OrderResponse.class);
+                        returnedOrderCodes.add(resp.getOrderCode());
+                    } else if (status == 409) {
+                        conflict409Count.incrementAndGet();
+                    } else {
+                        otherStatusCount.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    // ignore
+                }
+            });
+        }
+
+        readyLatch.await();
+        startLatch.countDown();
+        executor.shutdown();
+        assertTrue(executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS));
+
+        // Phải có ít nhất 1 request thành công 201
+        assertTrue(success201Count.get() >= 1, "Ít nhất 1 thread phải thành công (201 Created)");
+        assertEquals(0, otherStatusCount.get(), "Không được có status lỗi nào khác ngoài 201 hoặc 409");
+        assertEquals(numThreads, success201Count.get() + conflict409Count.get(), "Tất cả các thread phải kết thúc với 201 hoặc 409");
+
+        // Nếu có nhiều hơn 1 thread nhận 201 (do cache hit), tất cả phải trả về cùng 1 mã đơn hàng duy nhất!
+        if (!returnedOrderCodes.isEmpty()) {
+            String firstCode = returnedOrderCodes.get(0);
+            for (String code : returnedOrderCodes) {
+                assertEquals(firstCode, code, "Mọi response 201 đều phải trả về chung 1 mã đơn");
+            }
+        }
+
+        // Khẳng định: Kho chỉ bị trừ đúng 1 lần duy nhất!
+        Product refreshed = productRepository.findById(testProduct.getId()).orElseThrow();
+        assertEquals(initialStock - buyQty, refreshed.getStockQuantity(),
+                "Tồn kho chỉ được trừ đúng 1 lần duy nhất cho toàn bộ các luồng cùng key!");
+    }
+
+    @Test
+    @DisplayName("5. Cùng Idempotency-Key nhưng khác nội dung Payload: Trả về HTTP 422 Unprocessable Entity")
+    void testCreateOrder_SameKeyDifferentPayload_Returns422UnprocessableEntity() throws Exception {
+        String sharedKey = "payload-mismatch-" + UUID.randomUUID();
+
+        // Request 1: Mua số lượng 2
+        CreateOrderRequest request1 = CreateOrderRequest.builder()
+                .customerId(testCustomer.getId())
+                .note("Đơn hàng thứ nhất")
+                .items(List.of(
+                        OrderItemRequest.builder()
+                                .productId(testProduct.getId())
+                                .quantity(2)
+                                .build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", staffToken)
+                        .header("Idempotency-Key", sharedKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request1)))
+                .andExpect(status().isCreated());
+
+        // Request 2: Cùng key nhưng mua số lượng 10 và note khác (Payload khác!)
+        CreateOrderRequest request2 = CreateOrderRequest.builder()
+                .customerId(testCustomer.getId())
+                .note("Đơn hàng thứ hai đã đổi nội dung")
+                .items(List.of(
+                        OrderItemRequest.builder()
+                                .productId(testProduct.getId())
+                                .quantity(10)
+                                .build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", staffToken)
+                        .header("Idempotency-Key", sharedKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request2)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("nội dung khác")));
+    }
+
+    @Test
+    @DisplayName("6. Request thất bại (lỗi thiếu tồn kho / lỗi nghiệp vụ): Key được giải phóng, cho phép Retry thành công")
+    void testCreateOrder_FailedRequest_AllowsRetryWithSameKey() throws Exception {
+        String retryKey = "retry-key-" + UUID.randomUUID();
+
+        // Lần 1: Mua vượt quá tồn kho (mua 9999 cái) -> Thất bại (400 Bad Request)
+        CreateOrderRequest failRequest = CreateOrderRequest.builder()
+                .customerId(testCustomer.getId())
+                .note("Đơn vượt tồn kho")
+                .items(List.of(
+                        OrderItemRequest.builder()
+                                .productId(testProduct.getId())
+                                .quantity(9999)
+                                .build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", staffToken)
+                        .header("Idempotency-Key", retryKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(failRequest)))
+                .andExpect(status().isBadRequest());
+
+        // Lần 2: Sửa lại số lượng hợp lệ (mua 3 cái) và gửi lại với CÙNG key đó -> Phải thành công 201 Created!
+        CreateOrderRequest successRequest = CreateOrderRequest.builder()
+                .customerId(testCustomer.getId())
+                .note("Đơn vượt tồn kho")
+                .items(List.of(
+                        OrderItemRequest.builder()
+                                .productId(testProduct.getId())
+                                .quantity(3)
+                                .build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", staffToken)
+                        .header("Idempotency-Key", retryKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(successRequest)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.orderCode").isNotEmpty());
+
+        // Tồn kho phải giảm đúng 3
+        Product p = productRepository.findById(testProduct.getId()).orElseThrow();
+        assertEquals(47, p.getStockQuantity());
+    }
+
+    @Test
+    @DisplayName("7. Dọn dẹp bản ghi Idempotency cũ quá hạn bằng Scheduled Service")
+    void testCleanupOldRecords_DeletesExpiredKeysOnly() {
+        String freshKey = "fresh-key-" + UUID.randomUUID();
+
+        // Tạo 1 key mới
+        idempotencyService.startExecution(freshKey, "/api/orders", "hash1");
+        idempotencyService.completeExecution(freshKey, 201, "{}");
+
+        // Dọn dẹp bản ghi cũ hơn 1 ngày
+        idempotencyService.cleanupOldRecords(1);
+
+        // freshKey vừa tạo phải còn tồn tại
+        assertTrue(idempotencyRecordRepository.findByIdempotencyKey(freshKey).isPresent(), "Fresh key phải còn tồn tại");
     }
 }

@@ -94,6 +94,19 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Nhóm 2a1: Xung đột nội dung Idempotency Key (cùng key nhưng khác payload) -> 422 Unprocessable Entity
+     */
+    @ExceptionHandler(IdempotencyPayloadMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleIdempotencyPayloadMismatch(IdempotencyPayloadMismatchException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+    }
+
+    /**
      * Nhóm 2b: Xung đột dữ liệu / ràng buộc nghiệp vụ (Sản phẩm trong đơn hàng, danh mục có sản phẩm liên kết) -> 409 Conflict
      */
     @ExceptionHandler({

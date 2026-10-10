@@ -36,4 +36,7 @@ public class IdempotencyRecord extends BaseEntity {
 
     @Column(name = "response_body", columnDefinition = "LONGTEXT")
     private String responseBody;
+
+    @Column(name = "locked_at")
+    private java.time.LocalDateTime lockedAt;
 }
