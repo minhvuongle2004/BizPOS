@@ -139,16 +139,61 @@
 
                     <!-- Phần Khách hàng & Ghi chú -->
                     <div class="p-3 border-top bg-light bg-opacity-25">
-                        <!-- Chọn Khách hàng -->
-                        <div class="mb-3">
+                        <!-- Chọn Khách hàng (Tìm theo SĐT hoặc thêm mới trực tiếp) -->
+                        <div class="mb-3 position-relative">
                             <label class="form-label small fw-semibold text-dark d-flex align-items-center justify-content-between mb-1">
                                 <span><i class="bi bi-person-fill text-muted me-1"></i>Khách hàng</span>
-                                <a href="/customers" target="_blank" class="text-decoration-none small text-danger" title="Mở danh sách khách hàng">+ Thêm KH</a>
+                                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 small text-danger fw-semibold" onclick="openQuickAddCustomerModal('')">
+                                    <i class="bi bi-person-plus-fill me-1"></i>+ Thêm mới KH
+                                </button>
                             </label>
-                            <select id="posCustomerSelect" class="biz-input py-2">
-                                <option value="">Khách vãng lai (Mặc định)</option>
-                                <!-- Danh sách khách hàng nạp động từ /api/customers -->
-                            </select>
+
+                            <!-- Giữ input hidden để đồng bộ ID khách hàng cho luồng checkout -->
+                            <input type="hidden" id="posCustomerSelect" value="">
+
+                            <!-- Trạng thái 1: Ô tìm kiếm SĐT / Tên (khi chưa chọn khách) -->
+                            <div id="customerSearchContainer" class="position-relative">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-muted">
+                                        <i class="bi bi-telephone-fill small"></i>
+                                    </span>
+                                    <input type="text" id="posCustomerPhoneInput" class="biz-input border-start-0 py-2 ps-1" 
+                                           placeholder="Nhập SĐT hoặc Tên khách (VD: 0987...)" 
+                                           autocomplete="off"
+                                           oninput="handleCustomerPhoneSearch(this.value)"
+                                           onfocus="handleCustomerPhoneFocus()"
+                                           onkeydown="if(event.key === 'Enter') handleCustomerPhoneEnter(event)">
+                                    <button type="button" id="btnClearCustomerSearch" class="btn btn-outline-secondary d-none border-start-0" onclick="clearCustomerSearch()" title="Xóa">
+                                        <i class="bi bi-x-circle-fill"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Dropdown danh sách gợi ý tự động (Autocomplete) -->
+                                <div id="customerSearchResultsDropdown" class="position-absolute start-0 end-0 bg-white border rounded-3 shadow-lg p-0 mt-1 d-none" 
+                                     style="z-index: 1050; max-height: 250px; overflow-y: auto;">
+                                    <!-- Nạp động -->
+                                </div>
+                            </div>
+
+                            <!-- Trạng thái 2: Thẻ hiển thị khách hàng đã chọn -->
+                            <div id="customerSelectedCard" class="p-2 px-3 bg-white border border-primary-subtle rounded-3 d-flex align-items-center justify-content-between d-none shadow-sm">
+                                <div class="d-flex align-items-center gap-2 overflow-hidden">
+                                    <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; min-width: 36px;">
+                                        <i class="bi bi-person-check-fill fs-5"></i>
+                                    </div>
+                                    <div class="overflow-hidden">
+                                        <div class="fw-bold text-dark text-truncate small" id="selectedCustomerNameDisplay">Nguyễn Văn A</div>
+                                        <div class="small text-muted d-flex align-items-center gap-1">
+                                            <i class="bi bi-telephone-fill" style="font-size: 10px;"></i>
+                                            <span id="selectedCustomerPhoneDisplay">0987654321</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2 small d-flex align-items-center gap-1" onclick="removeSelectedCustomer()" title="Bỏ chọn khách">
+                                    <i class="bi bi-x-lg"></i>
+                                    <span class="d-none d-sm-inline">Bỏ chọn</span>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Ghi chú đơn hàng -->
@@ -199,6 +244,75 @@
                             <button type="button" class="btn btn-biz-danger flex-grow-1" onclick="executeClearCart()">Xóa bỏ</button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: THÊM NHANH KHÁCH HÀNG (QUICK ADD CUSTOMER) ================= -->
+        <div class="modal fade" id="quickAddCustomerModal" tabindex="-1" data-bs-backdrop="static" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-primary bg-opacity-10 border-bottom border-primary-subtle py-3 px-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-person-plus-fill text-primary fs-4"></i>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark mb-0">Thêm khách hàng mới</h5>
+                                <span class="small text-muted">Lưu thông tin khách hàng và tự động chọn vào đơn</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <form id="quickAddCustomerForm" onsubmit="handleQuickCreateCustomer(event)">
+                        <div class="modal-body p-4">
+                            <!-- Số điện thoại -->
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-dark mb-1">
+                                    <i class="bi bi-telephone text-primary me-1"></i>Số điện thoại
+                                </label>
+                                <input type="text" id="quickCustPhone" class="biz-input py-2" maxlength="20" 
+                                       placeholder="VD: 0987654321..." autocomplete="off">
+                                <div class="form-text small text-muted">SĐT giúp nhận diện nhanh khách quen và tích điểm.</div>
+                            </div>
+
+                            <!-- Họ và tên (Bắt buộc) -->
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-dark mb-1">
+                                    <i class="bi bi-person text-primary me-1"></i>Họ và tên <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" id="quickCustFullName" class="biz-input py-2" required maxlength="150" 
+                                       placeholder="VD: Nguyễn Văn A..." autocomplete="off">
+                            </div>
+
+                            <!-- Địa chỉ -->
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-dark mb-1">
+                                    <i class="bi bi-geo-alt text-muted me-1"></i>Địa chỉ
+                                </label>
+                                <input type="text" id="quickCustAddress" class="biz-input py-2" maxlength="255" 
+                                       placeholder="VD: 123 Lê Lợi, Q.1, TP.HCM (tùy chọn)...">
+                            </div>
+
+                            <!-- Email -->
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold text-dark mb-1">
+                                    <i class="bi bi-envelope text-muted me-1"></i>Email
+                                </label>
+                                <input type="email" id="quickCustEmail" class="biz-input py-2" maxlength="150" 
+                                       placeholder="VD: khachhang@gmail.com (tùy chọn)...">
+                            </div>
+                        </div>
+
+                        <div class="modal-footer border-top py-3 px-4 bg-light bg-opacity-50 justify-content-between">
+                            <button type="button" class="btn btn-biz-outline" data-bs-dismiss="modal">
+                                Hủy bỏ
+                            </button>
+                            <button type="submit" id="btnSaveQuickCustomer" class="btn btn-biz-primary fw-bold d-flex align-items-center gap-2">
+                                <i class="bi bi-check2-circle fs-5"></i>
+                                <span id="btnSaveQuickCustomerText">LƯU & CHỌN VÀO ĐƠN</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -884,8 +998,14 @@
             let clearCartModalInstance = null;
             let orderSuccessModalInstance = null;
             let checkoutPaymentModalInstance = null;
+            let quickAddCustomerModalInstance = null;
             let returnModalInstance = null;
             let returnSuccessModalInstance = null;
+
+            // State khách hàng trên POS
+            let allCustomers = [];
+            let selectedCustomer = null;
+            let customerSearchDebounceTimer = null;
 
             // State thanh toán đơn hàng
             let currentPaymentMethod = 'CASH'; // 'CASH' hoặc 'BANK_TRANSFER'
@@ -931,6 +1051,18 @@
                     }
                 }
                 return checkoutPaymentModalInstance;
+            }
+
+            function getQuickAddCustomerModal() {
+                if (!quickAddCustomerModalInstance) {
+                    const el = document.getElementById('quickAddCustomerModal');
+                    if (el && window.bootstrap) {
+                        quickAddCustomerModalInstance = (bootstrap.Modal.getOrCreateInstance) 
+                            ? bootstrap.Modal.getOrCreateInstance(el) 
+                            : new bootstrap.Modal(el);
+                    }
+                }
+                return quickAddCustomerModalInstance;
             }
 
             function getOrderSuccessModal() {
@@ -1277,7 +1409,7 @@
             // ================= 6. NẠP DANH SÁCH KHÁCH HÀNG TỪ /api/customers =================
             async function loadCustomers() {
                 try {
-                    const response = await fetch('/api/customers?page=0&size=100', {
+                    const response = await fetch('/api/customers?page=0&size=500', {
                         headers: getAuthHeaders()
                     });
 
@@ -1285,22 +1417,295 @@
 
                     if (response.ok) {
                         const data = await response.json();
-                        const customers = data.content || [];
-                        const select = document.getElementById('posCustomerSelect');
-                        if (!select) return;
-
-                        select.innerHTML = '<option value="">Khách vãng lai (Mặc định)</option>';
-
-                        customers.forEach(c => {
-                            const opt = document.createElement('option');
-                            opt.value = c.id;
-                            const phoneStr = c.phone ? ` - ${c.phone}` : '';
-                            opt.textContent = `${c.fullName}${phoneStr}`;
-                            select.appendChild(opt);
-                        });
+                        allCustomers = data.content || [];
                     }
                 } catch (err) {
                     console.error('Lỗi nạp khách hàng:', err);
+                }
+            }
+
+            // ================= 6.1. TÌM KIẾM SĐT VÀ THÊM NHANH KHÁCH HÀNG TẠI POS =================
+            function handleCustomerPhoneSearch(keyword) {
+                clearTimeout(customerSearchDebounceTimer);
+                const clearBtn = document.getElementById('btnClearCustomerSearch');
+                if (clearBtn) {
+                    if (keyword && keyword.trim().length > 0) {
+                        clearBtn.classList.remove('d-none');
+                    } else {
+                        clearBtn.classList.add('d-none');
+                    }
+                }
+
+                customerSearchDebounceTimer = setTimeout(() => {
+                    executeCustomerSearch(keyword);
+                }, 150);
+            }
+
+            function clearCustomerSearch() {
+                const input = document.getElementById('posCustomerPhoneInput');
+                if (input) input.value = '';
+                const clearBtn = document.getElementById('btnClearCustomerSearch');
+                if (clearBtn) clearBtn.classList.add('d-none');
+                const dropdown = document.getElementById('customerSearchResultsDropdown');
+                if (dropdown) dropdown.classList.add('d-none');
+            }
+
+            function handleCustomerPhoneFocus() {
+                const input = document.getElementById('posCustomerPhoneInput');
+                const val = input ? input.value.trim() : '';
+                if (val.length > 0) {
+                    executeCustomerSearch(val);
+                }
+            }
+
+            function handleCustomerPhoneEnter(e) {
+                if (e) e.preventDefault();
+                const input = document.getElementById('posCustomerPhoneInput');
+                const val = input ? input.value.trim() : '';
+                if (!val) return;
+
+                const clean = val.toLowerCase();
+                const matched = allCustomers.filter(c => 
+                    (c.phone && c.phone.includes(clean)) || 
+                    (c.fullName && c.fullName.toLowerCase().includes(clean))
+                );
+
+                if (matched.length > 0) {
+                    selectCustomer(matched[0]);
+                } else {
+                    openQuickAddCustomerModal(val);
+                }
+            }
+
+            async function executeCustomerSearch(keyword) {
+                const dropdown = document.getElementById('customerSearchResultsDropdown');
+                if (!dropdown) return;
+
+                const clean = (keyword || '').trim().toLowerCase();
+                if (!clean) {
+                    dropdown.classList.add('d-none');
+                    return;
+                }
+
+                // Lọc trong danh sách cache allCustomers
+                let matches = allCustomers.filter(c => 
+                    (c.phone && c.phone.includes(clean)) || 
+                    (c.fullName && c.fullName.toLowerCase().includes(clean))
+                );
+
+                // Nếu không có trong cache, gọi API backend
+                if (matches.length === 0) {
+                    try {
+                        const res = await fetch('/api/customers?page=0&size=10&keyword=' + encodeURIComponent(clean), {
+                            headers: getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            const serverItems = data.content || [];
+                            serverItems.forEach(si => {
+                                if (!allCustomers.some(ac => ac.id === si.id)) {
+                                    allCustomers.push(si);
+                                }
+                            });
+                            matches = serverItems;
+                        }
+                    } catch (e) {
+                        console.warn('Lỗi tìm kiếm khách hàng từ backend:', e);
+                    }
+                }
+
+                dropdown.innerHTML = '';
+                dropdown.classList.remove('d-none');
+
+                if (matches.length > 0) {
+                    matches.slice(0, 8).forEach(c => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'p-2 px-3 border-bottom d-flex justify-content-between align-items-center';
+                        itemEl.style.cursor = 'pointer';
+                        itemEl.onmouseenter = () => itemEl.style.backgroundColor = '#f8f9fa';
+                        itemEl.onmouseleave = () => itemEl.style.backgroundColor = '#ffffff';
+                        itemEl.onclick = () => selectCustomer(c);
+
+                        const phoneText = c.phone ? c.phone : 'Chưa có SĐT';
+                        itemEl.innerHTML = `
+                            <div>
+                                <div class="fw-bold text-dark small">${c.fullName}</div>
+                                <div class="small text-muted"><i class="bi bi-telephone-fill me-1" style="font-size:10px;"></i>${phoneText}</div>
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle small">Chọn</span>
+                        `;
+                        dropdown.appendChild(itemEl);
+                    });
+
+                    // Nút footer thêm khách mới khác
+                    const footerEl = document.createElement('div');
+                    footerEl.className = 'p-2 text-center bg-light border-top';
+                    footerEl.innerHTML = `
+                        <button type="button" class="btn btn-sm btn-link text-decoration-none text-danger small p-0 fw-semibold" onclick="openQuickAddCustomerModal('${keyword}')">
+                            <i class="bi bi-person-plus-fill me-1"></i>+ Thêm mới khách hàng khác
+                        </button>
+                    `;
+                    dropdown.appendChild(footerEl);
+                } else {
+                    // Không tìm thấy khách hàng nào với keyword
+                    const noResultEl = document.createElement('div');
+                    noResultEl.className = 'p-3 text-center';
+                    noResultEl.innerHTML = `
+                        <div class="small text-muted mb-2">Chưa có khách hàng: <strong class="text-dark">"${keyword}"</strong></div>
+                        <button type="button" class="btn btn-sm btn-biz-primary w-100 fw-bold py-2" onclick="openQuickAddCustomerModal('${keyword}')">
+                            <i class="bi bi-person-plus-fill me-1"></i>+ THÊM MỚI KHÁCH VỚI SĐT NÀY
+                        </button>
+                    `;
+                    dropdown.appendChild(noResultEl);
+                }
+            }
+
+            function selectCustomer(customer) {
+                selectedCustomer = customer;
+
+                const hiddenSelect = document.getElementById('posCustomerSelect');
+                if (hiddenSelect) hiddenSelect.value = customer ? customer.id : '';
+
+                const searchContainer = document.getElementById('customerSearchContainer');
+                const selectedCard = document.getElementById('customerSelectedCard');
+                const nameDisplay = document.getElementById('selectedCustomerNameDisplay');
+                const phoneDisplay = document.getElementById('selectedCustomerPhoneDisplay');
+                const dropdown = document.getElementById('customerSearchResultsDropdown');
+
+                if (dropdown) dropdown.classList.add('d-none');
+
+                if (customer) {
+                    if (nameDisplay) nameDisplay.textContent = customer.fullName;
+                    if (phoneDisplay) phoneDisplay.textContent = customer.phone || 'Chưa có SĐT';
+                    if (searchContainer) searchContainer.classList.add('d-none');
+                    if (selectedCard) selectedCard.classList.remove('d-none');
+                } else {
+                    removeSelectedCustomer();
+                }
+            }
+
+            function removeSelectedCustomer() {
+                selectedCustomer = null;
+                const hiddenSelect = document.getElementById('posCustomerSelect');
+                if (hiddenSelect) hiddenSelect.value = '';
+
+                const searchContainer = document.getElementById('customerSearchContainer');
+                const selectedCard = document.getElementById('customerSelectedCard');
+                const input = document.getElementById('posCustomerPhoneInput');
+                const clearBtn = document.getElementById('btnClearCustomerSearch');
+                const dropdown = document.getElementById('customerSearchResultsDropdown');
+
+                if (selectedCard) selectedCard.classList.add('d-none');
+                if (searchContainer) searchContainer.classList.remove('d-none');
+                if (input) input.value = '';
+                if (clearBtn) clearBtn.classList.add('d-none');
+                if (dropdown) dropdown.classList.add('d-none');
+            }
+
+            function openQuickAddCustomerModal(prefillVal) {
+                const modal = getQuickAddCustomerModal();
+                const phoneInput = document.getElementById('quickCustPhone');
+                const nameInput = document.getElementById('quickCustFullName');
+                const addressInput = document.getElementById('quickCustAddress');
+                const emailInput = document.getElementById('quickCustEmail');
+                const dropdown = document.getElementById('customerSearchResultsDropdown');
+
+                if (dropdown) dropdown.classList.add('d-none');
+
+                const val = (prefillVal || '').trim();
+                if (phoneInput && nameInput) {
+                    const isDigits = /^[0-9+]+$/.test(val);
+                    if (isDigits && val) {
+                        phoneInput.value = val;
+                        nameInput.value = '';
+                    } else if (val) {
+                        phoneInput.value = '';
+                        nameInput.value = val;
+                    } else {
+                        phoneInput.value = '';
+                        nameInput.value = '';
+                    }
+                }
+                if (addressInput) addressInput.value = '';
+                if (emailInput) emailInput.value = '';
+
+                if (modal) {
+                    modal.show();
+                    setTimeout(() => {
+                        if (nameInput && !nameInput.value) nameInput.focus();
+                        else if (phoneInput && !phoneInput.value) phoneInput.focus();
+                    }, 350);
+                }
+            }
+
+            async function handleQuickCreateCustomer(e) {
+                if (e) e.preventDefault();
+
+                const phoneInput = document.getElementById('quickCustPhone');
+                const nameInput = document.getElementById('quickCustFullName');
+                const addressInput = document.getElementById('quickCustAddress');
+                const emailInput = document.getElementById('quickCustEmail');
+
+                const fullName = nameInput ? nameInput.value.trim() : '';
+                const phone = phoneInput ? phoneInput.value.trim() : '';
+                const address = addressInput ? addressInput.value.trim() : '';
+                const email = emailInput ? emailInput.value.trim() : '';
+
+                if (!fullName) {
+                    showToast('Lỗi', 'Vui lòng nhập họ và tên khách hàng!', false);
+                    if (nameInput) nameInput.focus();
+                    return;
+                }
+
+                const btn = document.getElementById('btnSaveQuickCustomer');
+                const btnText = document.getElementById('btnSaveQuickCustomerText');
+                if (btn) btn.disabled = true;
+                if (btnText) btnText.textContent = 'ĐANG LƯU...';
+
+                try {
+                    const payload = {
+                        fullName: fullName,
+                        phone: phone || null,
+                        address: address || null,
+                        email: email || null
+                    };
+
+                    const response = await fetch('/api/customers', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (checkAuthError(response.status)) {
+                        if (btn) btn.disabled = false;
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    if (response.status === 201 || response.ok) {
+                        // Thêm vào cache
+                        allCustomers.unshift(data);
+
+                        // Đóng modal
+                        const modal = getQuickAddCustomerModal();
+                        if (modal) modal.hide();
+
+                        // Tự động chọn luôn khách hàng này vào đơn hàng hiện tại!
+                        selectCustomer(data);
+
+                        showToast('Thành công', `Đã thêm khách hàng [${data.fullName}] và chọn vào đơn!`, true);
+                    } else if (response.status === 409 || response.status === 400) {
+                        showToast('Lỗi (400)', data.message || 'Số điện thoại hoặc Email đã tồn tại!', false);
+                    } else {
+                        showToast('Lỗi (500)', data.message || 'Không thể tạo khách hàng!', false);
+                    }
+                } catch (err) {
+                    console.error('Lỗi thêm nhanh khách hàng:', err);
+                    showToast('Lỗi kết nối', 'Không thể kết nối đến máy chủ backend!', false);
+                } finally {
+                    if (btn) btn.disabled = false;
+                    if (btnText) btnText.textContent = 'LƯU & CHỌN VÀO ĐƠN';
                 }
             }
 
@@ -1897,6 +2302,7 @@
                         renderCart();
                         if (noteInput) noteInput.value = '';
                         if (customerSelect) customerSelect.value = '';
+                        removeSelectedCustomer();
 
                         // Tải lại sản phẩm
                         await loadProducts();
@@ -1996,6 +2402,7 @@
                 const customerSelect = document.getElementById('posCustomerSelect');
                 if (noteInput) noteInput.value = '';
                 if (customerSelect) customerSelect.value = '';
+                removeSelectedCustomer();
                 const searchInput = document.getElementById('posSearchInput');
                 if (searchInput) searchInput.focus();
                 await loadProducts();
@@ -3012,6 +3419,27 @@
             window.setCashFixed = setCashFixed;
             window.copyQrField = copyQrField;
             window.confirmExecuteOrder = confirmExecuteOrder;
+
+            // Nghiệp vụ Khách hàng tại POS
+            window.handleCustomerPhoneSearch = handleCustomerPhoneSearch;
+            window.clearCustomerSearch = clearCustomerSearch;
+            window.handleCustomerPhoneFocus = handleCustomerPhoneFocus;
+            window.handleCustomerPhoneEnter = handleCustomerPhoneEnter;
+            window.selectCustomer = selectCustomer;
+            window.removeSelectedCustomer = removeSelectedCustomer;
+            window.openQuickAddCustomerModal = openQuickAddCustomerModal;
+            window.handleQuickCreateCustomer = handleQuickCreateCustomer;
+
+            // Đóng autocomplete khi click ngoài vùng
+            document.addEventListener('click', function(e) {
+                const container = document.getElementById('customerSearchContainer');
+                const dropdown = document.getElementById('customerSearchResultsDropdown');
+                if (dropdown && !dropdown.classList.contains('d-none')) {
+                    if (container && !container.contains(e.target)) {
+                        dropdown.classList.add('d-none');
+                    }
+                }
+            });
 
             // Khởi chạy khi tải trang
             async function initPos() {
